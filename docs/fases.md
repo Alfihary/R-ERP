@@ -2,8 +2,8 @@
 
 ## Estado del documento
 
-- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0`.
-- Fase autorizada y en revisión: `SECURITY-0`.
+- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0`.
+- Fase autorizada y en revisión: `DB-CORE-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -262,23 +262,37 @@ Commit recomendado: `security: establish web security primitives`.
 
 ### `DB-CORE-0`
 
-Objetivo futuro:
+Objetivo:
 
-- Crear usuarios, perfiles, roles, permisos, relaciones y auditoría base.
+- Crear usuarios, roles, permisos, relaciones y auditoría base sin implementar
+  autenticación.
 
-Tablas previstas:
+Tablas de negocio:
 
 - `usuarios`
-- `usuario_perfiles`
 - `roles`
 - `permisos`
 - `usuario_roles`
 - `rol_permisos`
-- `auditoria_logs`
+- `auditoria_eventos`
 
-Migración, seeds y DB-TEST: obligatorios y aún no autorizados.
+Tabla técnica:
 
-Servicios relacionados: Auth, Permission y Audit a nivel de diseño.
+- `schema_migrations`
+
+Artefactos:
+
+- Migración PHP `db_core_0_001_create_core_identity_tables`.
+- Seed idempotente del rol `ADMIN`.
+- Runner CLI con confirmación doble de la base.
+- DB-TEST transaccional con casos válidos e inválidos.
+
+La migración, el seed y DB-TEST-CORE se ejecutaron correctamente el 2026-06-29
+sobre `r_erp_db_core_0_test` con MySQL 8.0.38. El esquema y el rol ADMIN se
+conservaron; los datos transitorios se revirtieron.
+
+Servicios relacionados: conexión PDO y runner de migraciones. Auth, Permission
+y Audit permanecen a nivel de diseño.
 
 Seguridad:
 
@@ -621,17 +635,17 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `SECURITY-0`.
+- `main` contiene únicamente el diff revisable de `DB-CORE-0`.
 - `/` y `/health` continúan respondiendo localmente.
-- La cookie de sesión usa `HttpOnly`, `SameSite` y `Secure` en producción.
-- CSRF acepta un token válido y rechaza tokens ausentes o inválidos.
-- Las respuestas incluyen los headers de seguridad aprobados.
-- Producción no muestra trazas y las vistas escapan contenido dinámico.
+- El runner rechaza producción y bases no confirmadas.
+- La migración crea solo las tablas aprobadas con InnoDB y `utf8mb4`.
+- El seed crea `ADMIN`, cero usuarios y cero permisos funcionales.
+- DB-TEST prueba unicidad, FKs, checks, relaciones y auditoría.
+- Los datos de DB-TEST se revierten en transacción.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
-- No existen migraciones, seeds o archivos SQL nuevos.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a `DB-CORE-0`, AUTH-0 o módulos funcionales.
+- No se ha avanzado a `DB-SCOPE-1`, AUTH-0 o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -645,16 +659,15 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Cierre formal de `SECURITY-0`.
-- Herramientas y runners.
-- Todas las fases de seguridad, BD y módulos.
+- Cierre formal de `DB-CORE-0`.
+- Fases posteriores de BD, autenticación y módulos.
 - Criterios específicos de cada caso de uso.
 
 ## Fuera de alcance de esta fase
 
 - Ejecutar cualquiera de las fases futuras.
-- Crear código funcional.
-- Crear o modificar la BD.
-- Hacer QA de módulos inexistentes.
+- Crear login, dashboard o módulos funcionales.
+- Crear empresas, almacenes o alcance.
+- Ejecutar contra producción.
 - Hacer deploy.
 - Integrar tickets, inventario, correo u otros módulos.

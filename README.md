@@ -6,14 +6,15 @@ auditoría y folios.
 
 ## Estado actual
 
-Fase cerrada: `CONFIG-0`.
-Fase autorizada y en revisión: `SECURITY-0`.
+Fases cerradas: `CONFIG-0 + SECURITY-0`.
+Fase autorizada y en revisión: `DB-CORE-0`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
 SECURITY-0 agrega sesión técnica, CSRF central, escape HTML, errores seguros y
-headers HTTP. Todavía no existen login, usuarios, autorización, conexión de
-base de datos, migraciones, seeds ni módulos de negocio.
+headers HTTP. DB-CORE-0 prepara la conexión PDO, una migración de identidad,
+el rol estructural ADMIN y DB-TEST-CORE. La base no se usa desde rutas públicas
+y todavía no existe login, autorización funcional ni módulos de negocio.
 
 ## Arranque local
 
@@ -35,6 +36,21 @@ el archivo real permanece ignorado por Git.
 La protección CSRF se aplica centralmente a `POST`, `PUT`, `PATCH` y `DELETE`.
 Los formularios futuros podrán generar el campo oculto mediante
 `csrf_field($csrf)`. Las vistas deben escapar texto dinámico con `e($value)`.
+
+## DB-CORE-0
+
+La configuración de base de datos usa únicamente variables `APP_DB_*` y no
+incluye credenciales reales. El runner es exclusivo de CLI y exige que
+`APP_DB_NAME`, `--database` y `--confirm-database` coincidan.
+
+```powershell
+php database/console.php migrate --database=<db-test> --confirm-database=<db-test>
+php database/console.php seed --database=<db-test> --confirm-database=<db-test>
+php database/console.php db:test --database=<db-test> --confirm-database=<db-test>
+```
+
+El runner no crea bases de datos y rechaza `APP_ENV=production`. El diseño,
+rollback y criterios de aceptación están en `docs/db-core-0.md`.
 
 ## Decisiones base
 
@@ -86,18 +102,14 @@ Los formularios futuros podrán generar el campo oculto mediante
 
 ## Pendiente de aprobar
 
-- Cierre de `SECURITY-0`.
-- `DB-CORE-0`: esquema inicial de identidad y autorización.
+- Cierre formal de `DB-CORE-0` después de DB-TEST aprobado.
 - `AUTH-0`: login real después de aprobar sus prerrequisitos.
-- `SECURITY-0`: primitivas de seguridad y middlewares.
-- `DB-CORE-0`: primera migración y sus seeds.
-- `DB-TEST-CORE`: ejecución de pruebas sobre una base exclusiva.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
 ## Fuera de alcance de esta fase
 
-- SQL ejecutable, migraciones y seeds.
-- Login, sesiones, CSRF, permisos y servicios funcionales.
+- Login, autenticación, PermissionService y UserScopeService.
+- Empresas, almacenes y alcance operativo.
 - Productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.

@@ -2,10 +2,11 @@
 
 ## Estado del documento
 
-- Fase: `DOCS-0`.
-- Estado: diseño conceptual; no ejecutable.
+- Fase base: `DOCS-0`.
+- Estado actual: `DB-CORE-0` implementada con DB-TEST aprobado.
 - Motor objetivo: MySQL con InnoDB.
-- Esta fase no crea migraciones, seeds, tablas ni SQL.
+- El alcance ejecutable actual se limita a identidad, relaciones y auditoría
+  descritas en `docs/db-core-0.md`.
 
 ## Objetivo
 
@@ -84,6 +85,8 @@ Propósito: identidad, autenticación y estado de cuenta.
 Campos conceptuales:
 
 - `id`: entero positivo.
+- `username`: identificador obligatorio y único para login futuro; normalizado
+  en minúsculas, longitud de 3 a 50 y limitado a `a-z`, `0-9`, `.`, `_` y `-`.
 - `email`: cadena normalizada y única.
 - `password_hash`: cadena de longitud suficiente.
 - `estado`: enumeración controlada o catálogo aprobado.
@@ -451,24 +454,17 @@ revertir estructura sea peligroso, se documentará una corrección hacia adelant
 
 ## Pendiente de aprobar
 
-- Versión exacta de MySQL en local y AwardSpace.
-- Collation definitiva.
-- Estrategia de IDs.
 - Precisión de importes y cantidades.
 - Zona horaria de almacenamiento.
-- Runner y formato de migraciones.
-- Runner y formato de seeds.
-- Esquema exacto de `DB-CORE-0`.
 - Representación del alcance global.
 - Política detallada de eliminación lógica.
 - Retención y particionado futuro de auditoría.
 
 ## Fuera de alcance de esta fase
 
-- Crear o conectar una base de datos.
-- Crear migraciones, seeds o SQL.
-- Ejecutar DB-TEST.
 - Definir todos los campos de módulos operativos.
 - Importar datos de otro ERP.
-- Crear usuarios, roles, permisos o empresas.
+- Crear empresas, almacenes o alcance.
+- Crear usuario administrador o permisos funcionales.
+- Implementar login, AuthService, PermissionService o AuditService.
 - Modificar producción.
