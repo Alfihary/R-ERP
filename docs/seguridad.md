@@ -3,10 +3,10 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `SECURITY-0` cerrada y `AUTH-0` en revisión.
+- Estado actual: `AUTH-0` cerrada y `RBAC-0` en revisión.
 - Alcance: sesión segura, CSRF, escape HTML, middleware, errores, headers,
   login por email/username, logout y ruta privada mínima.
-- Permisos funcionales, alcance y módulos siguen fuera de alcance.
+- Permisos de módulos, alcance y módulos funcionales siguen fuera de alcance.
 
 ## Objetivo
 
@@ -89,6 +89,22 @@ No se guardarán permisos completos en sesión sin una estrategia explícita de
 invalidación. El backend deberá poder reflejar cambios de permisos y alcance.
 
 ## Autorización por acción
+
+RBAC-0 implementa `PermissionService`, `PermissionRepository` y
+`PermissionMiddleware`. La consulta exige usuario, asignación de rol, rol,
+relación rol-permiso y permiso activos y no eliminados. Los permisos no se
+guardan en sesión y `ADMIN` no recibe un bypass implícito.
+
+Los únicos permisos creados en esta fase son:
+
+```text
+sistema.acceder
+sistema.app.ver
+seguridad.rbac.ver
+```
+
+`GET /app` exige `sistema.app.ver`. Un usuario sin sesión se redirige a
+`/login`; un usuario autenticado sin permiso recibe `403`.
 
 Cada acción tendrá un código estable, por ejemplo:
 
@@ -345,7 +361,7 @@ Cada fase funcional deberá incluir casos negativos:
   administrador inicial.
 - Duraciones exactas de sesión y bloqueo.
 - Estrategia de recuperación de contraseña.
-- Contrato de `PermissionService` y `UserScopeService`.
+- Contrato de `UserScopeService`.
 - Matriz completa de permisos por rol.
 - Campos exactos de auditoría y retención.
 - CSP definitiva.
@@ -360,5 +376,5 @@ Cada fase funcional deberá incluir casos negativos:
 - Ejecutar pruebas de penetración.
 - Configurar headers directamente en el servidor web.
 - Subir o servir archivos.
-- Crear usuarios adicionales, roles o permisos funcionales.
+- Crear usuarios adicionales, roles o permisos de módulos operativos.
 - Modificar producción o AwardSpace.

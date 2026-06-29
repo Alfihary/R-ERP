@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0`.
-- Fase autorizada y en revisión: `AUTH-0`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0`.
+- Fase autorizada y en revisión: `RBAC-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -636,20 +636,21 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `AUTH-0`.
+- `main` contiene únicamente el diff revisable de `RBAC-0`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login regenera el ID; logout destruye la sesión.
 - Login y logout validan CSRF.
-- `/app` redirige sin sesión y responde 200 con sesión.
-- El CLI rechaza producción y bases no confirmadas.
-- El administrador inicial se crea una sola vez y se asocia a `ADMIN`.
-- No se guardan hashes en sesión ni se imprimen secretos.
-- El rol `ADMIN` permanece y no se crean permisos funcionales.
+- `/app` redirige sin sesión, responde 403 sin permiso y 200 con permiso.
+- El seed crea tres permisos estructurales y los asigna una vez a `ADMIN`.
+- El CLI RBAC-0 rechaza producción y bases no confirmadas.
+- Roles y permisos inactivos no conceden acceso.
+- Un permiso inexistente no concede acceso.
+- No se guardan permisos en sesión ni se imprime información sensible.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a RBAC-0, DB-SCOPE-1 o módulos funcionales.
+- No se ha avanzado a SCOPE-0, DB-SCOPE-1 o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -663,7 +664,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas con credenciales locales y cierre formal de `AUTH-0`.
+- Pruebas y cierre formal de `RBAC-0`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 
@@ -672,7 +673,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 - Ejecutar cualquiera de las fases futuras.
 - Crear dashboard o módulos funcionales.
 - Crear empresas, almacenes o alcance.
-- Crear permisos funcionales o `PermissionMiddleware`.
+- Crear permisos de módulos operativos.
 - Ejecutar contra producción.
 - Hacer deploy.
 - Integrar tickets, inventario, correo u otros módulos.

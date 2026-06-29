@@ -6,8 +6,8 @@ auditoría y folios.
 
 ## Estado actual
 
-Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0`.
-Fase autorizada y en revisión: `AUTH-0`.
+Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0`.
+Fase autorizada y en revisión: `RBAC-0`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -15,7 +15,9 @@ SECURITY-0 agrega sesión técnica, CSRF central, escape HTML, errores seguros y
 headers HTTP. DB-CORE-0 prepara la conexión PDO, una migración de identidad,
 el rol estructural ADMIN y DB-TEST-CORE. AUTH-0 incorpora login por email o
 username, logout, una ruta privada mínima y creación controlada del primer
-administrador. Todavía no existe autorización funcional ni módulos de negocio.
+administrador. RBAC-0 incorpora permisos estructurales, resolución efectiva y
+protección de `/app`. Todavía no existen alcance operativo ni módulos de
+negocio.
 
 ## Arranque local
 
@@ -67,6 +69,20 @@ php database/auth.php rotate-initial-admin-password --database=<db-test> --confi
 
 El procedimiento completo y sus límites están en `docs/auth-0.md`.
 
+## RBAC-0
+
+RBAC-0 crea únicamente `sistema.acceder`, `sistema.app.ver` y
+`seguridad.rbac.ver`, los asigna de forma idempotente a `ADMIN` y protege
+`GET /app` con `PermissionMiddleware`.
+
+La autorización se resuelve desde la base en cada petición y exige usuario,
+roles, relaciones y permisos activos y no eliminados. No existe bypass por
+nombre de rol.
+
+La fase no incorpora empresas, almacenes, `UserScopeService`, dashboard, menús
+ni permisos de módulos funcionales. El contrato completo está en
+`docs/rbac-0.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -93,6 +109,7 @@ El procedimiento completo y sus límites están en `docs/auth-0.md`.
 - `docs/convenciones.md`: reglas de nombres, código, rutas y Git.
 - `docs/base-datos.md`: modelo conceptual y gobierno por fases.
 - `docs/auth-0.md`: login, administrador inicial, rotación y rollback.
+- `docs/rbac-0.md`: permisos estructurales, resolución, pruebas y rollback.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -118,13 +135,13 @@ El procedimiento completo y sus límites están en `docs/auth-0.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `AUTH-0`.
+- Pruebas y cierre formal de `RBAC-0`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
 ## Fuera de alcance de esta fase
 
-- PermissionService y UserScopeService.
+- UserScopeService.
 - Empresas, almacenes y alcance operativo.
 - Dashboard y layout administrativo.
 - Productos, inventario, tickets, compras, ventas y reportes.

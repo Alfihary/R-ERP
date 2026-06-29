@@ -8,13 +8,16 @@ use App\Core\Response;
 use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Security\PermissionService;
 use App\Http\Middlewares\AuthMiddleware;
+use App\Http\Middlewares\PermissionMiddleware;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
     Router $router,
     Config $config,
     AuthService $auth,
+    PermissionService $permissions,
     CsrfTokenService $csrf
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
@@ -56,13 +59,18 @@ return static function (
     });
 
     $authMiddleware = new AuthMiddleware($auth);
+    $appPermissionMiddleware = new PermissionMiddleware(
+        $auth,
+        $permissions,
+        'sistema.app.ver'
+    );
 
     $router->get('/app', static function (Request $request) use ($auth, $csrf): Response {
         return Response::html(View::render('auth/private', [
             'csrf' => $csrf,
             'user' => $auth->user(),
         ]));
-    }, [$authMiddleware]);
+    }, [$authMiddleware, $appPermissionMiddleware]);
 
     $router->post('/logout', static function (Request $request) use ($auth): Response {
         $auth->logout();
