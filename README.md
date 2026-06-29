@@ -6,12 +6,14 @@ auditoría y folios.
 
 ## Estado actual
 
-Fase en revisión: `CONFIG-0`.
+Fase cerrada: `CONFIG-0`.
+Fase autorizada y en revisión: `SECURITY-0`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
-Todavía no existen seguridad, conexión de base de datos, migraciones, seeds ni
-módulos de negocio.
+SECURITY-0 agrega sesión técnica, CSRF central, escape HTML, errores seguros y
+headers HTTP. Todavía no existen login, usuarios, autorización, conexión de
+base de datos, migraciones, seeds ni módulos de negocio.
 
 ## Arranque local
 
@@ -29,6 +31,10 @@ Después se pueden consultar:
 La aplicación usa valores seguros documentados en `.env.example` cuando no
 existe `.env`. Para configuración local se puede copiar esa plantilla a `.env`;
 el archivo real permanece ignorado por Git.
+
+La protección CSRF se aplica centralmente a `POST`, `PUT`, `PATCH` y `DELETE`.
+Los formularios futuros podrán generar el campo oculto mediante
+`csrf_field($csrf)`. Las vistas deben escapar texto dinámico con `e($value)`.
 
 ## Decisiones base
 
@@ -80,7 +86,9 @@ el archivo real permanece ignorado por Git.
 
 ## Pendiente de aprobar
 
-- Cierre de `CONFIG-0`: bootstrap y configuración mínima.
+- Cierre de `SECURITY-0`.
+- `DB-CORE-0`: esquema inicial de identidad y autorización.
+- `AUTH-0`: login real después de aprobar sus prerrequisitos.
 - `SECURITY-0`: primitivas de seguridad y middlewares.
 - `DB-CORE-0`: primera migración y sus seeds.
 - `DB-TEST-CORE`: ejecución de pruebas sobre una base exclusiva.

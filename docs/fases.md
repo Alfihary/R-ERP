@@ -2,8 +2,8 @@
 
 ## Estado del documento
 
-- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0`.
-- Fase autorizada y en revisión: `CONFIG-0`.
+- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0`.
+- Fase autorizada y en revisión: `SECURITY-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -221,7 +221,7 @@ Commit recomendado: `config: add secure application bootstrap`.
 
 ### `SECURITY-0` — Primitivas de seguridad
 
-Objetivo futuro:
+Objetivo:
 
 - Crear escape, CSRF, sesión segura, manejo de errores y headers base.
 
@@ -230,6 +230,14 @@ Tablas: ninguna salvo que una propuesta separada justifique persistencia.
 Servicios previstos:
 
 - CSRF, sesión, errores y helpers de salida.
+
+Implementación:
+
+- Sesión técnica con cookies `HttpOnly`, `SameSite` y modo seguro por entorno.
+- Token CSRF con expiración y middleware para métodos mutables.
+- Helpers `e()` y `csrf_field()`.
+- Middleware general de headers y manejo de excepciones.
+- Respuestas seguras 404, 419 y 500.
 
 Pruebas:
 
@@ -613,15 +621,17 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `CONFIG-0`.
-- `/` y `/health` responden localmente.
+- `main` contiene únicamente el diff revisable de `SECURITY-0`.
+- `/` y `/health` continúan respondiendo localmente.
+- La cookie de sesión usa `HttpOnly`, `SameSite` y `Secure` en producción.
+- CSRF acepta un token válido y rechaza tokens ausentes o inválidos.
+- Las respuestas incluyen los headers de seguridad aprobados.
+- Producción no muestra trazas y las vistas escapan contenido dinámico.
 - Los archivos PHP pasan revisión de sintaxis.
-- `.env` es opcional, permanece ignorado y `.env.example` no contiene secretos.
-- Producción no muestra errores aunque `APP_DEBUG` se configure incorrectamente.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - No existen migraciones, seeds o archivos SQL nuevos.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a `SECURITY-0`, `DB-CORE-0` o módulos funcionales.
+- No se ha avanzado a `DB-CORE-0`, AUTH-0 o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -635,7 +645,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Cierre formal de `CONFIG-0`.
+- Cierre formal de `SECURITY-0`.
 - Herramientas y runners.
 - Todas las fases de seguridad, BD y módulos.
 - Criterios específicos de cada caso de uso.

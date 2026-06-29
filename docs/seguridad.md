@@ -2,10 +2,11 @@
 
 ## Estado del documento
 
-- Fase: `DOCS-0`.
-- Estado: política propuesta para aprobación.
-- Alcance: requisitos de seguridad que deberán implementarse en fases futuras.
-- Esta fase no implementa controles funcionales.
+- Fase base: `DOCS-0`.
+- Estado actual: `SECURITY-0` implementada y pendiente de revisión.
+- Alcance: sesión técnica, CSRF, escape HTML, pipeline de middleware, errores y
+  headers HTTP.
+- Login, usuarios, permisos, alcance y persistencia siguen fuera de alcance.
 
 ## Objetivo
 
@@ -68,16 +69,18 @@ en mensajes públicos.
 
 ## Sesiones
 
-La configuración futura deberá contemplar:
+SECURITY-0 implementa:
 
 - Cookie `HttpOnly`.
-- Cookie `Secure` en producción HTTPS.
-- `SameSite=Lax` como base, sujeto a revisión de flujos externos.
-- Tiempo de inactividad y tiempo máximo absoluto.
-- Regeneración periódica o después de elevar privilegios.
+- Cookie `Secure` forzada en producción o cuando `APP_URL` usa HTTPS.
+- `SameSite=Lax` configurable.
+- Tiempo máximo del almacenamiento de sesión configurable.
+- Método central para regenerar el identificador.
 - Protección contra fijación de sesión.
 - Identificador de sesión fuera de URLs.
-- Invalidación controlada de sesiones.
+
+La expiración por inactividad, duración absoluta e invalidación ligada a
+usuarios se definirán con AUTH-0 porque todavía no existe identidad persistida.
 
 No se guardarán permisos completos en sesión sin una estrategia explícita de
 invalidación. El backend deberá poder reflejar cambios de permisos y alcance.
@@ -184,6 +187,10 @@ Todo `POST`, `PUT`, `PATCH` o `DELETE` deberá:
 Los endpoints AJAX no estarán exentos. Las operaciones idempotentes no deberán
 usar `GET` para modificar estado.
 
+SECURITY-0 aplica esta validación mediante middleware central a `POST`, `PUT`,
+`PATCH` y `DELETE`. El token puede llegar en `_token` o `X-CSRF-Token`. El
+helper `csrf_field()` genera el campo oculto para formularios futuros.
+
 ## XSS y salida segura
 
 - Todo texto dinámico se escapará en el contexto correcto.
@@ -194,6 +201,10 @@ usar `GET` para modificar estado.
   whitelist explícita.
 - Las plantillas de correo no aceptarán PHP ni JavaScript.
 - Los mensajes de validación no reflejarán contenido peligroso sin escape.
+
+SECURITY-0 incorpora el helper `e()` y actualiza la vista mínima para usarlo.
+El escape de URL, JavaScript, CSS o HTML enriquecido requerirá controles
+específicos en la fase que introduzca esos contextos.
 
 ## SQL Injection
 
@@ -270,6 +281,11 @@ La fase de seguridad evaluará e implementará como mínimo:
 - HSTS solo después de confirmar HTTPS permanente en todos los subdominios
   afectados.
 
+SECURITY-0 implementa CSP básica compatible con la vista mínima,
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y una
+`Permissions-Policy` restrictiva. HSTS permanece fuera hasta validar HTTPS en
+el entorno de despliegue.
+
 ## Auditoría
 
 Se auditarán, cuando aplique:
@@ -335,11 +351,10 @@ Cada fase funcional deberá incluir casos negativos:
 
 ## Fuera de alcance de esta fase
 
-- Implementar login, sesiones o recuperación.
-- Crear middlewares, helpers o servicios.
+- Implementar login o recuperación.
 - Crear tablas de seguridad.
 - Ejecutar pruebas de penetración.
-- Configurar headers en servidor.
+- Configurar headers directamente en el servidor web.
 - Subir o servir archivos.
 - Crear usuarios, roles o permisos.
 - Modificar producción o AwardSpace.

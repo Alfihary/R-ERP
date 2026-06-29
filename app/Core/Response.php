@@ -45,4 +45,22 @@ final class Response
 
         echo $this->body;
     }
+
+    public function withHeader(string $name, string $value): self
+    {
+        $headers = $this->headers;
+        $headers[$name] = $value;
+
+        return new self($this->body, $this->status, $headers);
+    }
+
+    public function status(): int
+    {
+        return $this->status;
+    }
+
+    public function body(): string
+    {
+        return $this->body;
+    }
 }
