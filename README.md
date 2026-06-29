@@ -6,12 +6,29 @@ auditoría y folios.
 
 ## Estado actual
 
-Fase autorizada: `GIT-0 + DOCS-0 + ARCH-0`.
+Fase en revisión: `CONFIG-0`.
 
-Este repositorio contiene únicamente la base documental, la higiene inicial de
-Git y el árbol arquitectónico vacío. Todavía no existe aplicación ejecutable,
-entry point público, configuración funcional, migraciones, seeds ni módulos de
-negocio.
+El repositorio contiene un arranque técnico mínimo con entry point público,
+autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
+Todavía no existen seguridad, conexión de base de datos, migraciones, seeds ni
+módulos de negocio.
+
+## Arranque local
+
+Requiere PHP 8.x. Desde la raíz del repositorio:
+
+```powershell
+php -S 127.0.0.1:8000 -t public
+```
+
+Después se pueden consultar:
+
+- `http://127.0.0.1:8000/`
+- `http://127.0.0.1:8000/health`
+
+La aplicación usa valores seguros documentados en `.env.example` cuando no
+existe `.env`. Para configuración local se puede copiar esa plantilla a `.env`;
+el archivo real permanece ignorado por Git.
 
 ## Decisiones base
 
@@ -63,7 +80,7 @@ negocio.
 
 ## Pendiente de aprobar
 
-- `CONFIG-0`: bootstrap y configuración real.
+- Cierre de `CONFIG-0`: bootstrap y configuración mínima.
 - `SECURITY-0`: primitivas de seguridad y middlewares.
 - `DB-CORE-0`: primera migración y sus seeds.
 - `DB-TEST-CORE`: ejecución de pruebas sobre una base exclusiva.
@@ -72,7 +89,6 @@ negocio.
 
 ## Fuera de alcance de esta fase
 
-- Código PHP operativo y `public/index.php`.
 - SQL ejecutable, migraciones y seeds.
 - Login, sesiones, CSRF, permisos y servicios funcionales.
 - Productos, inventario, tickets, compras, ventas y reportes.

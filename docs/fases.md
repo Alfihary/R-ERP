@@ -2,8 +2,8 @@
 
 ## Estado del documento
 
-- Fase documental actual: `GIT-0 + DOCS-0 + ARCH-0`.
-- Única fase autorizada: la indicada arriba.
+- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0`.
+- Fase autorizada y en revisión: `CONFIG-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -166,21 +166,34 @@ Commit recomendado: `init: create modular architecture skeleton`.
 
 ### `CONFIG-0` — Configuración y bootstrap
 
-Objetivo futuro:
+Objetivo:
 
-- Aprobar entry point, autoload, carga segura de configuración y manejo de
+- Implementar entry point, autoload, carga segura de configuración y manejo de
   entornos.
 
-Archivos previstos:
+Archivos:
 
 - `public/index.php`
-- `config/*.php`
+- `bootstrap/app.php`
+- `config/app.php` y `config/paths.php`
 - clases mínimas de `app/Core`
-- definición futura de dependencias PHP
+- `routes/web.php`
+- `app/Views/welcome.php`
+
+Prueba local:
+
+```powershell
+php -S 127.0.0.1:8000 -t public
+```
+
+Rutas mínimas:
+
+- `GET /`
+- `GET /health`
 
 Tablas: ninguna.
 
-Servicios: bootstrap y configuración; nombres exactos pendientes.
+Servicios: bootstrap, entorno, configuración y núcleo HTTP mínimo.
 
 Seguridad:
 
@@ -600,16 +613,15 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- Rama autorizada creada.
-- `.gitignore`, `.env.example` y README creados.
-- Siete documentos base creados.
-- Árbol vacío conservado con `.gitkeep`.
-- `node_modules/` ignorado, no eliminado.
-- `package.json` y `package-lock.json` sin cambios.
-- Sin `public/index.php`.
-- Sin clases PHP, migraciones, seeds o SQL.
-- `git diff --check` sin errores.
-- No se ha avanzado a fases posteriores.
+- `main` contiene únicamente el diff revisable de `CONFIG-0`.
+- `/` y `/health` responden localmente.
+- Los archivos PHP pasan revisión de sintaxis.
+- `.env` es opcional, permanece ignorado y `.env.example` no contiene secretos.
+- Producción no muestra errores aunque `APP_DEBUG` se configure incorrectamente.
+- `package.json` y `package-lock.json` permanecen sin cambios.
+- No existen migraciones, seeds o archivos SQL nuevos.
+- `git diff --check` no reporta errores.
+- No se ha avanzado a `SECURITY-0`, `DB-CORE-0` o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -623,9 +635,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Cierre formal de `GIT-0 + DOCS-0 + ARCH-0`.
-- Rama estable definitiva.
-- `CONFIG-0`.
+- Cierre formal de `CONFIG-0`.
 - Herramientas y runners.
 - Todas las fases de seguridad, BD y módulos.
 - Criterios específicos de cada caso de uso.
