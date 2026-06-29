@@ -2,8 +2,9 @@
 
 ## Estado del documento
 
-- Fases cerradas: `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0`.
-- Fase autorizada y en revisión: `DB-CORE-0`.
+- Fases cerradas:
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0`.
+- Fase autorizada y en revisión: `AUTH-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -531,7 +532,7 @@ Commit recomendado: `db: add approved mail and notification schema`.
 
 | Fase | Objetivo | Prerrequisito | No hacer todavía | Riesgo |
 |---|---|---|---|---|
-| `AUTH-0` | Autenticación y logout | SECURITY-0, DB-CORE-0 | Recuperación avanzada no aprobada | alto |
+| `AUTH-0` | Login por email/username, logout, administrador inicial y ruta `/app` mínima | SECURITY-0, DB-CORE-0 | Permisos, dashboard y recuperación avanzada | alto |
 | `SESSION-0` | Política y persistencia de sesión | SECURITY-0 | Recordar sesión indefinidamente | alto |
 | `CSRF-0` | Integración central en rutas mutables | SECURITY-0 | Exentar AJAX | alto |
 | `RBAC-0` | Roles y PermissionService | DB-CORE-0 | Usar solo rol en vistas | alto |
@@ -635,17 +636,20 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `DB-CORE-0`.
-- `/` y `/health` continúan respondiendo localmente.
-- El runner rechaza producción y bases no confirmadas.
-- La migración crea solo las tablas aprobadas con InnoDB y `utf8mb4`.
-- El seed crea `ADMIN`, cero usuarios y cero permisos funcionales.
-- DB-TEST prueba unicidad, FKs, checks, relaciones y auditoría.
-- Los datos de DB-TEST se revierten en transacción.
+- `main` contiene únicamente el diff revisable de `AUTH-0`.
+- `/`, `/health` y el 404 continúan respondiendo correctamente.
+- Login por email y username funciona con respuesta uniforme ante rechazo.
+- Login regenera el ID; logout destruye la sesión.
+- Login y logout validan CSRF.
+- `/app` redirige sin sesión y responde 200 con sesión.
+- El CLI rechaza producción y bases no confirmadas.
+- El administrador inicial se crea una sola vez y se asocia a `ADMIN`.
+- No se guardan hashes en sesión ni se imprimen secretos.
+- El rol `ADMIN` permanece y no se crean permisos funcionales.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a `DB-SCOPE-1`, AUTH-0 o módulos funcionales.
+- No se ha avanzado a RBAC-0, DB-SCOPE-1 o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -659,15 +663,16 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Cierre formal de `DB-CORE-0`.
-- Fases posteriores de BD, autenticación y módulos.
+- Pruebas con credenciales locales y cierre formal de `AUTH-0`.
+- Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 
 ## Fuera de alcance de esta fase
 
 - Ejecutar cualquiera de las fases futuras.
-- Crear login, dashboard o módulos funcionales.
+- Crear dashboard o módulos funcionales.
 - Crear empresas, almacenes o alcance.
+- Crear permisos funcionales o `PermissionMiddleware`.
 - Ejecutar contra producción.
 - Hacer deploy.
 - Integrar tickets, inventario, correo u otros módulos.

@@ -3,10 +3,10 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `SECURITY-0` implementada y pendiente de revisión.
-- Alcance: sesión técnica, CSRF, escape HTML, pipeline de middleware, errores y
-  headers HTTP.
-- Login, usuarios, permisos, alcance y persistencia siguen fuera de alcance.
+- Estado actual: `SECURITY-0` cerrada y `AUTH-0` en revisión.
+- Alcance: sesión segura, CSRF, escape HTML, middleware, errores, headers,
+  login por email/username, logout y ruta privada mínima.
+- Permisos funcionales, alcance y módulos siguen fuera de alcance.
 
 ## Objetivo
 
@@ -51,18 +51,21 @@ Ocultar botones mejora la experiencia, pero no concede ni revoca autorización.
 
 ## Autenticación
 
-La fase futura de autenticación deberá:
+AUTH-0 implementa:
 
 - Usar `password_hash()` y `password_verify()`.
 - No almacenar contraseñas reversibles.
 - Regenerar el ID de sesión después del login.
 - Invalidar la sesión en logout.
 - Aplicar respuesta uniforme ante credenciales inválidas.
-- Registrar intentos exitosos y fallidos sin guardar contraseñas.
-- Definir bloqueo temporal y recuperación segura.
-- Invalidar sesiones relevantes después de cambios críticos de credenciales.
-- Exigir token de un solo uso, expiración y almacenamiento no reversible para
-  recuperación de contraseña.
+- Consultar por email o username normalizado mediante PDO preparado.
+- Exigir usuario activo y no eliminado.
+- Guardar en sesión solo ID, username y email.
+- Crear y rotar el administrador inicial desde CLI sin imprimir secretos.
+
+El registro persistente de intentos, bloqueo temporal, recuperación segura e
+invalidación global de sesiones requieren fases posteriores expresamente
+aprobadas.
 
 La existencia de un usuario no debe poder inferirse por diferencias evitables
 en mensajes públicos.
@@ -80,7 +83,7 @@ SECURITY-0 implementa:
 - Identificador de sesión fuera de URLs.
 
 La expiración por inactividad, duración absoluta e invalidación ligada a
-usuarios se definirán con AUTH-0 porque todavía no existe identidad persistida.
+usuarios se definirán en una fase posterior de política de sesión.
 
 No se guardarán permisos completos en sesión sin una estrategia explícita de
 invalidación. El backend deberá poder reflejar cambios de permisos y alcance.
@@ -338,7 +341,8 @@ Cada fase funcional deberá incluir casos negativos:
 
 ## Pendiente de aprobar
 
-- Política de contraseñas.
+- Política completa de contraseñas; AUTH-0 exige 12 caracteres solo para el
+  administrador inicial.
 - Duraciones exactas de sesión y bloqueo.
 - Estrategia de recuperación de contraseña.
 - Contrato de `PermissionService` y `UserScopeService`.
@@ -351,10 +355,10 @@ Cada fase funcional deberá incluir casos negativos:
 
 ## Fuera de alcance de esta fase
 
-- Implementar login o recuperación.
+- Implementar recuperación.
 - Crear tablas de seguridad.
 - Ejecutar pruebas de penetración.
 - Configurar headers directamente en el servidor web.
 - Subir o servir archivos.
-- Crear usuarios, roles o permisos.
+- Crear usuarios adicionales, roles o permisos funcionales.
 - Modificar producción o AwardSpace.

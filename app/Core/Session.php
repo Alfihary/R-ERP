@@ -89,6 +89,28 @@ final class Session
         unset($_SESSION[$key]);
     }
 
+    public function invalidate(): void
+    {
+        $this->assertStarted();
+        $_SESSION = [];
+
+        if ((bool) ini_get('session.use_cookies')) {
+            $parameters = session_get_cookie_params();
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $parameters['path'],
+                'domain' => $parameters['domain'],
+                'secure' => $parameters['secure'],
+                'httponly' => $parameters['httponly'],
+                'samesite' => $parameters['samesite'],
+            ]);
+        }
+
+        if (!session_destroy()) {
+            throw new \RuntimeException('Unable to destroy the session.');
+        }
+    }
+
     private function assertStarted(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {

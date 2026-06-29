@@ -23,6 +23,7 @@ foreach ($paths as $constant => $path) {
 
 return new Config([
     'app' => require CONFIG_PATH . '/app.php',
+    'auth' => require CONFIG_PATH . '/auth.php',
     'database' => require CONFIG_PATH . '/database.php',
     'paths' => $paths,
 ]);

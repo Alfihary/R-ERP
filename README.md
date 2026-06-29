@@ -6,15 +6,16 @@ auditoría y folios.
 
 ## Estado actual
 
-Fases cerradas: `CONFIG-0 + SECURITY-0`.
-Fase autorizada y en revisión: `DB-CORE-0`.
+Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0`.
+Fase autorizada y en revisión: `AUTH-0`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
 SECURITY-0 agrega sesión técnica, CSRF central, escape HTML, errores seguros y
 headers HTTP. DB-CORE-0 prepara la conexión PDO, una migración de identidad,
-el rol estructural ADMIN y DB-TEST-CORE. La base no se usa desde rutas públicas
-y todavía no existe login, autorización funcional ni módulos de negocio.
+el rol estructural ADMIN y DB-TEST-CORE. AUTH-0 incorpora login por email o
+username, logout, una ruta privada mínima y creación controlada del primer
+administrador. Todavía no existe autorización funcional ni módulos de negocio.
 
 ## Arranque local
 
@@ -28,6 +29,7 @@ Después se pueden consultar:
 
 - `http://127.0.0.1:8000/`
 - `http://127.0.0.1:8000/health`
+- `http://127.0.0.1:8000/login`
 
 La aplicación usa valores seguros documentados en `.env.example` cuando no
 existe `.env`. Para configuración local se puede copiar esa plantilla a `.env`;
@@ -51,6 +53,19 @@ php database/console.php db:test --database=<db-test> --confirm-database=<db-tes
 
 El runner no crea bases de datos y rechaza `APP_ENV=production`. El diseño,
 rollback y criterios de aceptación están en `docs/db-core-0.md`.
+
+## AUTH-0
+
+El primer administrador se crea o rota únicamente mediante
+`database/auth.php`. El comando exige confirmación doble de la base y toma
+email y contraseña temporal del `.env` local. No imprime contraseña ni hash.
+
+```powershell
+php database/auth.php create-initial-admin --database=<db-test> --confirm-database=<db-test>
+php database/auth.php rotate-initial-admin-password --database=<db-test> --confirm-database=<db-test>
+```
+
+El procedimiento completo y sus límites están en `docs/auth-0.md`.
 
 ## Decisiones base
 
@@ -77,6 +92,7 @@ rollback y criterios de aceptación están en `docs/db-core-0.md`.
 - `docs/seguridad.md`: controles y modelo de autorización.
 - `docs/convenciones.md`: reglas de nombres, código, rutas y Git.
 - `docs/base-datos.md`: modelo conceptual y gobierno por fases.
+- `docs/auth-0.md`: login, administrador inicial, rotación y rollback.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -102,14 +118,14 @@ rollback y criterios de aceptación están en `docs/db-core-0.md`.
 
 ## Pendiente de aprobar
 
-- Cierre formal de `DB-CORE-0` después de DB-TEST aprobado.
-- `AUTH-0`: login real después de aprobar sus prerrequisitos.
+- Pruebas y cierre formal de `AUTH-0`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
 ## Fuera de alcance de esta fase
 
-- Login, autenticación, PermissionService y UserScopeService.
+- PermissionService y UserScopeService.
 - Empresas, almacenes y alcance operativo.
+- Dashboard y layout administrativo.
 - Productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.

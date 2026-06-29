@@ -8,10 +8,13 @@ use App\Core\Env;
 use App\Core\ErrorHandler;
 use App\Core\Router;
 use App\Core\Session;
+use App\Domain\Auth\AuthService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Support\Security\CsrfTokenService;
+use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\UserRepository;
 
 if (!defined('BASE_PATH')) {
     throw new RuntimeException('BASE_PATH must be defined before bootstrapping the application.');
@@ -33,6 +36,8 @@ foreach ($paths as $constant => $path) {
 
 $config = new Config([
     'app' => require CONFIG_PATH . '/app.php',
+    'auth' => require CONFIG_PATH . '/auth.php',
+    'database' => require CONFIG_PATH . '/database.php',
     'paths' => $paths,
     'security' => require CONFIG_PATH . '/security.php',
     'session' => require CONFIG_PATH . '/session.php',
@@ -60,6 +65,14 @@ $session->start();
 $csrfTtl = (int) $config->get('security.csrf_ttl_seconds', 7200);
 $csrf = new CsrfTokenService($session, $csrfTtl);
 $errorHandler = new ErrorHandler($debug);
+$databaseConfig = $config->get('database', []);
+
+if (!is_array($databaseConfig)) {
+    throw new RuntimeException('Database configuration must be an array.');
+}
+
+$connection = new ConnectionProvider($databaseConfig);
+$auth = new AuthService(new UserRepository($connection), $session);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -67,6 +80,6 @@ $router->middleware(new ErrorHandlingMiddleware($errorHandler));
 $router->middleware(new CsrfMiddleware($csrf));
 
 $registerRoutes = require ROUTES_PATH . '/web.php';
-$registerRoutes($router, $config);
+$registerRoutes($router, $config, $auth, $csrf);
 
 return new App($router, $config, $debug, $errorHandler);
