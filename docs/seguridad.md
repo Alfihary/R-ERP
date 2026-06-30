@@ -3,7 +3,8 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `AUTH-0` cerrada y `RBAC-0` en revisión.
+- Estado actual: `AUTH-0 + RBAC-0 + UI-SHELL-0` cerradas y `DB-SCOPE-1`
+  en revisión.
 - Alcance: sesión segura, CSRF, escape HTML, middleware, errores, headers,
   login por email/username, logout y ruta privada mínima.
 - Permisos de módulos, alcance y módulos funcionales siguen fuera de alcance.
@@ -168,6 +169,11 @@ ADMIN podrá recibir todos los permisos o un bypass controlado. En ambos casos,
 sus acciones críticas deberán auditarse.
 
 ## Alcance operativo
+
+DB-SCOPE-1 persiste empresas, almacenes y asignaciones de alcance. La relación
+`usuario_almacenes` exige mediante FKs compuestas que el usuario tenga acceso a
+la empresa y que el almacén pertenezca a esa misma empresa. Esto protege la
+integridad persistente, pero no sustituye la validación de cada caso de uso.
 
 `UserScopeService` será la única fuente central para resolver alcance. Deberá
 distinguir:

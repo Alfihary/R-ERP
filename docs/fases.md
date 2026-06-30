@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0`.
-- Fase autorizada y en revisión: `UI-SHELL-0`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0`.
+- Fase autorizada y en revisión: `DB-SCOPE-1`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -319,7 +319,7 @@ Commit recomendado: `db: add approved core identity schema`.
 
 ### `DB-SCOPE-1`
 
-Objetivo futuro:
+Objetivo:
 
 - Crear empresas, almacenes y asignaciones de alcance.
 
@@ -330,9 +330,14 @@ Tablas previstas:
 - `usuario_empresas`
 - `usuario_almacenes`
 
-Migración, seeds y DB-TEST: obligatorios.
+Artefactos:
 
-Servicios relacionados: `UserScopeService`.
+- Migración `db_scope_1_001_create_scope_tables`.
+- Seed idempotente `db_scope_1_seed_initial_scope`.
+- Runner CLI `database/scope.php`.
+- DB-TEST-SCOPE transaccional.
+
+Servicios relacionados: `UserScopeService` permanece pendiente.
 
 Seguridad:
 
@@ -637,21 +642,21 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `UI-SHELL-0`.
+- `main` contiene únicamente el diff revisable de `DB-SCOPE-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login regenera el ID; logout destruye la sesión.
 - Login y logout validan CSRF.
-- `/app` conserva autenticación y `sistema.app.ver`.
-- El shell muestra sidebar, topbar, contenido principal e identidad escapada.
-- Logout sigue usando `POST` con CSRF.
-- La navegación es estática y no aparenta módulos inexistentes.
-- No se muestran roles, permisos, IDs, credenciales ni datos sensibles.
-- No se crean dashboard, métricas, módulos, temas ni menú dinámico.
+- Existen `empresas`, `almacenes`, `usuario_empresas` y `usuario_almacenes`.
+- Las cuatro tablas usan InnoDB y `utf8mb4_unicode_ci`.
+- El seed crea una empresa, un almacén y asignaciones únicas del administrador.
+- Las FKs compuestas rechazan almacenes fuera de la empresa permitida.
+- DB-TEST-SCOPE revierte todos sus datos transitorios.
+- La regresión AUTH/RBAC/UI-SHELL continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a SCOPE-0, DB-SCOPE-1, dashboard o módulos funcionales.
+- No se ha avanzado a SCOPE-0, dashboard o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -665,7 +670,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `UI-SHELL-0`.
+- Pruebas y cierre formal de `DB-SCOPE-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 
@@ -673,7 +678,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 - Ejecutar cualquiera de las fases futuras.
 - Crear dashboard, layout final o módulos funcionales.
-- Crear empresas, almacenes o alcance.
+- Implementar `UserScopeService` o selectores de alcance.
 - Crear permisos de módulos operativos.
 - Ejecutar contra producción.
 - Hacer deploy.

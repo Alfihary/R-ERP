@@ -6,8 +6,9 @@ auditoría y folios.
 
 ## Estado actual
 
-Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0`.
-Fase autorizada y en revisión: `UI-SHELL-0`.
+Fases cerradas:
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0`.
+Fase autorizada y en revisión: `DB-SCOPE-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -94,6 +95,17 @@ El shell no incluye dashboard, métricas, módulos funcionales, menú dinámico,
 temas ni alcance por empresa o almacén. El CSS vive en
 `public/css/core/app.css` y no requiere Tailwind, Node ni herramientas de build.
 
+## DB-SCOPE-1
+
+DB-SCOPE-1 crea empresas, almacenes y asignaciones normalizadas de alcance a
+usuarios. Las llaves foráneas compuestas impiden asignar un almacén de otra
+empresa o sin acceso previo a esa empresa.
+
+La fase incorpora una empresa, un almacén y las asignaciones estructurales del
+administrador inicial. No implementa `UserScopeService`, selectores visuales,
+dashboard ni módulos operativos. El contrato completo está en
+`docs/db-scope-1.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -121,6 +133,7 @@ temas ni alcance por empresa o almacén. El CSS vive en
 - `docs/base-datos.md`: modelo conceptual y gobierno por fases.
 - `docs/auth-0.md`: login, administrador inicial, rotación y rollback.
 - `docs/rbac-0.md`: permisos estructurales, resolución, pruebas y rollback.
+- `docs/db-scope-1.md`: empresas, almacenes, alcance, DB-TEST y rollback.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -146,7 +159,7 @@ temas ni alcance por empresa o almacén. El CSS vive en
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `UI-SHELL-0`.
+- Pruebas y cierre formal de `DB-SCOPE-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 

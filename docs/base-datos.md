@@ -464,7 +464,7 @@ revertir estructura sea peligroso, se documentará una corrección hacia adelant
 
 - Definir todos los campos de módulos operativos.
 - Importar datos de otro ERP.
-- Crear empresas, almacenes o alcance.
+- Implementar `UserScopeService` o usar alcance en módulos.
 - Crear usuario administrador o permisos funcionales.
 - Implementar login, AuthService, PermissionService o AuditService.
 - Modificar producción.
