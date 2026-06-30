@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0`.
-- Fase autorizada y en revisión: `RBAC-0`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0`.
+- Fase autorizada y en revisión: `UI-SHELL-0`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -536,6 +536,7 @@ Commit recomendado: `db: add approved mail and notification schema`.
 | `SESSION-0` | Política y persistencia de sesión | SECURITY-0 | Recordar sesión indefinidamente | alto |
 | `CSRF-0` | Integración central en rutas mutables | SECURITY-0 | Exentar AJAX | alto |
 | `RBAC-0` | Roles y PermissionService | DB-CORE-0 | Usar solo rol en vistas | alto |
+| `UI-SHELL-0` | Layout autenticado mínimo para `/app` | AUTH-0, RBAC-0 | Dashboard, módulos y menú dinámico | bajo |
 | `SCOPE-0` | UserScopeService | DB-SCOPE-1, RBAC-0 | Filtrar solo en PHP | crítico |
 | `AUDIT-0` | AuditService | DB-CORE-0 | Registrar secretos | alto |
 | `FOLIOS-0` | FolioService | DB-FOLIOS-3, SCOPE-0 | Generar fuera de transacción | alto |
@@ -636,21 +637,21 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `RBAC-0`.
+- `main` contiene únicamente el diff revisable de `UI-SHELL-0`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login regenera el ID; logout destruye la sesión.
 - Login y logout validan CSRF.
-- `/app` redirige sin sesión, responde 403 sin permiso y 200 con permiso.
-- El seed crea tres permisos estructurales y los asigna una vez a `ADMIN`.
-- El CLI RBAC-0 rechaza producción y bases no confirmadas.
-- Roles y permisos inactivos no conceden acceso.
-- Un permiso inexistente no concede acceso.
-- No se guardan permisos en sesión ni se imprime información sensible.
+- `/app` conserva autenticación y `sistema.app.ver`.
+- El shell muestra sidebar, topbar, contenido principal e identidad escapada.
+- Logout sigue usando `POST` con CSRF.
+- La navegación es estática y no aparenta módulos inexistentes.
+- No se muestran roles, permisos, IDs, credenciales ni datos sensibles.
+- No se crean dashboard, métricas, módulos, temas ni menú dinámico.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a SCOPE-0, DB-SCOPE-1 o módulos funcionales.
+- No se ha avanzado a SCOPE-0, DB-SCOPE-1, dashboard o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -664,14 +665,14 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `RBAC-0`.
+- Pruebas y cierre formal de `UI-SHELL-0`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 
 ## Fuera de alcance de esta fase
 
 - Ejecutar cualquiera de las fases futuras.
-- Crear dashboard o módulos funcionales.
+- Crear dashboard, layout final o módulos funcionales.
 - Crear empresas, almacenes o alcance.
 - Crear permisos de módulos operativos.
 - Ejecutar contra producción.

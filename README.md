@@ -6,8 +6,8 @@ auditoría y folios.
 
 ## Estado actual
 
-Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0`.
-Fase autorizada y en revisión: `RBAC-0`.
+Fases cerradas: `CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0`.
+Fase autorizada y en revisión: `UI-SHELL-0`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -17,7 +17,8 @@ el rol estructural ADMIN y DB-TEST-CORE. AUTH-0 incorpora login por email o
 username, logout, una ruta privada mínima y creación controlada del primer
 administrador. RBAC-0 incorpora permisos estructurales, resolución efectiva y
 protección de `/app`. Todavía no existen alcance operativo ni módulos de
-negocio.
+negocio. UI-SHELL-0 agrega el cascarón visual autenticado sin convertirlo en
+dashboard.
 
 ## Arranque local
 
@@ -83,6 +84,16 @@ La fase no incorpora empresas, almacenes, `UserScopeService`, dashboard, menús
 ni permisos de módulos funcionales. El contrato completo está en
 `docs/rbac-0.md`.
 
+## UI-SHELL-0
+
+`GET /app` usa un layout autenticado mínimo con sidebar, topbar, área principal
+y logout visible mediante `POST` con CSRF. La navegación es estática y solo
+incluye el inicio privado existente.
+
+El shell no incluye dashboard, métricas, módulos funcionales, menú dinámico,
+temas ni alcance por empresa o almacén. El CSS vive en
+`public/css/core/app.css` y no requiere Tailwind, Node ni herramientas de build.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -135,7 +146,7 @@ ni permisos de módulos funcionales. El contrato completo está en
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `RBAC-0`.
+- Pruebas y cierre formal de `UI-SHELL-0`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
@@ -143,6 +154,6 @@ ni permisos de módulos funcionales. El contrato completo está en
 
 - UserScopeService.
 - Empresas, almacenes y alcance operativo.
-- Dashboard y layout administrativo.
+- Dashboard y layout administrativo final.
 - Productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.

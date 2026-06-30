@@ -65,9 +65,16 @@ return static function (
         'sistema.app.ver'
     );
 
-    $router->get('/app', static function (Request $request) use ($auth, $csrf): Response {
-        return Response::html(View::render('auth/private', [
+    $router->get('/app', static function (Request $request) use (
+        $auth,
+        $config,
+        $csrf
+    ): Response {
+        return Response::html(View::render('layouts/app', [
+            'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
+            'contentView' => 'auth/private',
             'csrf' => $csrf,
+            'pageTitle' => 'Inicio',
             'user' => $auth->user(),
         ]));
     }, [$authMiddleware, $appPermissionMiddleware]);
