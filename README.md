@@ -7,8 +7,8 @@ auditoría y folios.
 ## Estado actual
 
 Fases cerradas:
-`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0`.
-Fase autorizada y en revisión: `DB-SCOPE-1`.
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1`.
+Fase autorizada y en revisión: `SCOPE-SERVICE-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -17,9 +17,10 @@ headers HTTP. DB-CORE-0 prepara la conexión PDO, una migración de identidad,
 el rol estructural ADMIN y DB-TEST-CORE. AUTH-0 incorpora login por email o
 username, logout, una ruta privada mínima y creación controlada del primer
 administrador. RBAC-0 incorpora permisos estructurales, resolución efectiva y
-protección de `/app`. Todavía no existen alcance operativo ni módulos de
-negocio. UI-SHELL-0 agrega el cascarón visual autenticado sin convertirlo en
-dashboard.
+protección de `/app`. UI-SHELL-0 agrega el cascarón visual autenticado sin
+convertirlo en dashboard. DB-SCOPE-1 incorpora la persistencia de empresas,
+almacenes y asignaciones. SCOPE-SERVICE-1 resuelve ese alcance en backend sin
+crear contexto activo ni módulos de negocio.
 
 ## Arranque local
 
@@ -102,9 +103,18 @@ usuarios. Las llaves foráneas compuestas impiden asignar un almacén de otra
 empresa o sin acceso previo a esa empresa.
 
 La fase incorpora una empresa, un almacén y las asignaciones estructurales del
-administrador inicial. No implementa `UserScopeService`, selectores visuales,
-dashboard ni módulos operativos. El contrato completo está en
-`docs/db-scope-1.md`.
+administrador inicial. El contrato completo está en `docs/db-scope-1.md`.
+
+## SCOPE-SERVICE-1
+
+`UserScopeService` resuelve empresas y almacenes activos y no eliminados desde
+el ID del usuario autenticado. `ScopeRepository` encapsula las consultas PDO
+preparadas y valida en SQL la relación usuario-empresa-almacén.
+
+`GET /app` muestra información mínima del alcance efectivo. No acepta IDs de
+empresa o almacén del navegador, no guarda el alcance completo en sesión y no
+incluye selector ni contexto activo persistente. El contrato está en
+`docs/scope-service-1.md`.
 
 ## Decisiones base
 
@@ -134,6 +144,7 @@ dashboard ni módulos operativos. El contrato completo está en
 - `docs/auth-0.md`: login, administrador inicial, rotación y rollback.
 - `docs/rbac-0.md`: permisos estructurales, resolución, pruebas y rollback.
 - `docs/db-scope-1.md`: empresas, almacenes, alcance, DB-TEST y rollback.
+- `docs/scope-service-1.md`: resolución backend y pruebas del alcance efectivo.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -159,14 +170,13 @@ dashboard ni módulos operativos. El contrato completo está en
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `DB-SCOPE-1`.
+- Pruebas y cierre formal de `SCOPE-SERVICE-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
 ## Fuera de alcance de esta fase
 
-- UserScopeService.
-- Empresas, almacenes y alcance operativo.
+- Selector y contexto activo de empresa o almacén.
 - Dashboard y layout administrativo final.
 - Productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.

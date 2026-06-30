@@ -9,6 +9,7 @@ use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
+use App\Domain\Scope\UserScopeService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Support\Security\CsrfTokenService;
@@ -18,6 +19,7 @@ return static function (
     Config $config,
     AuthService $auth,
     PermissionService $permissions,
+    UserScopeService $userScope,
     CsrfTokenService $csrf
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
@@ -68,14 +70,19 @@ return static function (
     $router->get('/app', static function (Request $request) use (
         $auth,
         $config,
-        $csrf
+        $csrf,
+        $userScope
     ): Response {
+        $user = $auth->user();
+        $scope = $userScope->resolveForUser((int) ($user['user_id'] ?? 0));
+
         return Response::html(View::render('layouts/app', [
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'contentView' => 'auth/private',
             'csrf' => $csrf,
             'pageTitle' => 'Inicio',
-            'user' => $auth->user(),
+            'scope' => $scope->toArray(),
+            'user' => $user,
         ]));
     }, [$authMiddleware, $appPermissionMiddleware]);
 

@@ -7,12 +7,16 @@ use App\Support\Security\CsrfTokenService;
 
 if (!$csrf instanceof CsrfTokenService
     || !is_array($user ?? null)
+    || !is_array($scope ?? null)
     || !is_string($contentView ?? null)
 ) {
     throw new RuntimeException('Authenticated layout context is incomplete.');
 }
 
-$content = View::render($contentView, ['user' => $user]);
+$content = View::render($contentView, [
+    'scope' => $scope,
+    'user' => $user,
+]);
 $appName = is_string($appName ?? null) && $appName !== ''
     ? $appName
     : 'SoporteGR ERP';

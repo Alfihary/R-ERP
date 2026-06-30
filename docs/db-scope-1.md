@@ -3,8 +3,9 @@
 ## Objetivo
 
 Crear la estructura normalizada para empresas, almacenes y asignaciones de
-alcance a usuarios. Esta fase no implementa `UserScopeService`, selectores UI,
-dashboard ni módulos funcionales.
+alcance a usuarios. `UserScopeService` se implementa posteriormente en
+SCOPE-SERVICE-1; DB-SCOPE-1 no incluye selectores UI, dashboard ni módulos
+funcionales.
 
 ## Tablas
 
@@ -149,17 +150,15 @@ destructivas. El rollback es de riesgo alto porque elimina estructura de
 alcance y solo debe ejecutarse en una base controlada y sin dependencias
 posteriores.
 
-## Pendiente para `UserScopeService`
+## Continuidad en `UserScopeService`
 
-- Resolver empresas y almacenes efectivos del usuario autenticado.
-- Excluir estados inactivos o eliminados en cada nivel.
-- Validar recursos y destinos operativos.
-- Definir alcance global, si se autoriza.
-- Integrar selectores de contexto en UI.
+- SCOPE-SERVICE-1 resuelve empresas y almacenes efectivos.
+- Excluye estados inactivos o eliminados en cada nivel.
+- La validación de recursos y destinos operativos queda para cada módulo futuro.
+- El contexto activo y los selectores continúan pendientes.
 
 ## Fuera de alcance
 
-- `UserScopeService`.
 - Selector de empresa o almacén.
 - Dashboard y módulos funcionales.
 - Productos, inventario, tickets, compras, ventas, CXC o CXP.

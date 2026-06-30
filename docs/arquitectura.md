@@ -267,14 +267,15 @@ el alcance del usuario.
 
 ### `UserScopeService`
 
-Resolverá:
+SCOPE-SERVICE-1 resuelve:
 
-- Si el usuario tiene alcance global.
-- Empresas visibles y operables.
-- Almacenes visibles y operables.
-- Filtros obligatorios para listados.
-- Validación de recursos en lectura y escritura.
-- Alcance aplicable a exportaciones y descargas.
+- Empresas y almacenes activos asignados al usuario autenticado.
+- Valores predeterminados derivados del alcance disponible.
+- Estado vacío controlado.
+- Rechazo defensivo de almacenes fuera de empresas permitidas.
+
+El contexto activo, los filtros de módulos, la validación de recursos y el
+alcance de exportaciones o descargas se implementarán en sus fases autorizadas.
 
 La autorización efectiva será:
 
@@ -346,8 +347,7 @@ resolverá reglas, plantillas, cola, envío, logs y auditoría.
 - Contratos e interfaces exactos.
 - Convención definitiva de namespaces.
 - Modelo de excepciones y respuestas.
-- Diseño de `UserScopeService`, `PermissionService`, `AuditService` y
-  `FolioService`.
+- Diseño de `AuditService` y `FolioService`.
 - Entry point y configuración funcional.
 - Arquitectura interna de cada módulo operativo.
 

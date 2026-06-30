@@ -3,11 +3,12 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `AUTH-0 + RBAC-0 + UI-SHELL-0` cerradas y `DB-SCOPE-1`
-  en revisión.
+- Estado actual: `AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1` cerradas y
+  `SCOPE-SERVICE-1` en revisión.
 - Alcance: sesión segura, CSRF, escape HTML, middleware, errores, headers,
   login por email/username, logout y ruta privada mínima.
-- Permisos de módulos, alcance y módulos funcionales siguen fuera de alcance.
+- Permisos de módulos, contexto activo y módulos funcionales siguen fuera de
+  alcance.
 
 ## Objetivo
 
@@ -175,8 +176,16 @@ DB-SCOPE-1 persiste empresas, almacenes y asignaciones de alcance. La relación
 la empresa y que el almacén pertenezca a esa misma empresa. Esto protege la
 integridad persistente, pero no sustituye la validación de cada caso de uso.
 
-`UserScopeService` será la única fuente central para resolver alcance. Deberá
-distinguir:
+SCOPE-SERVICE-1 implementa `UserScopeService` como fuente central para resolver
+empresas y almacenes efectivos. La resolución exige usuario, relaciones,
+empresas y almacenes activos y no eliminados. El servicio recibe únicamente el
+ID autenticado y filtra defensivamente almacenes fuera de empresas permitidas.
+
+La fase devuelve empresas, almacenes, valores predeterminados y banderas de
+disponibilidad. No guarda el alcance completo en sesión y no acepta IDs del
+navegador.
+
+Los módulos futuros deberán ampliar la validación para distinguir:
 
 - Alcance global.
 - Empresa visible.
@@ -367,7 +376,7 @@ Cada fase funcional deberá incluir casos negativos:
   administrador inicial.
 - Duraciones exactas de sesión y bloqueo.
 - Estrategia de recuperación de contraseña.
-- Contrato de `UserScopeService`.
+- Contrato de contexto activo de empresa y almacén.
 - Matriz completa de permisos por rol.
 - Campos exactos de auditoría y retención.
 - CSP definitiva.
