@@ -7,8 +7,8 @@ auditoría y folios.
 ## Estado actual
 
 Fases cerradas:
-`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1`.
-Fase autorizada y en revisión: `SCOPE-CONTEXT-1`.
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1`.
+Fase autorizada y en revisión: `APP-HOME-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -22,6 +22,8 @@ convertirlo en dashboard. DB-SCOPE-1 incorpora la persistencia de empresas,
 almacenes y asignaciones. SCOPE-SERVICE-1 resuelve ese alcance en backend sin
 crear módulos de negocio. SCOPE-CONTEXT-1 mantiene en sesión el par activo
 empresa/almacén validado contra ese alcance.
+APP-HOME-1 convierte `/app` en un inicio operativo sin métricas, módulos ni
+datos ficticios.
 
 ## Arranque local
 
@@ -127,6 +129,16 @@ Con un solo par el contexto se establece automáticamente. Con múltiples pares,
 `POST /app/contexto`, protegido por autenticación, `sistema.app.ver` y CSRF.
 El contrato está en `docs/scope-context-1.md`.
 
+## APP-HOME-1
+
+`GET /app` presenta la sesión, el contexto activo y el estado descriptivo de
+los controles base. La navegación mantiene únicamente el inicio privado y el
+cierre de sesión ya disponibles.
+
+La pantalla no es un dashboard analítico o funcional: no contiene métricas,
+gráficas, actividad ficticia, CRUD ni enlaces a módulos pendientes. El contrato
+está en `docs/app-home-1.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -157,6 +169,7 @@ El contrato está en `docs/scope-context-1.md`.
 - `docs/db-scope-1.md`: empresas, almacenes, alcance, DB-TEST y rollback.
 - `docs/scope-service-1.md`: resolución backend y pruebas del alcance efectivo.
 - `docs/scope-context-1.md`: contexto activo, selector y pruebas de sesión.
+- `docs/app-home-1.md`: inicio operativo, límites y pruebas de presentación.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -182,7 +195,7 @@ El contrato está en `docs/scope-context-1.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `SCOPE-CONTEXT-1`.
+- Pruebas y cierre formal de `APP-HOME-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
