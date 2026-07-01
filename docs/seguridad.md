@@ -3,8 +3,9 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1` cerradas y
-  `SCOPE-SERVICE-1` en revisión.
+- Estado actual:
+  `AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1` cerradas y
+  `SCOPE-CONTEXT-1` en revisión.
 - Alcance: sesión segura, CSRF, escape HTML, middleware, errores, headers,
   login por email/username, logout y ruta privada mínima.
 - Permisos de módulos, contexto activo y módulos funcionales siguen fuera de
@@ -182,8 +183,15 @@ empresas y almacenes activos y no eliminados. El servicio recibe únicamente el
 ID autenticado y filtra defensivamente almacenes fuera de empresas permitidas.
 
 La fase devuelve empresas, almacenes, valores predeterminados y banderas de
-disponibilidad. No guarda el alcance completo en sesión y no acepta IDs del
-navegador.
+disponibilidad. No guarda el alcance completo en sesión.
+
+SCOPE-CONTEXT-1 agrega un par activo validado. La sesión conserva únicamente
+`active_company_id` y `active_warehouse_id`; nombres, listas y permisos se
+resuelven nuevamente desde backend. Un contexto inválido se elimina.
+
+`POST /app/contexto` trata los IDs del navegador como entrada no confiable,
+exige autenticación, `sistema.app.ver` y CSRF, y valida empresa, almacén y su
+relación antes de actualizar la sesión.
 
 Los módulos futuros deberán ampliar la validación para distinguir:
 
@@ -376,7 +384,7 @@ Cada fase funcional deberá incluir casos negativos:
   administrador inicial.
 - Duraciones exactas de sesión y bloqueo.
 - Estrategia de recuperación de contraseña.
-- Contrato de contexto activo de empresa y almacén.
+- Aplicación del contexto a recursos de módulos futuros.
 - Matriz completa de permisos por rol.
 - Campos exactos de auditoría y retención.
 - CSP definitiva.

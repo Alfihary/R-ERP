@@ -98,8 +98,7 @@ La prueba valida:
 
 ## Pendientes
 
-- Selector empresa/almacén.
-- Contexto activo de operación.
+- SCOPE-CONTEXT-1 implementa selector y contexto activo de operación.
 - Validación de recursos concretos de módulos futuros.
 - Aplicación de filtros de alcance en repositorios operativos.
 - Middleware de alcance únicamente cuando una ruta futura lo justifique.

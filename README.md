@@ -7,8 +7,8 @@ auditoría y folios.
 ## Estado actual
 
 Fases cerradas:
-`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1`.
-Fase autorizada y en revisión: `SCOPE-SERVICE-1`.
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1`.
+Fase autorizada y en revisión: `SCOPE-CONTEXT-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -20,7 +20,8 @@ administrador. RBAC-0 incorpora permisos estructurales, resolución efectiva y
 protección de `/app`. UI-SHELL-0 agrega el cascarón visual autenticado sin
 convertirlo en dashboard. DB-SCOPE-1 incorpora la persistencia de empresas,
 almacenes y asignaciones. SCOPE-SERVICE-1 resuelve ese alcance en backend sin
-crear contexto activo ni módulos de negocio.
+crear módulos de negocio. SCOPE-CONTEXT-1 mantiene en sesión el par activo
+empresa/almacén validado contra ese alcance.
 
 ## Arranque local
 
@@ -113,8 +114,18 @@ preparadas y valida en SQL la relación usuario-empresa-almacén.
 
 `GET /app` muestra información mínima del alcance efectivo. No acepta IDs de
 empresa o almacén del navegador, no guarda el alcance completo en sesión y no
-incluye selector ni contexto activo persistente. El contrato está en
-`docs/scope-service-1.md`.
+incluye módulos funcionales. El contrato está en `docs/scope-service-1.md`.
+
+## SCOPE-CONTEXT-1
+
+`ScopeContextService` conserva únicamente `active_company_id` y
+`active_warehouse_id` en sesión. El par se valida contra `UserScopeService` y
+se limpia si deja de ser permitido.
+
+Con un solo par el contexto se establece automáticamente. Con múltiples pares,
+`GET /app` muestra un selector mínimo que actualiza mediante
+`POST /app/contexto`, protegido por autenticación, `sistema.app.ver` y CSRF.
+El contrato está en `docs/scope-context-1.md`.
 
 ## Decisiones base
 
@@ -145,6 +156,7 @@ incluye selector ni contexto activo persistente. El contrato está en
 - `docs/rbac-0.md`: permisos estructurales, resolución, pruebas y rollback.
 - `docs/db-scope-1.md`: empresas, almacenes, alcance, DB-TEST y rollback.
 - `docs/scope-service-1.md`: resolución backend y pruebas del alcance efectivo.
+- `docs/scope-context-1.md`: contexto activo, selector y pruebas de sesión.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -170,13 +182,13 @@ incluye selector ni contexto activo persistente. El contrato está en
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `SCOPE-SERVICE-1`.
+- Pruebas y cierre formal de `SCOPE-CONTEXT-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
 ## Fuera de alcance de esta fase
 
-- Selector y contexto activo de empresa o almacén.
+- Dashboard, CRUD y operaciones empresariales.
 - Dashboard y layout administrativo final.
 - Productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.

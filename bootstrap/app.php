@@ -10,6 +10,7 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
+use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
@@ -79,6 +80,7 @@ $connection = new ConnectionProvider($databaseConfig);
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
 $userScope = new UserScopeService(new ScopeRepository($connection));
+$scopeContext = new ScopeContextService($userScope, $session);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -86,6 +88,13 @@ $router->middleware(new ErrorHandlingMiddleware($errorHandler));
 $router->middleware(new CsrfMiddleware($csrf));
 
 $registerRoutes = require ROUTES_PATH . '/web.php';
-$registerRoutes($router, $config, $auth, $permissions, $userScope, $csrf);
+$registerRoutes(
+    $router,
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf
+);
 
 return new App($router, $config, $debug, $errorHandler);

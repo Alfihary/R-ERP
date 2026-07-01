@@ -277,6 +277,16 @@ SCOPE-SERVICE-1 resuelve:
 El contexto activo, los filtros de módulos, la validación de recursos y el
 alcance de exportaciones o descargas se implementarán en sus fases autorizadas.
 
+### `ScopeContextService`
+
+SCOPE-CONTEXT-1 mantiene un único par empresa/almacén activo. Depende de
+`UserScopeService`, valida el par antes de guardarlo y conserva únicamente dos
+IDs en sesión.
+
+El contexto activo es una preferencia operativa validada, no una autorización
+de recurso. Los Repositories futuros seguirán obligados a filtrar por alcance y
+los Services deberán validar permiso, alcance, recurso y regla contextual.
+
 La autorización efectiva será:
 
 ```text

@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1`.
-- Fase autorizada y en revisión: `SCOPE-SERVICE-1`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1`.
+- Fase autorizada y en revisión: `SCOPE-CONTEXT-1`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -544,6 +544,7 @@ Commit recomendado: `db: add approved mail and notification schema`.
 | `RBAC-0` | Roles y PermissionService | DB-CORE-0 | Usar solo rol en vistas | alto |
 | `UI-SHELL-0` | Layout autenticado mínimo para `/app` | AUTH-0, RBAC-0 | Dashboard, módulos y menú dinámico | bajo |
 | `SCOPE-SERVICE-1` | UserScopeService y ScopeRepository | DB-SCOPE-1, RBAC-0 | Selector o contexto activo | crítico |
+| `SCOPE-CONTEXT-1` | Contexto activo y selector mínimo | SCOPE-SERVICE-1 | Dashboard o CRUD | alto |
 | `AUDIT-0` | AuditService | DB-CORE-0 | Registrar secretos | alto |
 | `FOLIOS-0` | FolioService | DB-FOLIOS-3, SCOPE-0 | Generar fuera de transacción | alto |
 | `USUARIOS-0` | Administración base | AUTH/RBAC/SCOPE | Módulos operativos | alto |
@@ -643,23 +644,23 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `SCOPE-SERVICE-1`.
+- `main` contiene únicamente el diff revisable de `SCOPE-CONTEXT-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login regenera el ID; logout destruye la sesión.
 - Login y logout validan CSRF.
-- `UserScopeService` devuelve una empresa y un almacén para ADMIN.
-- Usuarios sin asignaciones reciben alcance vacío controlado.
-- Estados inactivos y borrado lógico no conceden alcance.
-- Un almacén fuera de empresas permitidas se descarta.
-- Parámetros del navegador no alteran el alcance.
-- DB-TEST de servicio revierte todos sus datos transitorios.
+- Un único par se selecciona automáticamente.
+- La sesión guarda solo los dos IDs activos.
+- Cambios válidos requieren POST, autenticación, permiso y CSRF.
+- Empresas, almacenes y pares fuera de alcance se rechazan.
+- Contextos inválidos en sesión se eliminan.
+- Usuarios sin alcance reciben estado controlado.
+- DB-TEST de contexto revierte todos sus datos transitorios.
 - La regresión AUTH/RBAC/UI-SHELL continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a selector, contexto activo, dashboard o módulos
-  funcionales.
+- No se ha avanzado a dashboard, CRUD o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -673,7 +674,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `SCOPE-SERVICE-1`.
+- Pruebas y cierre formal de `SCOPE-CONTEXT-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 
@@ -681,7 +682,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 - Ejecutar cualquiera de las fases futuras.
 - Crear dashboard, layout final o módulos funcionales.
-- Implementar selector o contexto activo de alcance.
+- Crear dashboard, CRUD o módulos funcionales.
 - Crear permisos de módulos operativos.
 - Ejecutar contra producción.
 - Hacer deploy.

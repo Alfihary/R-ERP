@@ -9,7 +9,7 @@ use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
-use App\Domain\Scope\UserScopeService;
+use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Support\Security\CsrfTokenService;
@@ -19,7 +19,7 @@ return static function (
     Config $config,
     AuthService $auth,
     PermissionService $permissions,
-    UserScopeService $userScope,
+    ScopeContextService $scopeContext,
     CsrfTokenService $csrf
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
@@ -71,19 +71,46 @@ return static function (
         $auth,
         $config,
         $csrf,
-        $userScope
+        $scopeContext
     ): Response {
         $user = $auth->user();
-        $scope = $userScope->resolveForUser((int) ($user['user_id'] ?? 0));
+        $context = $scopeContext->resolveForUser((int) ($user['user_id'] ?? 0));
 
         return Response::html(View::render('layouts/app', [
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
+            'context' => $context->toArray(),
             'contentView' => 'auth/private',
             'csrf' => $csrf,
             'pageTitle' => 'Inicio',
-            'scope' => $scope->toArray(),
             'user' => $user,
         ]));
+    }, [$authMiddleware, $appPermissionMiddleware]);
+
+    $router->post('/app/contexto', static function (Request $request) use (
+        $auth,
+        $scopeContext
+    ): Response {
+        $user = $auth->user();
+        $companyId = filter_var(
+            $request->input('active_company_id'),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $warehouseId = filter_var(
+            $request->input('active_warehouse_id'),
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+
+        if ($companyId !== false && $warehouseId !== false) {
+            $scopeContext->changeForUser(
+                (int) ($user['user_id'] ?? 0),
+                $companyId,
+                $warehouseId
+            );
+        }
+
+        return Response::redirect('/app');
     }, [$authMiddleware, $appPermissionMiddleware]);
 
     $router->post('/logout', static function (Request $request) use ($auth): Response {
