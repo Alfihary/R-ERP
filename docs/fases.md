@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1`.
-- Fase autorizada y en revisión: `APP-HOME-1`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1`.
+- Fase autorizada y en revisión: `DB-CATALOGOS-1`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -437,31 +437,36 @@ Riesgo: medio.
 
 Commit recomendado: `db: add controlled UI themes`.
 
-### `DB-CATALOGOS-5`
+### `DB-CATALOGOS-1`
 
-Objetivo futuro:
+Objetivo:
 
-- Crear catálogos globales iniciales.
+- Crear catálogos globales iniciales sin productos ni operación.
 
-Tablas candidatas:
+Tablas:
 
-- `productos`
-- `unidades_medida`
-- `marcas`
-- `lineas_producto`
-- `clasificaciones_producto`
 - `monedas`
+- `tipos_cambio`
+- `unidades_medida`
 - `impuestos`
-- `unidades_sat`
-- `claves_sat`
+- `lineas_producto`
+- `marcas`
+- `clasificaciones_producto`
+
+Artefactos:
+
+- Migración `db_catalogos_1_001_create_base_catalog_tables`.
+- Seed idempotente `db_catalogos_1_seed_base_catalogs`.
+- Runner CLI `database/catalogos.php`.
+- DB-TEST-CATALOGOS transaccional.
 
 No hacer:
 
-- Existencias, compras o ventas.
+- Productos, CRUD, existencias, compras o ventas.
 
 Riesgo: medio-alto.
 
-Commit recomendado: `db: add approved global catalogs`.
+Commit recomendado: `db: add base catalog schema`.
 
 ### `DB-INVENTARIO-6`
 
@@ -559,7 +564,7 @@ separada.
 
 | Fase | Objetivo futuro | Prerrequisitos mínimos | Qué no debe mezclarse |
 |---|---|---|---|
-| `CATALOGOS-0` | CRUD de catálogos aprobados | DB-CATALOGOS-5, RBAC, SCOPE | Inventario |
+| `CATALOGOS-0` | CRUD de catálogos aprobados | DB-CATALOGOS-1, RBAC, SCOPE | Inventario |
 | `PRODUCTOS-0` | Producto global y archivos | CATALOGOS-0 | Existencias y movimientos |
 | `EXISTENCIAS-0` | Consulta de saldo | DB-INVENTARIO-6, SCOPE | Ajustes |
 | `INVENTARIO-0` | Movimientos y ajustes | EXISTENCIAS-0, FOLIOS-0, AUDIT-0 | Compras/ventas completas |
@@ -645,21 +650,23 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `APP-HOME-1`.
+- `main` contiene únicamente el diff revisable de `DB-CATALOGOS-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login y logout validan CSRF.
-- `/app` muestra sesión, empresa y almacén activos sin exponer datos internos.
-- El selector de contexto conserva autenticación, permiso y CSRF.
-- La interfaz funciona sin overflow horizontal en escritorio y móvil.
-- Solo se ofrecen accesos reales a inicio y cierre de sesión.
-- Las capacidades futuras se muestran como no disponibles y sin enlaces.
-- No existen métricas, gráficas, datos ficticios, CRUD ni módulos funcionales.
-- La regresión AUTH/RBAC/SCOPE continúa aprobada.
+- La migración y el seed son idempotentes.
+- Existen las siete tablas aprobadas con InnoDB, índices y FKs.
+- MXN es la única moneda base.
+- Los códigos y tipos de cambio duplicados se rechazan.
+- Tasas y tipos de cambio inválidos se rechazan.
+- La jerarquía válida se acepta y padres inexistentes se rechazan.
+- DB-TEST revierte todos sus datos transitorios.
+- Los conteos persistentes coinciden con el seed mínimo.
+- La regresión AUTH/RBAC/SCOPE/APP-HOME continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a dashboard analítico, CRUD o módulos funcionales.
+- No se ha avanzado a CRUD, productos, inventario o módulos funcionales.
 
 ## Reglas obligatorias
 
@@ -673,7 +680,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `APP-HOME-1`.
+- Pruebas y cierre formal de `DB-CATALOGOS-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 

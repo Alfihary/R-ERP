@@ -7,8 +7,8 @@ auditoría y folios.
 ## Estado actual
 
 Fases cerradas:
-`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1`.
-Fase autorizada y en revisión: `APP-HOME-1`.
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1`.
+Fase autorizada y en revisión: `DB-CATALOGOS-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -24,6 +24,8 @@ crear módulos de negocio. SCOPE-CONTEXT-1 mantiene en sesión el par activo
 empresa/almacén validado contra ese alcance.
 APP-HOME-1 convierte `/app` en un inicio operativo sin métricas, módulos ni
 datos ficticios.
+DB-CATALOGOS-1 incorpora siete catálogos globales estructurales sin crear
+productos, inventario, CRUD ni operaciones empresariales.
 
 ## Arranque local
 
@@ -139,6 +141,21 @@ La pantalla no es un dashboard analítico o funcional: no contiene métricas,
 gráficas, actividad ficticia, CRUD ni enlaces a módulos pendientes. El contrato
 está en `docs/app-home-1.md`.
 
+## DB-CATALOGOS-1
+
+DB-CATALOGOS-1 crea monedas, tipos de cambio, unidades de medida, impuestos,
+líneas, marcas y clasificaciones de producto. El seed incorpora tres monedas,
+cinco unidades y tres impuestos; no crea líneas, marcas, clasificaciones,
+productos ni inventario.
+
+```powershell
+php database/catalogos.php migrate --database=<db-test> --confirm-database=<db-test>
+php database/catalogos.php seed --database=<db-test> --confirm-database=<db-test>
+php database/catalogos.php db:test --database=<db-test> --confirm-database=<db-test>
+```
+
+El contrato está en `docs/db-catalogos-1.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -170,6 +187,7 @@ está en `docs/app-home-1.md`.
 - `docs/scope-service-1.md`: resolución backend y pruebas del alcance efectivo.
 - `docs/scope-context-1.md`: contexto activo, selector y pruebas de sesión.
 - `docs/app-home-1.md`: inicio operativo, límites y pruebas de presentación.
+- `docs/db-catalogos-1.md`: catálogos base, seed, DB-TEST y rollback.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -195,7 +213,7 @@ está en `docs/app-home-1.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `APP-HOME-1`.
+- Pruebas y cierre formal de `DB-CATALOGOS-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 

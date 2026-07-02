@@ -3,10 +3,11 @@
 ## Estado del documento
 
 - Fase base: `DOCS-0`.
-- Estado actual: `DB-CORE-0` implementada con DB-TEST aprobado.
+- Estado actual: `DB-CATALOGOS-1` autorizada y en revisión.
 - Motor objetivo: MySQL con InnoDB.
-- El alcance ejecutable actual se limita a identidad, relaciones y auditoría
-  descritas en `docs/db-core-0.md`.
+- El alcance ejecutable actual incluye identidad, alcance empresa/almacén y
+  los catálogos globales descritos en `docs/db-catalogos-1.md`; todavía no
+  existen productos, inventario ni operaciones.
 
 ## Objetivo
 
@@ -332,7 +333,8 @@ almacenes 0..1---N series_folios
 usuarios 0..1---N auditoria_logs
 ```
 
-Las relaciones de catálogos y módulos posteriores se aprobarán en su fase.
+Las relaciones de los catálogos base están aprobadas en DB-CATALOGOS-1. Las
+relaciones con productos y módulos operativos continúan pendientes.
 
 ## Orden de fases
 
@@ -343,7 +345,7 @@ Las relaciones de catálogos y módulos posteriores se aprobarán en su fase.
 | `DB-SECURITY-2` | intentos, recuperación y sesiones si se aprueban |
 | `DB-FOLIOS-3` | series de folios |
 | `DB-THEMES-4` | temas y tokens opcionales |
-| `DB-CATALOGOS-5` | productos y catálogos globales |
+| `DB-CATALOGOS-1` | catálogos globales base, sin productos |
 | `DB-INVENTARIO-6` | existencias, movimientos y conceptos |
 | `DB-TICKETS-7` | tickets, partidas, comentarios y archivos |
 | `DB-MAIL-8` | plantillas, cola, logs y reglas de notificación |
