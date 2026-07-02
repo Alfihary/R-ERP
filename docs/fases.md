@@ -565,6 +565,7 @@ separada.
 | Fase | Objetivo futuro | Prerrequisitos mínimos | Qué no debe mezclarse |
 |---|---|---|---|
 | `CRUD-CATALOGOS-1` | CRUD de cinco catálogos simples | DB-CATALOGOS-1, RBAC, SCOPE | Tipos de cambio, jerarquías, productos e inventario |
+| `CRUD-CATALOGOS-2` | CRUD jerárquico de clasificaciones | CRUD-CATALOGOS-1, DB-CATALOGOS-1, RBAC | Tipos de cambio, productos e inventario |
 | `PRODUCTOS-0` | Producto global y archivos | CATALOGOS-0 | Existencias y movimientos |
 | `EXISTENCIAS-0` | Consulta de saldo | DB-INVENTARIO-6, SCOPE | Ajustes |
 | `INVENTARIO-0` | Movimientos y ajustes | EXISTENCIAS-0, FOLIOS-0, AUDIT-0 | Compras/ventas completas |
@@ -650,14 +651,17 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `CRUD-CATALOGOS-1`.
+- `main` contiene únicamente el diff revisable de `CRUD-CATALOGOS-2`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login y logout validan CSRF.
-- Los 21 permisos se crean y asignan a ADMIN sin duplicados.
+- Los cuatro permisos nuevos se crean y asignan a ADMIN sin duplicar los 21
+  permisos de CRUD-CATALOGOS-1.
 - Cada ruta privada exige autenticación y permiso específico.
 - Cada escritura exige CSRF y validación backend.
-- Los cinco catálogos aceptan alta, edición y cambio de estado.
+- Clasificaciones acepta raíces, hijos, edición y cambios seguros de estado.
+- El servicio rechaza autorreferencias, padres inexistentes y ciclos directos
+  o indirectos.
 - Duplicados y entradas inválidas se rechazan de forma controlada.
 - No existe borrado físico.
 - DB-TEST-CATALOGOS continúa aprobado.
@@ -665,7 +669,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a tipos de cambio, clasificaciones, productos o inventario.
+- No se ha avanzado a tipos de cambio, productos o inventario.
 
 ## Reglas obligatorias
 
@@ -679,7 +683,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `CRUD-CATALOGOS-1`.
+- Pruebas y cierre formal de `CRUD-CATALOGOS-2`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 

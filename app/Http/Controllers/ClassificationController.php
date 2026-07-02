@@ -11,11 +11,12 @@ use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\CatalogValidationException;
+use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Support\Security\CsrfTokenService;
 
-final class CatalogController
+final class ClassificationController
 {
     public function __construct(
         private readonly Config $config,
@@ -23,29 +24,14 @@ final class CatalogController
         private readonly PermissionService $permissions,
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
-        private readonly CatalogService $catalogs
+        private readonly CatalogService $catalogs,
+        private readonly ClassificationService $classifications
     ) {
     }
 
     public function index(Request $request): Response
     {
-        $user = $this->user();
-
         return $this->render(
-            'catalogs/index',
-            [
-                'availableCatalogs' => $this->viewableDefinitions(
-                    $user['user_id']
-                ),
-            ],
-            'Catálogos'
-        );
-    }
-
-    public function show(Request $request, string $catalog): Response
-    {
-        return $this->renderCatalog(
-            $catalog,
             200,
             [],
             [],
@@ -55,19 +41,17 @@ final class CatalogController
         );
     }
 
-    public function create(Request $request, string $catalog): Response
+    public function create(Request $request): Response
     {
         $user = $this->user();
 
         try {
-            $this->catalogs->create(
-                $catalog,
+            $this->classifications->create(
                 $request->body(),
                 $user['user_id']
             );
         } catch (CatalogValidationException $exception) {
-            return $this->renderCatalog(
-                $catalog,
+            return $this->render(
                 422,
                 $exception->errors(),
                 $request->body(),
@@ -78,71 +62,61 @@ final class CatalogController
         }
 
         return Response::redirect(
-            '/catalogos/' . $this->catalogs->definition($catalog)['slug']
-            . '?result=created'
+            '/catalogos/clasificaciones?result=created'
         );
     }
 
-    public function update(Request $request, string $catalog): Response
+    public function update(Request $request): Response
     {
         $user = $this->user();
         $id = $this->id($request);
 
         try {
-            $this->catalogs->update(
-                $catalog,
-                $id,
+            $this->classifications->update(
                 $request->body(),
                 $user['user_id']
             );
         } catch (CatalogValidationException $exception) {
-            return $this->renderCatalog(
-                $catalog,
+            return $this->render(
                 422,
                 $exception->errors(),
                 $request->body(),
                 'update',
-                $id > 0 ? $id : null,
+                $id,
                 null
             );
         }
 
         return Response::redirect(
-            '/catalogos/' . $this->catalogs->definition($catalog)['slug']
-            . '?result=updated'
+            '/catalogos/clasificaciones?result=updated'
         );
     }
 
-    public function state(
-        Request $request,
-        string $catalog,
-        bool $active
-    ): Response {
+    public function state(Request $request, bool $active): Response
+    {
         $user = $this->user();
         $id = $this->id($request);
 
         try {
-            $this->catalogs->setActive(
-                $catalog,
-                $id,
+            $this->classifications->setActive(
+                $request->body(),
                 $active,
                 $user['user_id']
             );
         } catch (CatalogValidationException $exception) {
-            return $this->renderCatalog(
-                $catalog,
+            return $this->render(
                 422,
                 $exception->errors(),
                 [],
                 'state',
-                $id > 0 ? $id : null,
+                $id,
                 null
             );
         }
 
         return Response::redirect(
-            '/catalogos/' . $this->catalogs->definition($catalog)['slug']
-            . '?result=' . ($active ? 'activated' : 'deactivated')
+            '/catalogos/clasificaciones?result='
+            . ($active ? 'activated' : 'deactivated')
         );
     }
 
@@ -150,8 +124,7 @@ final class CatalogController
      * @param array<string, string> $errors
      * @param array<string, mixed> $formData
      */
-    private function renderCatalog(
-        string $catalog,
+    private function render(
         int $status,
         array $errors,
         array $formData,
@@ -159,50 +132,17 @@ final class CatalogController
         ?int $failedId,
         ?string $notice
     ): Response {
-        $definition = $this->catalogs->definition($catalog);
         $user = $this->user();
-        $prefix = 'catalogos.' . $definition['permission'] . '.';
+        $context = $this->scopeContext->resolveForUser($user['user_id']);
+        $hierarchy = $this->classifications->viewData();
         $abilities = [];
 
         foreach (['crear', 'editar', 'estado'] as $action) {
             $abilities[$action] = $this->permissions->allows(
                 $user['user_id'],
-                $prefix . $action
+                'catalogos.clasificaciones.' . $action
             );
         }
-
-        return $this->render(
-            'catalogs/manage',
-            [
-                'abilities' => $abilities,
-                'catalog' => $catalog,
-                'catalogDefinition' => $definition,
-                'errors' => $errors,
-                'failedAction' => $failedAction,
-                'failedId' => $failedId,
-                'formData' => $formData,
-                'notice' => $notice,
-                'records' => $this->catalogs->list($catalog),
-                'viewableCatalogs' => $this->viewableDefinitions(
-                    $user['user_id']
-                ),
-            ],
-            $definition['title'],
-            $status
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $contentData
-     */
-    private function render(
-        string $contentView,
-        array $contentData,
-        string $pageTitle,
-        int $status = 200
-    ): Response {
-        $user = $this->user();
-        $context = $this->scopeContext->resolveForUser($user['user_id']);
 
         return Response::html(View::render('layouts/app', [
             'activeNavigation' => 'catalogs',
@@ -211,11 +151,25 @@ final class CatalogController
                 'SoporteGR ERP'
             ),
             'canAccessCatalogs' => true,
-            'contentData' => $contentData,
-            'contentView' => $contentView,
+            'contentData' => [
+                'abilities' => $abilities,
+                'createParentOptions' =>
+                    $hierarchy['create_parent_options'],
+                'editParentOptions' =>
+                    $hierarchy['edit_parent_options'],
+                'errors' => $errors,
+                'failedAction' => $failedAction,
+                'failedId' => $failedId,
+                'formData' => $formData,
+                'notice' => $notice,
+                'records' => $hierarchy['records'],
+                'viewableCatalogs' =>
+                    $this->viewableCatalogDefinitions($user['user_id']),
+            ],
+            'contentView' => 'catalogs/classifications',
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
-            'pageTitle' => $pageTitle,
+            'pageTitle' => 'Clasificaciones de producto',
             'stylesheets' => ['/css/modules/catalogs.css'],
             'user' => $user,
         ]), $status);
@@ -230,14 +184,14 @@ final class CatalogController
 
         if ($user === null) {
             throw new \RuntimeException(
-                'Authenticated catalog controller requires a user.'
+                'Authenticated classification controller requires a user.'
             );
         }
 
         return $user;
     }
 
-    private function id(Request $request): int
+    private function id(Request $request): ?int
     {
         $id = filter_var(
             $request->input('id'),
@@ -245,18 +199,16 @@ final class CatalogController
             ['options' => ['min_range' => 1]]
         );
 
-        return $id === false ? 0 : $id;
+        return $id === false ? null : $id;
     }
 
     private function resultMessage(Request $request): ?string
     {
-        $result = $request->query()['result'] ?? null;
-
-        return match ($result) {
-            'created' => 'Registro creado correctamente.',
-            'updated' => 'Registro actualizado correctamente.',
-            'activated' => 'Registro activado correctamente.',
-            'deactivated' => 'Registro desactivado correctamente.',
+        return match ($request->query()['result'] ?? null) {
+            'created' => 'Clasificación creada correctamente.',
+            'updated' => 'Clasificación actualizada correctamente.',
+            'activated' => 'Clasificación activada correctamente.',
+            'deactivated' => 'Clasificación desactivada correctamente.',
             default => null,
         };
     }
@@ -269,7 +221,7 @@ final class CatalogController
      *     permission: string
      * }>
      */
-    private function viewableDefinitions(int $userId): array
+    private function viewableCatalogDefinitions(int $userId): array
     {
         $available = [];
 

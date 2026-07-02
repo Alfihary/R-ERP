@@ -243,6 +243,17 @@
     font-size: 0.8125rem;
 }
 
+.catalog-table--classifications {
+    min-width: 66rem;
+}
+
+.classification-path {
+    display: block;
+    max-width: 28rem;
+    color: var(--color-muted);
+    overflow-wrap: anywhere;
+}
+
 .catalog-table th,
 .catalog-table td {
     padding: 0.75rem 1rem;

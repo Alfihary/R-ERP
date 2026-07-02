@@ -10,6 +10,7 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
+use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -17,10 +18,12 @@ use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\ClassificationController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
+use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
@@ -83,6 +86,9 @@ $connection = new ConnectionProvider($databaseConfig);
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
 $catalogs = new CatalogService(new CatalogRepository($connection));
+$classifications = new ClassificationService(
+    new ClassificationRepository($connection)
+);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -92,6 +98,15 @@ $catalogController = new CatalogController(
     $scopeContext,
     $csrf,
     $catalogs
+);
+$classificationController = new ClassificationController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $classifications
 );
 
 $router = new Router();
@@ -107,7 +122,8 @@ $registerRoutes(
     $permissions,
     $scopeContext,
     $csrf,
-    $catalogController
+    $catalogController,
+    $classificationController
 );
 
 return new App($router, $config, $debug, $errorHandler);

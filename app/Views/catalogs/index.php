@@ -12,6 +12,8 @@ $descriptions = [
     'impuestos' => 'Tasas y tipos estructurales aprobados.',
     'lineas' => 'Agrupación general para productos futuros.',
     'marcas' => 'Marcas globales para productos futuros.',
+    'clasificaciones' =>
+        'Jerarquía padre-hijo para organizar productos futuros.',
 ];
 ?>
 <header class="catalog-page-heading">
@@ -53,6 +55,6 @@ $descriptions = [
 </section>
 
 <p class="catalog-scope-note">
-    Tipos de cambio y clasificaciones de producto permanecen fuera de esta
-    fase por sus reglas adicionales de vigencia y jerarquía.
+    Los tipos de cambio permanecen fuera de esta fase por sus reglas
+    adicionales de vigencia y conversión.
 </p>

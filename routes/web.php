@@ -13,6 +13,7 @@ use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\ClassificationController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -22,7 +23,8 @@ return static function (
     PermissionService $permissions,
     ScopeContextService $scopeContext,
     CsrfTokenService $csrf,
-    CatalogController $catalogController
+    CatalogController $catalogController,
+    ClassificationController $classificationController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -216,4 +218,66 @@ return static function (
             $stateMiddleware
         );
     }
+
+    $classificationPermissionPrefix = 'catalogos.clasificaciones.';
+    $classificationBasePath = '/catalogos/clasificaciones';
+    $classificationViewMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $classificationPermissionPrefix . 'ver'
+        ),
+    ]);
+    $classificationCreateMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $classificationPermissionPrefix . 'crear'
+        ),
+    ]);
+    $classificationEditMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $classificationPermissionPrefix . 'editar'
+        ),
+    ]);
+    $classificationStateMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $classificationPermissionPrefix . 'estado'
+        ),
+    ]);
+
+    $router->get(
+        $classificationBasePath,
+        static fn (Request $request): Response =>
+            $classificationController->index($request),
+        $classificationViewMiddleware
+    );
+    $router->post(
+        $classificationBasePath,
+        static fn (Request $request): Response =>
+            $classificationController->create($request),
+        $classificationCreateMiddleware
+    );
+    $router->post(
+        $classificationBasePath . '/actualizar',
+        static fn (Request $request): Response =>
+            $classificationController->update($request),
+        $classificationEditMiddleware
+    );
+    $router->post(
+        $classificationBasePath . '/activar',
+        static fn (Request $request): Response =>
+            $classificationController->state($request, true),
+        $classificationStateMiddleware
+    );
+    $router->post(
+        $classificationBasePath . '/desactivar',
+        static fn (Request $request): Response =>
+            $classificationController->state($request, false),
+        $classificationStateMiddleware
+    );
 };
