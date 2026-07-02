@@ -9,15 +9,18 @@ use App\Core\ErrorHandler;
 use App\Core\Router;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
+use App\Domain\Catalogs\CatalogService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
+use App\Http\Controllers\CatalogController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
+use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
@@ -79,8 +82,17 @@ if (!is_array($databaseConfig)) {
 $connection = new ConnectionProvider($databaseConfig);
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
+$catalogs = new CatalogService(new CatalogRepository($connection));
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
+$catalogController = new CatalogController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -94,7 +106,8 @@ $registerRoutes(
     $auth,
     $permissions,
     $scopeContext,
-    $csrf
+    $csrf,
+    $catalogController
 );
 
 return new App($router, $config, $debug, $errorHandler);

@@ -22,6 +22,7 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
 $hasScope = ($context['has_scope'] ?? false) === true;
 $hasActiveContext = ($context['has_active_context'] ?? false) === true;
 $requiresSelection = ($context['requires_selection'] ?? false) === true;
+$canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 ?>
 <header class="page-heading">
     <div class="page-heading__eyebrow">
@@ -244,6 +245,12 @@ $requiresSelection = ($context['requires_selection'] ?? false) === true;
                 <span>Cierre seguro de sesión</span>
                 <strong>Disponible en la barra superior</strong>
             </li>
+            <?php if ($canAccessCatalogs): ?>
+                <li>
+                    <span>Catálogos base</span>
+                    <strong>Disponible en la navegación</strong>
+                </li>
+            <?php endif; ?>
         </ul>
     </section>
 
@@ -256,7 +263,7 @@ $requiresSelection = ($context['requires_selection'] ?? false) === true;
         </div>
         <ul class="plain-status-list plain-status-list--pending">
             <li>
-                <span>Catálogos y productos</span>
+                <span>Productos</span>
                 <strong>No disponibles</strong>
             </li>
             <li>

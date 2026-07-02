@@ -3,8 +3,8 @@
 ## Estado del documento
 
 - Fases cerradas:
-  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1`.
-- Fase autorizada y en revisión: `DB-CATALOGOS-1`.
+  `GIT-0 + DOCS-0 + ARCH-0 + CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1 + DB-CATALOGOS-1`.
+- Fase autorizada y en revisión: `CRUD-CATALOGOS-1`.
 - Las fases siguientes son planificación, no autorización.
 
 ## Objetivo
@@ -564,7 +564,7 @@ separada.
 
 | Fase | Objetivo futuro | Prerrequisitos mínimos | Qué no debe mezclarse |
 |---|---|---|---|
-| `CATALOGOS-0` | CRUD de catálogos aprobados | DB-CATALOGOS-1, RBAC, SCOPE | Inventario |
+| `CRUD-CATALOGOS-1` | CRUD de cinco catálogos simples | DB-CATALOGOS-1, RBAC, SCOPE | Tipos de cambio, jerarquías, productos e inventario |
 | `PRODUCTOS-0` | Producto global y archivos | CATALOGOS-0 | Existencias y movimientos |
 | `EXISTENCIAS-0` | Consulta de saldo | DB-INVENTARIO-6, SCOPE | Ajustes |
 | `INVENTARIO-0` | Movimientos y ajustes | EXISTENCIAS-0, FOLIOS-0, AUDIT-0 | Compras/ventas completas |
@@ -650,23 +650,22 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `DB-CATALOGOS-1`.
+- `main` contiene únicamente el diff revisable de `CRUD-CATALOGOS-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login y logout validan CSRF.
-- La migración y el seed son idempotentes.
-- Existen las siete tablas aprobadas con InnoDB, índices y FKs.
-- MXN es la única moneda base.
-- Los códigos y tipos de cambio duplicados se rechazan.
-- Tasas y tipos de cambio inválidos se rechazan.
-- La jerarquía válida se acepta y padres inexistentes se rechazan.
-- DB-TEST revierte todos sus datos transitorios.
-- Los conteos persistentes coinciden con el seed mínimo.
+- Los 21 permisos se crean y asignan a ADMIN sin duplicados.
+- Cada ruta privada exige autenticación y permiso específico.
+- Cada escritura exige CSRF y validación backend.
+- Los cinco catálogos aceptan alta, edición y cambio de estado.
+- Duplicados y entradas inválidas se rechazan de forma controlada.
+- No existe borrado físico.
+- DB-TEST-CATALOGOS continúa aprobado.
 - La regresión AUTH/RBAC/SCOPE/APP-HOME continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a CRUD, productos, inventario o módulos funcionales.
+- No se ha avanzado a tipos de cambio, clasificaciones, productos o inventario.
 
 ## Reglas obligatorias
 
@@ -680,7 +679,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `DB-CATALOGOS-1`.
+- Pruebas y cierre formal de `CRUD-CATALOGOS-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 

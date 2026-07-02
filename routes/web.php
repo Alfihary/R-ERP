@@ -12,6 +12,7 @@ use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
+use App\Http\Controllers\CatalogController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -20,7 +21,8 @@ return static function (
     AuthService $auth,
     PermissionService $permissions,
     ScopeContextService $scopeContext,
-    CsrfTokenService $csrf
+    CsrfTokenService $csrf,
+    CatalogController $catalogController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -71,13 +73,23 @@ return static function (
         $auth,
         $config,
         $csrf,
-        $scopeContext
+        $scopeContext,
+        $permissions
     ): Response {
         $user = $auth->user();
         $context = $scopeContext->resolveForUser((int) ($user['user_id'] ?? 0));
+        $canAccessCatalogs = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'catalogos.acceder'
+        );
 
         return Response::html(View::render('layouts/app', [
+            'activeNavigation' => 'home',
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
+            'canAccessCatalogs' => $canAccessCatalogs,
+            'contentData' => [
+                'canAccessCatalogs' => $canAccessCatalogs,
+            ],
             'context' => $context->toArray(),
             'contentView' => 'auth/private',
             'csrf' => $csrf,
@@ -118,4 +130,90 @@ return static function (
 
         return Response::redirect('/login');
     }, [$authMiddleware]);
+
+    $catalogAccessMiddleware = new PermissionMiddleware(
+        $auth,
+        $permissions,
+        'catalogos.acceder'
+    );
+    $catalogBaseMiddleware = [$authMiddleware, $catalogAccessMiddleware];
+
+    $router->get(
+        '/catalogos',
+        static fn (Request $request): Response =>
+            $catalogController->index($request),
+        $catalogBaseMiddleware
+    );
+
+    foreach (
+        [
+            'monedas' => 'monedas',
+            'unidades' => 'unidades',
+            'impuestos' => 'impuestos',
+            'lineas' => 'lineas',
+            'marcas' => 'marcas',
+        ] as $slug => $catalog
+    ) {
+        $permissionPrefix = 'catalogos.' . $catalog . '.';
+        $viewMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'ver'
+            ),
+        ]);
+        $createMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'crear'
+            ),
+        ]);
+        $editMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'editar'
+            ),
+        ]);
+        $stateMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'estado'
+            ),
+        ]);
+        $basePath = '/catalogos/' . $slug;
+
+        $router->get(
+            $basePath,
+            static fn (Request $request): Response =>
+                $catalogController->show($request, $catalog),
+            $viewMiddleware
+        );
+        $router->post(
+            $basePath,
+            static fn (Request $request): Response =>
+                $catalogController->create($request, $catalog),
+            $createMiddleware
+        );
+        $router->post(
+            $basePath . '/actualizar',
+            static fn (Request $request): Response =>
+                $catalogController->update($request, $catalog),
+            $editMiddleware
+        );
+        $router->post(
+            $basePath . '/activar',
+            static fn (Request $request): Response =>
+                $catalogController->state($request, $catalog, true),
+            $stateMiddleware
+        );
+        $router->post(
+            $basePath . '/desactivar',
+            static fn (Request $request): Response =>
+                $catalogController->state($request, $catalog, false),
+            $stateMiddleware
+        );
+    }
 };

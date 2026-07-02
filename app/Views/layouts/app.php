@@ -13,15 +13,27 @@ if (!$csrf instanceof CsrfTokenService
     throw new RuntimeException('Authenticated layout context is incomplete.');
 }
 
+$contentData = is_array($contentData ?? null) ? $contentData : [];
 $content = View::render($contentView, [
     'context' => $context,
     'csrf' => $csrf,
     'user' => $user,
-]);
+] + $contentData);
 $appName = is_string($appName ?? null) && $appName !== ''
     ? $appName
     : 'SoporteGR ERP';
 $appName = trim($appName, " \t\n\r\0\x0B\"'");
+$activeNavigation = is_string($activeNavigation ?? null)
+    ? $activeNavigation
+    : 'home';
+$canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
+$stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
+$activeCompany = is_array($context['active_company'] ?? null)
+    ? $context['active_company']
+    : null;
+$activeWarehouse = is_array($context['active_warehouse'] ?? null)
+    ? $context['active_warehouse']
+    : null;
 ?>
 <!doctype html>
 <html lang="es">
@@ -31,6 +43,14 @@ $appName = trim($appName, " \t\n\r\0\x0B\"'");
     <meta name="color-scheme" content="light">
     <title><?= e($pageTitle ?? 'Inicio') ?> · <?= e($appName) ?></title>
     <link rel="stylesheet" href="/css/core/app.css">
+    <?php foreach ($stylesheets as $stylesheet): ?>
+        <?php if (
+            is_string($stylesheet)
+            && preg_match('#^/css/[a-z0-9/_-]+\.css$#', $stylesheet) === 1
+        ): ?>
+            <link rel="stylesheet" href="<?= e($stylesheet) ?>">
+        <?php endif; ?>
+    <?php endforeach; ?>
 </head>
 <body class="app-body">
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
@@ -46,10 +66,24 @@ $appName = trim($appName, " \t\n\r\0\x0B\"'");
             </a>
 
             <nav class="app-navigation" aria-label="Secciones">
-                <a class="app-navigation__item is-active" href="/app" aria-current="page">
+                <a
+                    class="app-navigation__item<?= $activeNavigation === 'home' ? ' is-active' : '' ?>"
+                    href="/app"
+                    <?= $activeNavigation === 'home' ? 'aria-current="page"' : '' ?>
+                >
                     <span aria-hidden="true">⌂</span>
                     Inicio
                 </a>
+                <?php if ($canAccessCatalogs): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'catalogs' ? ' is-active' : '' ?>"
+                        href="/catalogos"
+                        <?= $activeNavigation === 'catalogs' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▦</span>
+                        Catálogos
+                    </a>
+                <?php endif; ?>
             </nav>
 
             <p class="app-sidebar__note">
@@ -61,7 +95,14 @@ $appName = trim($appName, " \t\n\r\0\x0B\"'");
             <header class="app-topbar">
                 <div class="app-topbar__context">
                     <span>Área privada</span>
-                    <strong>Inicio</strong>
+                    <strong><?= e($pageTitle ?? 'Inicio') ?></strong>
+                    <?php if ($activeCompany !== null && $activeWarehouse !== null): ?>
+                        <small>
+                            <?= e($activeCompany['name'] ?? '') ?>
+                            ·
+                            <?= e($activeWarehouse['name'] ?? '') ?>
+                        </small>
+                    <?php endif; ?>
                 </div>
 
                 <div class="app-account">

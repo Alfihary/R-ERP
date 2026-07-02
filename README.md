@@ -7,8 +7,8 @@ auditoría y folios.
 ## Estado actual
 
 Fases cerradas:
-`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1`.
-Fase autorizada y en revisión: `DB-CATALOGOS-1`.
+`CONFIG-0 + SECURITY-0 + DB-CORE-0 + AUTH-0 + RBAC-0 + UI-SHELL-0 + DB-SCOPE-1 + SCOPE-SERVICE-1 + SCOPE-CONTEXT-1 + APP-HOME-1 + DB-CATALOGOS-1`.
+Fase autorizada y en revisión: `CRUD-CATALOGOS-1`.
 
 El repositorio contiene un arranque técnico mínimo con entry point público,
 autoload `App\`, configuración por entorno y rutas `GET /` y `GET /health`.
@@ -26,6 +26,8 @@ APP-HOME-1 convierte `/app` en un inicio operativo sin métricas, módulos ni
 datos ficticios.
 DB-CATALOGOS-1 incorpora siete catálogos globales estructurales sin crear
 productos, inventario, CRUD ni operaciones empresariales.
+CRUD-CATALOGOS-1 administra monedas, unidades, impuestos, líneas y marcas con
+permisos por acción, CSRF y validación backend.
 
 ## Arranque local
 
@@ -156,6 +158,15 @@ php database/catalogos.php db:test --database=<db-test> --confirm-database=<db-t
 
 El contrato está en `docs/db-catalogos-1.md`.
 
+## CRUD-CATALOGOS-1
+
+La sección privada `/catalogos` permite administrar cinco catálogos simples
+mediante formularios y tablas operativas. Todas las escrituras usan POST, CSRF,
+permisos específicos y PDO preparado.
+
+Tipos de cambio, clasificaciones jerárquicas, productos e inventario permanecen
+fuera de alcance. El contrato está en `docs/crud-catalogos-1.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -188,6 +199,7 @@ El contrato está en `docs/db-catalogos-1.md`.
 - `docs/scope-context-1.md`: contexto activo, selector y pruebas de sesión.
 - `docs/app-home-1.md`: inicio operativo, límites y pruebas de presentación.
 - `docs/db-catalogos-1.md`: catálogos base, seed, DB-TEST y rollback.
+- `docs/crud-catalogos-1.md`: rutas, permisos, validaciones y límites del CRUD.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -213,7 +225,7 @@ El contrato está en `docs/db-catalogos-1.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `DB-CATALOGOS-1`.
+- Pruebas y cierre formal de `CRUD-CATALOGOS-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 

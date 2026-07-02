@@ -186,6 +186,13 @@ a {
     font-size: 1rem;
 }
 
+.app-topbar__context small {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--color-muted);
+    font-size: 0.6875rem;
+}
+
 .app-account {
     display: flex;
     align-items: center;
@@ -617,12 +624,21 @@ a {
 }
 
 @media (max-width: 34rem) {
-    .app-topbar__context {
-        display: none;
+    .app-topbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    .app-topbar {
-        justify-content: flex-end;
+    .app-account {
+        align-items: center;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .app-account__identity {
+        max-width: min(13rem, 60vw);
+        text-align: left;
     }
 
     .page-heading__eyebrow,
