@@ -468,6 +468,33 @@ Riesgo: medio-alto.
 
 Commit recomendado: `db: add base catalog schema`.
 
+### `DB-PRODUCTOS-1`
+
+Objetivo:
+
+- Crear productos globales y relaciones estructurales sin CRUD ni operación.
+
+Tablas:
+
+- `productos`
+- `producto_codigos_barras`
+- `producto_impuestos`
+- `producto_documentos`
+
+Identidad:
+
+- `id_producto VARCHAR(16) ascii_bin` como única PK natural.
+- Regla exacta `^[A-Z0-9]{1,16}$`.
+- Sin `id`, `producto_id`, UUID, slug o identidad alternativa.
+
+No hacer:
+
+- CRUD, inventario, precios, documentos funcionales o módulos operativos.
+
+Riesgo: medio-alto.
+
+Commit recomendado: `db: add product base schema`.
+
 ### `DB-INVENTARIO-6`
 
 Objetivo futuro:
@@ -651,25 +678,24 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `CRUD-TIPOS-CAMBIO-1`.
+- `main` contiene únicamente el diff revisable de `DB-PRODUCTOS-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login y logout validan CSRF.
-- Los cuatro permisos nuevos se crean y asignan a ADMIN sin duplicar los 25
-  permisos de catálogos previos.
-- Cada ruta privada exige autenticación y permiso específico.
-- Cada escritura exige CSRF y validación backend.
-- Tipos de cambio acepta creación, edición y cambios de estado.
-- El servicio rechaza monedas inexistentes o inactivas, pares iguales, fechas
-  inválidas, valores no positivos o fuera de precisión y combinaciones
-  duplicadas.
-- No existe borrado físico.
+- La migración crea cuatro tablas y la segunda ejecución es idempotente.
+- `id_producto` es `VARCHAR(16) ascii_bin`, única PK natural y sin identidad
+  alternativa.
+- El CHECK rechaza minúsculas, espacios, acentos, guiones, caracteres
+  especiales, vacío y longitud mayor a 16.
+- Las tablas hijas referencian directamente `productos(id_producto)`.
+- FKs e índices respetan `RESTRICT` y `SET NULL` documentados.
+- No existe seed de productos.
 - DB-TEST-CATALOGOS continúa aprobado.
 - La regresión AUTH/RBAC/SCOPE/APP-HOME continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a conversión monetaria, productos o inventario.
+- No se ha avanzado a CRUD, inventario, precios o documentos funcionales.
 
 ## Reglas obligatorias
 
@@ -683,7 +709,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `CRUD-TIPOS-CAMBIO-1`.
+- Pruebas y cierre formal de `DB-PRODUCTOS-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 

@@ -50,7 +50,6 @@ return new class($initialAdminUsername, $initialAdminEmail) implements DatabaseT
             FROM information_schema.tables
             WHERE table_schema = DATABASE()
               AND table_name IN (
-                  'productos',
                   'existencias',
                   'inventario_movimientos',
                   'tickets',

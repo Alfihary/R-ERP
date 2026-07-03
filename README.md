@@ -188,6 +188,21 @@ fecha, precisión decimal y unicidad sin realizar conversiones.
 Productos, inventario, compras y ventas permanecen fuera de alcance. El
 contrato está en `docs/crud-tipos-cambio-1.md`.
 
+## DB-PRODUCTOS-1
+
+DB-PRODUCTOS-1 crea la estructura global de productos con
+`id_producto VARCHAR(16) ascii_bin` como única llave primaria natural, además
+de códigos de barras, relación con impuestos y metadata documental.
+
+La fase no crea CRUD, inventario, precios ni carga de archivos:
+
+```powershell
+php database/productos.php migrate --database=<db-test> --confirm-database=<db-test>
+php database/productos.php db:test --database=<db-test> --confirm-database=<db-test>
+```
+
+El contrato está en `docs/db-productos-1.md`.
+
 ## Decisiones base
 
 - PHP renderizará las vistas principales mediante una arquitectura MVC modular
@@ -223,6 +238,7 @@ contrato está en `docs/crud-tipos-cambio-1.md`.
 - `docs/crud-catalogos-1.md`: rutas, permisos, validaciones y límites del CRUD.
 - `docs/crud-catalogos-2.md`: jerarquía, ciclos, estado y permisos de clasificaciones.
 - `docs/crud-tipos-cambio-1.md`: rutas, permisos y reglas de tipos de cambio.
+- `docs/db-productos-1.md`: identidad natural, tablas, FKs y DB-TEST de productos.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -248,7 +264,7 @@ contrato está en `docs/crud-tipos-cambio-1.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `CRUD-TIPOS-CAMBIO-1`.
+- Pruebas y cierre formal de `DB-PRODUCTOS-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 
@@ -256,5 +272,5 @@ contrato está en `docs/crud-tipos-cambio-1.md`.
 
 - Dashboard, CRUD y operaciones empresariales.
 - Dashboard y layout administrativo final.
-- Productos, inventario, tickets, compras, ventas y reportes.
+- CRUD de productos, inventario, tickets, compras, ventas y reportes.
 - Integración SMTP, cron, despliegue o cambios en producción.
