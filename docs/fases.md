@@ -651,25 +651,25 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Criterios de cierre de la fase actual
 
-- `main` contiene únicamente el diff revisable de `CRUD-CATALOGOS-2`.
+- `main` contiene únicamente el diff revisable de `CRUD-TIPOS-CAMBIO-1`.
 - `/`, `/health` y el 404 continúan respondiendo correctamente.
 - Login por email y username funciona con respuesta uniforme ante rechazo.
 - Login y logout validan CSRF.
-- Los cuatro permisos nuevos se crean y asignan a ADMIN sin duplicar los 21
-  permisos de CRUD-CATALOGOS-1.
+- Los cuatro permisos nuevos se crean y asignan a ADMIN sin duplicar los 25
+  permisos de catálogos previos.
 - Cada ruta privada exige autenticación y permiso específico.
 - Cada escritura exige CSRF y validación backend.
-- Clasificaciones acepta raíces, hijos, edición y cambios seguros de estado.
-- El servicio rechaza autorreferencias, padres inexistentes y ciclos directos
-  o indirectos.
-- Duplicados y entradas inválidas se rechazan de forma controlada.
+- Tipos de cambio acepta creación, edición y cambios de estado.
+- El servicio rechaza monedas inexistentes o inactivas, pares iguales, fechas
+  inválidas, valores no positivos o fuera de precisión y combinaciones
+  duplicadas.
 - No existe borrado físico.
 - DB-TEST-CATALOGOS continúa aprobado.
 - La regresión AUTH/RBAC/SCOPE/APP-HOME continúa aprobada.
 - Los archivos PHP pasan revisión de sintaxis.
 - `package.json` y `package-lock.json` permanecen sin cambios.
 - `git diff --check` no reporta errores.
-- No se ha avanzado a tipos de cambio, productos o inventario.
+- No se ha avanzado a conversión monetaria, productos o inventario.
 
 ## Reglas obligatorias
 
@@ -683,7 +683,7 @@ Commit recomendado: `deploy: prepare approved AwardSpace release`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `CRUD-CATALOGOS-2`.
+- Pruebas y cierre formal de `CRUD-TIPOS-CAMBIO-1`.
 - Fases posteriores de BD, autorización y módulos.
 - Criterios específicos de cada caso de uso.
 

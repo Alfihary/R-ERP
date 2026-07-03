@@ -294,6 +294,18 @@ final class CatalogController
             ];
         }
 
+        if ($this->permissions->allows(
+            $userId,
+            'catalogos.tipos_cambio.ver'
+        )) {
+            $available['tipos_cambio'] = [
+                'slug' => 'tipos-cambio',
+                'title' => 'Tipos de cambio',
+                'singular' => 'tipo de cambio',
+                'permission' => 'tipos_cambio',
+            ];
+        }
+
         return $available;
     }
 }

@@ -14,6 +14,8 @@ $descriptions = [
     'marcas' => 'Marcas globales para productos futuros.',
     'clasificaciones' =>
         'Jerarquía padre-hijo para organizar productos futuros.',
+    'tipos_cambio' =>
+        'Valores diarios entre monedas, sin conversión automática.',
 ];
 ?>
 <header class="catalog-page-heading">
@@ -55,6 +57,6 @@ $descriptions = [
 </section>
 
 <p class="catalog-scope-note">
-    Los tipos de cambio permanecen fuera de esta fase por sus reglas
-    adicionales de vigencia y conversión.
+    Los catálogos son globales; el contexto activo permanece visible como
+    referencia operativa.
 </p>

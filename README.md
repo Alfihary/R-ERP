@@ -176,8 +176,17 @@ servicio específico. Las escrituras validan padre existente y activo,
 autorreferencia, descendientes, ciclos y cambios de estado dentro de una
 transacción.
 
-Tipos de cambio, productos e inventario permanecen fuera de alcance. El
-contrato está en `docs/crud-catalogos-2.md`.
+Productos e inventario permanecen fuera de alcance. El contrato está en
+`docs/crud-catalogos-2.md`.
+
+## CRUD-TIPOS-CAMBIO-1
+
+`GET /catalogos/tipos-cambio` administra valores diarios entre monedas activas
+mediante un servicio y repositorio específicos. Las escrituras validan par,
+fecha, precisión decimal y unicidad sin realizar conversiones.
+
+Productos, inventario, compras y ventas permanecen fuera de alcance. El
+contrato está en `docs/crud-tipos-cambio-1.md`.
 
 ## Decisiones base
 
@@ -213,6 +222,7 @@ contrato está en `docs/crud-catalogos-2.md`.
 - `docs/db-catalogos-1.md`: catálogos base, seed, DB-TEST y rollback.
 - `docs/crud-catalogos-1.md`: rutas, permisos, validaciones y límites del CRUD.
 - `docs/crud-catalogos-2.md`: jerarquía, ciclos, estado y permisos de clasificaciones.
+- `docs/crud-tipos-cambio-1.md`: rutas, permisos y reglas de tipos de cambio.
 - `docs/fases.md`: secuencia de construcción y puertas de aprobación.
 - `docs/deploy-awardspace.md`: preparación, exclusiones y rollback.
 - `docs/mail-notifications.md`: diseño conceptual del subsistema.
@@ -238,7 +248,7 @@ contrato está en `docs/crud-catalogos-2.md`.
 
 ## Pendiente de aprobar
 
-- Pruebas y cierre formal de `CRUD-CATALOGOS-2`.
+- Pruebas y cierre formal de `CRUD-TIPOS-CAMBIO-1`.
 - Estrategia concreta de Composer y dependencias PHP.
 - Configuración de Tailwind y scripts locales.
 

@@ -14,6 +14,7 @@ use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
+use App\Http\Controllers\ExchangeRateController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -24,7 +25,8 @@ return static function (
     ScopeContextService $scopeContext,
     CsrfTokenService $csrf,
     CatalogController $catalogController,
-    ClassificationController $classificationController
+    ClassificationController $classificationController,
+    ExchangeRateController $exchangeRateController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -279,5 +281,67 @@ return static function (
         static fn (Request $request): Response =>
             $classificationController->state($request, false),
         $classificationStateMiddleware
+    );
+
+    $exchangeRatePermissionPrefix = 'catalogos.tipos_cambio.';
+    $exchangeRateBasePath = '/catalogos/tipos-cambio';
+    $exchangeRateViewMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $exchangeRatePermissionPrefix . 'ver'
+        ),
+    ]);
+    $exchangeRateCreateMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $exchangeRatePermissionPrefix . 'crear'
+        ),
+    ]);
+    $exchangeRateEditMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $exchangeRatePermissionPrefix . 'editar'
+        ),
+    ]);
+    $exchangeRateStateMiddleware = array_merge($catalogBaseMiddleware, [
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            $exchangeRatePermissionPrefix . 'estado'
+        ),
+    ]);
+
+    $router->get(
+        $exchangeRateBasePath,
+        static fn (Request $request): Response =>
+            $exchangeRateController->index($request),
+        $exchangeRateViewMiddleware
+    );
+    $router->post(
+        $exchangeRateBasePath,
+        static fn (Request $request): Response =>
+            $exchangeRateController->create($request),
+        $exchangeRateCreateMiddleware
+    );
+    $router->post(
+        $exchangeRateBasePath . '/actualizar',
+        static fn (Request $request): Response =>
+            $exchangeRateController->update($request),
+        $exchangeRateEditMiddleware
+    );
+    $router->post(
+        $exchangeRateBasePath . '/activar',
+        static fn (Request $request): Response =>
+            $exchangeRateController->state($request, true),
+        $exchangeRateStateMiddleware
+    );
+    $router->post(
+        $exchangeRateBasePath . '/desactivar',
+        static fn (Request $request): Response =>
+            $exchangeRateController->state($request, false),
+        $exchangeRateStateMiddleware
     );
 };

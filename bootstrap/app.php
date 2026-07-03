@@ -11,6 +11,7 @@ use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
+use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -19,11 +20,13 @@ use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
+use App\Http\Controllers\ExchangeRateController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
+use App\Infrastructure\Repositories\ExchangeRateRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
@@ -89,6 +92,9 @@ $catalogs = new CatalogService(new CatalogRepository($connection));
 $classifications = new ClassificationService(
     new ClassificationRepository($connection)
 );
+$exchangeRates = new ExchangeRateService(
+    new ExchangeRateRepository($connection)
+);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -108,6 +114,15 @@ $classificationController = new ClassificationController(
     $catalogs,
     $classifications
 );
+$exchangeRateController = new ExchangeRateController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $exchangeRates
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -123,7 +138,8 @@ $registerRoutes(
     $scopeContext,
     $csrf,
     $catalogController,
-    $classificationController
+    $classificationController,
+    $exchangeRateController
 );
 
 return new App($router, $config, $debug, $errorHandler);

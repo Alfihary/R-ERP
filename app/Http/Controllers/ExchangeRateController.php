@@ -11,12 +11,12 @@ use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\CatalogValidationException;
-use App\Domain\Catalogs\ClassificationService;
+use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Support\Security\CsrfTokenService;
 
-final class ClassificationController
+final class ExchangeRateController
 {
     public function __construct(
         private readonly Config $config,
@@ -25,7 +25,7 @@ final class ClassificationController
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
         private readonly CatalogService $catalogs,
-        private readonly ClassificationService $classifications
+        private readonly ExchangeRateService $exchangeRates
     ) {
     }
 
@@ -46,7 +46,7 @@ final class ClassificationController
         $user = $this->user();
 
         try {
-            $this->classifications->create(
+            $this->exchangeRates->create(
                 $request->body(),
                 $user['user_id']
             );
@@ -62,7 +62,7 @@ final class ClassificationController
         }
 
         return Response::redirect(
-            '/catalogos/clasificaciones?result=created'
+            '/catalogos/tipos-cambio?result=created'
         );
     }
 
@@ -72,7 +72,7 @@ final class ClassificationController
         $id = $this->id($request);
 
         try {
-            $this->classifications->update(
+            $this->exchangeRates->update(
                 $request->body(),
                 $user['user_id']
             );
@@ -88,7 +88,7 @@ final class ClassificationController
         }
 
         return Response::redirect(
-            '/catalogos/clasificaciones?result=updated'
+            '/catalogos/tipos-cambio?result=updated'
         );
     }
 
@@ -98,7 +98,7 @@ final class ClassificationController
         $id = $this->id($request);
 
         try {
-            $this->classifications->setActive(
+            $this->exchangeRates->setActive(
                 $request->body(),
                 $active,
                 $user['user_id']
@@ -115,7 +115,7 @@ final class ClassificationController
         }
 
         return Response::redirect(
-            '/catalogos/clasificaciones?result='
+            '/catalogos/tipos-cambio?result='
             . ($active ? 'activated' : 'deactivated')
         );
     }
@@ -134,13 +134,13 @@ final class ClassificationController
     ): Response {
         $user = $this->user();
         $context = $this->scopeContext->resolveForUser($user['user_id']);
-        $hierarchy = $this->classifications->viewData();
+        $data = $this->exchangeRates->viewData();
         $abilities = [];
 
         foreach (['crear', 'editar', 'estado'] as $action) {
             $abilities[$action] = $this->permissions->allows(
                 $user['user_id'],
-                'catalogos.clasificaciones.' . $action
+                'catalogos.tipos_cambio.' . $action
             );
         }
 
@@ -153,23 +153,20 @@ final class ClassificationController
             'canAccessCatalogs' => true,
             'contentData' => [
                 'abilities' => $abilities,
-                'createParentOptions' =>
-                    $hierarchy['create_parent_options'],
-                'editParentOptions' =>
-                    $hierarchy['edit_parent_options'],
+                'currencies' => $data['currencies'],
                 'errors' => $errors,
                 'failedAction' => $failedAction,
                 'failedId' => $failedId,
                 'formData' => $formData,
                 'notice' => $notice,
-                'records' => $hierarchy['records'],
+                'records' => $data['records'],
                 'viewableCatalogs' =>
                     $this->viewableCatalogDefinitions($user['user_id']),
             ],
-            'contentView' => 'catalogs/classifications',
+            'contentView' => 'catalogs/exchange_rates',
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
-            'pageTitle' => 'Clasificaciones de producto',
+            'pageTitle' => 'Tipos de cambio',
             'stylesheets' => ['/css/modules/catalogs.css'],
             'user' => $user,
         ]), $status);
@@ -184,7 +181,7 @@ final class ClassificationController
 
         if ($user === null) {
             throw new \RuntimeException(
-                'Authenticated classification controller requires a user.'
+                'Authenticated exchange rate controller requires a user.'
             );
         }
 
@@ -205,10 +202,10 @@ final class ClassificationController
     private function resultMessage(Request $request): ?string
     {
         return match ($request->query()['result'] ?? null) {
-            'created' => 'Clasificación creada correctamente.',
-            'updated' => 'Clasificación actualizada correctamente.',
-            'activated' => 'Clasificación activada correctamente.',
-            'deactivated' => 'Clasificación desactivada correctamente.',
+            'created' => 'Tipo de cambio creado correctamente.',
+            'updated' => 'Tipo de cambio actualizado correctamente.',
+            'activated' => 'Tipo de cambio activado correctamente.',
+            'deactivated' => 'Tipo de cambio desactivado correctamente.',
             default => null,
         };
     }

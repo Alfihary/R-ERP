@@ -247,6 +247,27 @@
     min-width: 66rem;
 }
 
+.catalog-table--exchange-rates {
+    min-width: 58rem;
+}
+
+.catalog-form--exchange {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.catalog-cell-detail {
+    display: block;
+    max-width: 16rem;
+    margin-top: 0.125rem;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+}
+
+.catalog-decimal {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .classification-path {
     display: block;
     max-width: 28rem;
@@ -367,7 +388,8 @@
 
 @media (max-width: 48rem) {
     .catalog-form,
-    .catalog-form--edit {
+    .catalog-form--edit,
+    .catalog-form--exchange {
         min-width: 0;
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -379,7 +401,8 @@
 
 @media (max-width: 34rem) {
     .catalog-form,
-    .catalog-form--edit {
+    .catalog-form--edit,
+    .catalog-form--exchange {
         grid-template-columns: minmax(0, 1fr);
     }
 
