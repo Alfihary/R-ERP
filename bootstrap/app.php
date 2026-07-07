@@ -12,6 +12,7 @@ use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
+use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -21,12 +22,14 @@ use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\ProductController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
+use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
@@ -95,6 +98,7 @@ $classifications = new ClassificationService(
 $exchangeRates = new ExchangeRateService(
     new ExchangeRateRepository($connection)
 );
+$products = new ProductService(new ProductRepository($connection));
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -123,6 +127,14 @@ $exchangeRateController = new ExchangeRateController(
     $catalogs,
     $exchangeRates
 );
+$productController = new ProductController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $products
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -139,7 +151,8 @@ $registerRoutes(
     $csrf,
     $catalogController,
     $classificationController,
-    $exchangeRateController
+    $exchangeRateController,
+    $productController
 );
 
 return new App($router, $config, $debug, $errorHandler);

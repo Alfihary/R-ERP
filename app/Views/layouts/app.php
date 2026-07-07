@@ -27,6 +27,7 @@ $activeNavigation = is_string($activeNavigation ?? null)
     ? $activeNavigation
     : 'home';
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
+$canAccessProducts = ($canAccessProducts ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $activeCompany = is_array($context['active_company'] ?? null)
     ? $context['active_company']
@@ -82,6 +83,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">▦</span>
                         Catálogos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProducts): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'products' ? ' is-active' : '' ?>"
+                        href="/productos"
+                        <?= $activeNavigation === 'products' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▤</span>
+                        Productos
                     </a>
                 <?php endif; ?>
             </nav>

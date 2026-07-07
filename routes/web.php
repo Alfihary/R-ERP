@@ -15,6 +15,7 @@ use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\ProductController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -26,7 +27,8 @@ return static function (
     CsrfTokenService $csrf,
     CatalogController $catalogController,
     ClassificationController $classificationController,
-    ExchangeRateController $exchangeRateController
+    ExchangeRateController $exchangeRateController,
+    ProductController $productController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -86,13 +88,19 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'catalogos.acceder'
         );
+        $canAccessProducts = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'productos.acceder'
+        );
 
         return Response::html(View::render('layouts/app', [
             'activeNavigation' => 'home',
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $canAccessCatalogs,
+            'canAccessProducts' => $canAccessProducts,
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
+                'canAccessProducts' => $canAccessProducts,
             ],
             'context' => $context->toArray(),
             'contentView' => 'auth/private',
@@ -343,5 +351,72 @@ return static function (
         static fn (Request $request): Response =>
             $exchangeRateController->state($request, false),
         $exchangeRateStateMiddleware
+    );
+
+    $productBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            'productos.acceder'
+        ),
+    ];
+    $productMiddleware = static function (string $permission) use (
+        $productBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($productBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/productos',
+        static fn (Request $request): Response =>
+            $productController->index($request),
+        $productBaseMiddleware
+    );
+    $router->get(
+        '/productos/crear',
+        static fn (Request $request): Response =>
+            $productController->createForm($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->post(
+        '/productos',
+        static fn (Request $request): Response =>
+            $productController->create($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->get(
+        '/productos/ver',
+        static fn (Request $request): Response =>
+            $productController->detail($request),
+        $productMiddleware('productos.ver')
+    );
+    $router->get(
+        '/productos/editar',
+        static fn (Request $request): Response =>
+            $productController->editForm($request),
+        $productMiddleware('productos.editar')
+    );
+    $router->post(
+        '/productos/actualizar',
+        static fn (Request $request): Response =>
+            $productController->update($request),
+        $productMiddleware('productos.editar')
+    );
+    $router->post(
+        '/productos/activar',
+        static fn (Request $request): Response =>
+            $productController->state($request, true),
+        $productMiddleware('productos.estado')
+    );
+    $router->post(
+        '/productos/desactivar',
+        static fn (Request $request): Response =>
+            $productController->state($request, false),
+        $productMiddleware('productos.estado')
     );
 };
