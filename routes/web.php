@@ -16,6 +16,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -28,6 +29,7 @@ return static function (
     CatalogController $catalogController,
     ClassificationController $classificationController,
     ExchangeRateController $exchangeRateController,
+    SatCatalogController $satCatalogController,
     ProductController $productController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
@@ -352,6 +354,105 @@ return static function (
             $exchangeRateController->state($request, false),
         $exchangeRateStateMiddleware
     );
+
+    foreach (
+        [
+            'unidades_sat' => [
+                'base' => '/catalogos/unidades-sat',
+                'index' => 'unitsIndex',
+                'createForm' => 'unitsCreateForm',
+                'create' => 'unitsCreate',
+                'editForm' => 'unitsEditForm',
+                'update' => 'unitsUpdate',
+                'activate' => 'unitsActivate',
+                'deactivate' => 'unitsDeactivate',
+            ],
+            'claves_sat' => [
+                'base' => '/catalogos/claves-sat',
+                'index' => 'keysIndex',
+                'createForm' => 'keysCreateForm',
+                'create' => 'keysCreate',
+                'editForm' => 'keysEditForm',
+                'update' => 'keysUpdate',
+                'activate' => 'keysActivate',
+                'deactivate' => 'keysDeactivate',
+            ],
+        ] as $permission => $satRoutes
+    ) {
+        $permissionPrefix = 'catalogos.' . $permission . '.';
+        $satViewMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'acceder'
+            ),
+        ]);
+        $satCreateMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'crear'
+            ),
+        ]);
+        $satEditMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'editar'
+            ),
+        ]);
+        $satStateMiddleware = array_merge($catalogBaseMiddleware, [
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                $permissionPrefix . 'estado'
+            ),
+        ]);
+        $basePath = $satRoutes['base'];
+
+        $router->get(
+            $basePath,
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['index']}($request),
+            $satViewMiddleware
+        );
+        $router->get(
+            $basePath . '/crear',
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['createForm']}($request),
+            $satCreateMiddleware
+        );
+        $router->post(
+            $basePath,
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['create']}($request),
+            $satCreateMiddleware
+        );
+        $router->get(
+            $basePath . '/editar',
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['editForm']}($request),
+            $satEditMiddleware
+        );
+        $router->post(
+            $basePath . '/actualizar',
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['update']}($request),
+            $satEditMiddleware
+        );
+        $router->post(
+            $basePath . '/activar',
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['activate']}($request),
+            $satStateMiddleware
+        );
+        $router->post(
+            $basePath . '/desactivar',
+            static fn (Request $request): Response =>
+                $satCatalogController->{$satRoutes['deactivate']}($request),
+            $satStateMiddleware
+        );
+    }
 
     $productBaseMiddleware = [
         $authMiddleware,

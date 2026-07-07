@@ -12,6 +12,7 @@ use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
+use App\Domain\Catalogs\SatCatalogService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
@@ -23,6 +24,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
@@ -30,6 +32,7 @@ use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
@@ -98,6 +101,7 @@ $classifications = new ClassificationService(
 $exchangeRates = new ExchangeRateService(
     new ExchangeRateRepository($connection)
 );
+$satCatalogs = new SatCatalogService(new SatCatalogRepository($connection));
 $products = new ProductService(new ProductRepository($connection));
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
@@ -127,6 +131,15 @@ $exchangeRateController = new ExchangeRateController(
     $catalogs,
     $exchangeRates
 );
+$satCatalogController = new SatCatalogController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $satCatalogs
+);
 $productController = new ProductController(
     $config,
     $auth,
@@ -152,6 +165,7 @@ $registerRoutes(
     $catalogController,
     $classificationController,
     $exchangeRateController,
+    $satCatalogController,
     $productController
 );
 
