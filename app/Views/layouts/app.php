@@ -29,6 +29,7 @@ $activeNavigation = is_string($activeNavigation ?? null)
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
+$scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
     ? $context['active_company']
     : null;
@@ -135,5 +136,13 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
             </main>
         </div>
     </div>
+    <?php foreach ($scripts as $script): ?>
+        <?php if (
+            is_string($script)
+            && preg_match('#^/js/[a-z0-9/_-]+\.js$#', $script) === 1
+        ): ?>
+            <script src="<?= e($script) ?>" defer></script>
+        <?php endif; ?>
+    <?php endforeach; ?>
 </body>
 </html>

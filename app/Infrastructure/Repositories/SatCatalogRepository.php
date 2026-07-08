@@ -86,6 +86,55 @@ final class SatCatalogRepository
     }
 
     /**
+     * @return list<array{id: int, codigo: string, descripcion: string}>
+     */
+    public function searchActiveKeys(string $query, int $limit): array
+    {
+        $limit = max(1, min($limit, 20));
+        $statement = $this->pdo()->prepare(
+            <<<'SQL'
+            SELECT id, codigo, descripcion
+            FROM claves_sat
+            WHERE activo = 1
+              AND eliminado_en IS NULL
+              AND (
+                  codigo = :exact
+                  OR codigo LIKE :code_prefix
+                  OR codigo LIKE :code_any
+                  OR descripcion LIKE :description_any
+              )
+            ORDER BY
+                CASE
+                    WHEN codigo = :order_exact THEN 0
+                    WHEN codigo LIKE :order_prefix THEN 1
+                    WHEN codigo LIKE :order_any THEN 2
+                    ELSE 3
+                END,
+                codigo ASC
+            LIMIT :limit
+            SQL
+        );
+        $statement->bindValue('exact', $query);
+        $statement->bindValue('code_prefix', $query . '%');
+        $statement->bindValue('code_any', '%' . $query . '%');
+        $statement->bindValue('description_any', '%' . $query . '%');
+        $statement->bindValue('order_exact', $query);
+        $statement->bindValue('order_prefix', $query . '%');
+        $statement->bindValue('order_any', '%' . $query . '%');
+        $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'descripcion' => (string) $row['descripcion'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findUnit(int $id): ?array

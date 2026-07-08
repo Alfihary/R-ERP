@@ -115,6 +115,12 @@ final class ProductRepository
                 m.nombre AS marca_nombre,
                 p.clasificacion_producto_id,
                 c.nombre AS clasificacion_nombre,
+                p.clave_sat_id,
+                cs.codigo AS clave_sat_codigo,
+                cs.descripcion AS clave_sat_descripcion,
+                p.unidad_sat_id,
+                us.codigo AS unidad_sat_codigo,
+                us.nombre AS unidad_sat_nombre,
                 p.peso_kg,
                 p.largo_cm,
                 p.ancho_cm,
@@ -131,6 +137,8 @@ final class ProductRepository
             LEFT JOIN marcas m ON m.id = p.marca_id
             LEFT JOIN clasificaciones_producto c
                 ON c.id = p.clasificacion_producto_id
+            LEFT JOIN claves_sat cs ON cs.id = p.clave_sat_id
+            LEFT JOIN unidades_sat us ON us.id = p.unidad_sat_id
             WHERE p.id_producto = :id_producto
               AND p.eliminado_en IS NULL
             LIMIT 1
@@ -194,6 +202,10 @@ final class ProductRepository
                 'SELECT id, codigo, nombre FROM impuestos
                  WHERE activo = 1 AND eliminado_en IS NULL ORDER BY nombre'
             ),
+            'sat_units' => $this->activeOptions(
+                'SELECT id, codigo, nombre FROM unidades_sat
+                 WHERE activo = 1 AND eliminado_en IS NULL ORDER BY codigo'
+            ),
         ];
     }
 
@@ -225,6 +237,16 @@ final class ProductRepository
     public function activeTaxExists(int $id): bool
     {
         return $this->activeIdExists('impuestos', $id);
+    }
+
+    public function activeSatKeyExists(int $id): bool
+    {
+        return $this->activeIdExists('claves_sat', $id);
+    }
+
+    public function activeSatUnitExists(int $id): bool
+    {
+        return $this->activeIdExists('unidades_sat', $id);
     }
 
     /**
@@ -289,6 +311,8 @@ final class ProductRepository
                 linea_producto_id,
                 marca_id,
                 clasificacion_producto_id,
+                clave_sat_id,
+                unidad_sat_id,
                 peso_kg,
                 largo_cm,
                 ancho_cm,
@@ -310,6 +334,8 @@ final class ProductRepository
                 :linea_producto_id,
                 :marca_id,
                 :clasificacion_producto_id,
+                :clave_sat_id,
+                :unidad_sat_id,
                 :peso_kg,
                 :largo_cm,
                 :ancho_cm,
@@ -348,6 +374,8 @@ final class ProductRepository
                 linea_producto_id = :linea_producto_id,
                 marca_id = :marca_id,
                 clasificacion_producto_id = :clasificacion_producto_id,
+                clave_sat_id = :clave_sat_id,
+                unidad_sat_id = :unidad_sat_id,
                 peso_kg = :peso_kg,
                 largo_cm = :largo_cm,
                 ancho_cm = :ancho_cm,
@@ -613,6 +641,12 @@ final class ProductRepository
                  WHERE id = :id AND activo = 1 AND eliminado_en IS NULL',
             'impuestos' =>
                 'SELECT COUNT(*) FROM impuestos
+                 WHERE id = :id AND activo = 1 AND eliminado_en IS NULL',
+            'claves_sat' =>
+                'SELECT COUNT(*) FROM claves_sat
+                 WHERE id = :id AND activo = 1 AND eliminado_en IS NULL',
+            'unidades_sat' =>
+                'SELECT COUNT(*) FROM unidades_sat
                  WHERE id = :id AND activo = 1 AND eliminado_en IS NULL',
             default => throw new \InvalidArgumentException(
                 'Unsupported product catalog.'

@@ -26,6 +26,18 @@ $measurement = static function (mixed $value, string $unit): string {
 
     return (string) $value . ' ' . $unit;
 };
+$satKey = trim(
+    (string) ($product['clave_sat_codigo'] ?? '')
+    . ' · '
+    . (string) ($product['clave_sat_descripcion'] ?? ''),
+    ' ·'
+) ?: 'Sin asignar';
+$satUnit = trim(
+    (string) ($product['unidad_sat_codigo'] ?? '')
+    . ' · '
+    . (string) ($product['unidad_sat_nombre'] ?? ''),
+    ' ·'
+) ?: 'Sin asignar';
 ?>
 <header class="product-page-heading">
     <div>
@@ -79,6 +91,8 @@ $measurement = static function (mixed $value, string $unit): string {
             'Línea' => $product['linea_nombre'] ?? '—',
             'Marca' => $product['marca_nombre'] ?? '—',
             'Clasificación' => $product['clasificacion_nombre'] ?? '—',
+            'Clave SAT' => $satKey,
+            'Unidad SAT' => $satUnit,
             'Peso' => $measurement($product['peso_kg'] ?? null, 'kg'),
             'Largo' => $measurement($product['largo_cm'] ?? null, 'cm'),
             'Ancho' => $measurement($product['ancho_cm'] ?? null, 'cm'),

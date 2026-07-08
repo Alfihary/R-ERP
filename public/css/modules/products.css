@@ -188,6 +188,53 @@
     font-weight: 700;
 }
 
+.product-sat-search {
+    position: relative;
+}
+
+.product-sat-search__status {
+    min-height: 1rem;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+}
+
+.product-sat-search__results {
+    display: grid;
+    max-height: 16rem;
+    overflow-y: auto;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.product-sat-search__option {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.product-sat-search__option:last-child {
+    border-bottom: 0;
+}
+
+.product-sat-search__option:hover,
+.product-sat-search__option:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+    background: var(--color-surface);
+}
+
+.product-sat-search__clear {
+    justify-self: start;
+}
+
 .product-filter-actions,
 .product-form-actions {
     display: flex;

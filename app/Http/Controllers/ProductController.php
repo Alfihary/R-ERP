@@ -200,6 +200,7 @@ final class ProductController
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
             'pageTitle' => $pageTitle,
+            'scripts' => ['/js/modules/product-sat-search.js'],
             'stylesheets' => ['/css/modules/products.css'],
             'user' => $user,
         ]), $status);
@@ -274,6 +275,9 @@ final class ProductController
             'marca_id' => $product['marca_id'] ?? '',
             'clasificacion_producto_id' =>
                 $product['clasificacion_producto_id'] ?? '',
+            'clave_sat_id' => $product['clave_sat_id'] ?? '',
+            'clave_sat_label' => $this->satKeyLabel($product),
+            'unidad_sat_id' => $product['unidad_sat_id'] ?? '',
             'peso_kg' => $product['peso_kg'] ?? '',
             'largo_cm' => $product['largo_cm'] ?? '',
             'ancho_cm' => $product['ancho_cm'] ?? '',
@@ -299,6 +303,23 @@ final class ProductController
                 )
             ),
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $product
+     */
+    private function satKeyLabel(array $product): string
+    {
+        $code = trim((string) ($product['clave_sat_codigo'] ?? ''));
+        $description = trim(
+            (string) ($product['clave_sat_descripcion'] ?? '')
+        );
+
+        if ($code === '' || $description === '') {
+            return '';
+        }
+
+        return $code . ' · ' . $description;
     }
 
     private function resultMessage(Request $request): ?string

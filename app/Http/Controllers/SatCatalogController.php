@@ -111,6 +111,15 @@ final class SatCatalogController
         return $this->renderSat('claves_sat', $request);
     }
 
+    public function keysSearch(Request $request): Response
+    {
+        return Response::json([
+            'items' => $this->satCatalogs->searchKeys(
+                $request->query()['q'] ?? ''
+            ),
+        ]);
+    }
+
     public function keysCreateForm(Request $request): Response
     {
         return $this->renderSat('claves_sat', $request, 'create');

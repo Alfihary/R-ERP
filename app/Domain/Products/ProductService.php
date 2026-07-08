@@ -245,6 +245,8 @@ final class ProductService
             $input,
             'clasificacion_producto_id'
         );
+        $satKeyId = $this->optionalId($input, 'clave_sat_id');
+        $satUnitId = $this->optionalId($input, 'unidad_sat_id');
 
         if ($unitId === null) {
             $errors['unidad_medida_id'] = 'Selecciona una unidad de medida.';
@@ -261,6 +263,16 @@ final class ProductService
                 $classificationId,
                 'clasificación',
                 'activeClassificationExists',
+            ],
+            'clave_sat_id' => [
+                $satKeyId,
+                'clave SAT',
+                'activeSatKeyExists',
+            ],
+            'unidad_sat_id' => [
+                $satUnitId,
+                'unidad SAT',
+                'activeSatUnitExists',
             ],
         ] as $field => [$value, $label, $method]) {
             if ($value !== null && !$this->products->{$method}($value)) {
@@ -399,6 +411,8 @@ final class ProductService
                 'linea_producto_id' => $lineId,
                 'marca_id' => $brandId,
                 'clasificacion_producto_id' => $classificationId,
+                'clave_sat_id' => $satKeyId,
+                'unidad_sat_id' => $satUnitId,
                 'peso_kg' => $physical['peso_kg']['value'],
                 'largo_cm' => $physical['largo_cm']['value'],
                 'ancho_cm' => $physical['ancho_cm']['value'],

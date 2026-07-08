@@ -22,6 +22,8 @@ $originalId = (string) (
     $values['original_id_producto']
     ?? $productId
 );
+$selectedSatKeyId = (string) ($values['clave_sat_id'] ?? '');
+$selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
 ?>
 <header class="product-page-heading">
     <div>
@@ -202,6 +204,98 @@ $originalId = (string) (
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
+        </div>
+    </fieldset>
+
+    <fieldset class="product-form-section">
+        <legend>Datos SAT</legend>
+        <p class="product-form-section__help">
+            Datos fiscales opcionales. El producto puede operar sin clave o
+            unidad SAT; CFDI y facturación quedan fuera de esta fase.
+        </p>
+        <div class="product-form-grid">
+            <div
+                class="product-field product-field--wide product-sat-search"
+                data-sat-search
+                data-endpoint="/catalogos/claves-sat/buscar"
+            >
+                <label for="clave_sat_search">Clave SAT</label>
+                <input
+                    id="clave_sat_id"
+                    name="clave_sat_id"
+                    type="hidden"
+                    value="<?= e($selectedSatKeyId) ?>"
+                    data-sat-key-id
+                >
+                <input
+                    id="clave_sat_search"
+                    name="clave_sat_label"
+                    type="search"
+                    value="<?= e($selectedSatKeyLabel) ?>"
+                    placeholder="Busca por código o descripción"
+                    autocomplete="off"
+                    data-sat-key-search
+                    aria-describedby="clave_sat_help clave_sat_status"
+                >
+                <small id="clave_sat_help">
+                    Escribe al menos 2 caracteres. Se muestran hasta 20
+                    resultados activos.
+                </small>
+                <div
+                    class="product-sat-search__status"
+                    id="clave_sat_status"
+                    role="status"
+                    aria-live="polite"
+                    data-sat-status
+                ></div>
+                <div
+                    class="product-sat-search__results"
+                    role="listbox"
+                    aria-label="Resultados de clave SAT"
+                    data-sat-results
+                    hidden
+                ></div>
+                <button
+                    class="button button--secondary product-sat-search__clear"
+                    type="button"
+                    data-sat-clear
+                >
+                    Limpiar clave SAT
+                </button>
+                <?php if (isset($errors['clave_sat_id'])): ?>
+                    <span class="product-field-error">
+                        <?= e($errors['clave_sat_id']) ?>
+                    </span>
+                <?php endif; ?>
+            </div>
+
+            <div class="product-field">
+                <label for="unidad_sat_id">Unidad SAT</label>
+                <select id="unidad_sat_id" name="unidad_sat_id">
+                    <option value="">Sin asignar</option>
+                    <?php foreach (($catalogs['sat_units'] ?? []) as $option): ?>
+                        <?php
+                        $optionId = (string) ($option['id'] ?? '');
+                        $selected = (string) ($values['unidad_sat_id'] ?? '')
+                            === $optionId;
+                        ?>
+                        <option
+                            value="<?= e($optionId) ?>"
+                            <?= $selected ? 'selected' : '' ?>
+                        >
+                            <?= e($option['codigo'] ?? '') ?>
+                            ·
+                            <?= e($option['nombre'] ?? '') ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <small>Opcional; solo unidades SAT activas.</small>
+                <?php if (isset($errors['unidad_sat_id'])): ?>
+                    <span class="product-field-error">
+                        <?= e($errors['unidad_sat_id']) ?>
+                    </span>
+                <?php endif; ?>
+            </div>
         </div>
     </fieldset>
 

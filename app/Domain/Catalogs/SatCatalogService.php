@@ -71,6 +71,20 @@ final class SatCatalogService
     }
 
     /**
+     * @return list<array{id: int, codigo: string, descripcion: string}>
+     */
+    public function searchKeys(mixed $query): array
+    {
+        $text = $this->text($query, 80);
+
+        if ($text === '' || mb_strlen($text, 'UTF-8') < 2) {
+            return [];
+        }
+
+        return $this->repository->searchActiveKeys($text, self::KEY_PER_PAGE);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function findUnit(int $id): array

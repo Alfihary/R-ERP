@@ -410,6 +410,15 @@ return static function (
         ]);
         $basePath = $satRoutes['base'];
 
+        if ($permission === 'claves_sat') {
+            $router->get(
+                $basePath . '/buscar',
+                static fn (Request $request): Response =>
+                    $satCatalogController->keysSearch($request),
+                $satViewMiddleware
+            );
+        }
+
         $router->get(
             $basePath,
             static fn (Request $request): Response =>
