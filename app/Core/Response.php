@@ -44,6 +44,19 @@ final class Response
         return new self('', $status, ['Location' => $location]);
     }
 
+    /**
+     * @param array<string, string> $headers
+     */
+    public static function binary(string $body, string $contentType, array $headers = []): self
+    {
+        return new self($body, 200, [
+            'Content-Type' => $contentType,
+            'Content-Length' => (string) strlen($body),
+            'X-Content-Type-Options' => 'nosniff',
+            ...$headers,
+        ]);
+    }
+
     public function send(): void
     {
         http_response_code($this->status);

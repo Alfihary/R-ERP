@@ -14,6 +14,7 @@ if (
     throw new RuntimeException('Product form data is incomplete.');
 }
 
+$image = is_array($image ?? null) ? $image : null;
 $selectedTaxes = is_array($values['impuestos'] ?? null)
     ? array_map('strval', $values['impuestos'])
     : [];
@@ -40,6 +41,13 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     <div class="product-alert" role="alert">
         <strong>No fue posible guardar el producto.</strong>
         <p>Revisa los campos marcados y vuelve a intentarlo.</p>
+    </div>
+<?php endif; ?>
+
+<?php if (($_GET['image_error'] ?? '') === '1'): ?>
+    <div class="product-alert" role="alert">
+        <strong>No fue posible actualizar la imagen principal.</strong>
+        <p>Usa JPEG, PNG o WebP válidos, con tamaño máximo de 5 MiB.</p>
     </div>
 <?php endif; ?>
 
@@ -115,6 +123,73 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
             </div>
         </div>
     </fieldset>
+
+    <?php if ($editing): ?>
+        <fieldset class="product-form-section product-image-section">
+            <legend>Imagen principal</legend>
+            <p class="product-form-section__help">
+                Opcional. Se almacena de forma privada y solo se entrega por
+                endpoint autenticado. Formatos: JPEG, PNG o WebP. Tamaño máximo:
+                5 MiB.
+            </p>
+            <div class="product-image-editor">
+                <div class="product-image-preview">
+                    <?php if ($image !== null): ?>
+                        <img
+                            src="/productos/imagen?id_producto=<?= e(rawurlencode($productId)) ?>&v=<?= e(rawurlencode((string) ($image['actualizado_en'] ?? $image['creado_en'] ?? ''))) ?>"
+                            alt="Imagen principal de <?= e($productId) ?>"
+                        >
+                    <?php else: ?>
+                        <div class="product-image-placeholder" role="img" aria-label="Producto sin imagen principal">
+                            <span aria-hidden="true">▧</span>
+                            <strong>Sin imagen</strong>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <div class="product-image-actions">
+                    <div class="product-field">
+                        <label for="imagen">Seleccionar imagen</label>
+                        <input
+                            id="imagen"
+                            name="imagen"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            aria-describedby="imagen_help<?= isset($errors['imagen']) ? ' imagen_error' : '' ?>"
+                        >
+                        <small id="imagen_help">
+                            El backend valida MIME real, contenido decodificable
+                            y tamaño real del archivo temporal.
+                        </small>
+                        <?php if (isset($errors['imagen'])): ?>
+                            <span class="product-field-error" id="imagen_error">
+                                <?= e($errors['imagen']) ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    <button
+                        class="button"
+                        type="submit"
+                        formaction="/productos/imagen/subir"
+                        formenctype="multipart/form-data"
+                        formmethod="post"
+                    >
+                        <?= $image === null ? 'Subir imagen' : 'Subir/Reemplazar' ?>
+                    </button>
+                    <?php if ($image !== null): ?>
+                        <button
+                            class="button button--secondary"
+                            type="submit"
+                            formaction="/productos/imagen/eliminar"
+                            formmethod="post"
+                            formnovalidate
+                        >
+                            Eliminar imagen
+                        </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </fieldset>
+    <?php endif; ?>
 
     <fieldset class="product-form-section">
         <legend>Tipo de producto</legend>

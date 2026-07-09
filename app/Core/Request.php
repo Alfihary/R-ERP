@@ -10,13 +10,15 @@ final class Request
      * @param array<string, mixed> $query
      * @param array<string, mixed> $body
      * @param array<string, string> $headers
+     * @param array<string, mixed> $files
      */
     public function __construct(
         private readonly string $method,
         private readonly string $path,
         private readonly array $query = [],
         private readonly array $body = [],
-        private readonly array $headers = []
+        private readonly array $headers = [],
+        private readonly array $files = []
     ) {
     }
 
@@ -47,7 +49,8 @@ final class Request
             is_string($path) && $path !== '' ? $path : '/',
             $_GET,
             $_POST,
-            $headers
+            $headers,
+            $_FILES
         );
     }
 
@@ -87,5 +90,23 @@ final class Request
     public function header(string $name, ?string $default = null): ?string
     {
         return $this->headers[strtolower($name)] ?? $default;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function files(): array
+    {
+        return $this->files;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function file(string $key): ?array
+    {
+        $file = $this->files[$key] ?? null;
+
+        return is_array($file) ? $file : null;
     }
 }

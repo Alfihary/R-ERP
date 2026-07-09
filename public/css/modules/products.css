@@ -53,6 +53,7 @@
 .product-list,
 .product-detail,
 .product-related-section,
+.product-image-detail,
 .product-form {
     max-width: 76rem;
     margin-top: 1.5rem;
@@ -406,6 +407,62 @@
     border-top: 1px solid var(--color-line);
 }
 
+.product-image-section {
+    background: var(--color-bg);
+}
+
+.product-image-editor {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+}
+
+.product-image-preview,
+.product-image-display {
+    min-width: 0;
+    padding: 1.25rem;
+}
+
+.product-image-preview {
+    padding: 0;
+}
+
+.product-image-preview img,
+.product-image-display img,
+.product-image-placeholder {
+    display: grid;
+    width: 100%;
+    max-width: 24rem;
+    min-height: 12rem;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+}
+
+.product-image-preview img,
+.product-image-display img {
+    height: auto;
+    object-fit: contain;
+}
+
+.product-image-placeholder {
+    gap: 0.375rem;
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.product-image-placeholder span {
+    font-size: 2rem;
+}
+
+.product-image-actions {
+    display: grid;
+    align-content: start;
+    gap: 0.875rem;
+}
+
 .product-definition-list {
     display: grid;
     margin: 0;
@@ -485,6 +542,7 @@
 
     .product-filters,
     .product-form-grid,
+    .product-image-editor,
     .product-definition-list,
     .product-related {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -504,6 +562,7 @@
 @media (max-width: 34rem) {
     .product-filters,
     .product-form-grid,
+    .product-image-editor,
     .product-definition-list,
     .product-related {
         grid-template-columns: minmax(0, 1fr);

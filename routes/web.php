@@ -506,6 +506,12 @@ return static function (
         $productMiddleware('productos.ver')
     );
     $router->get(
+        '/productos/imagen',
+        static fn (Request $request): Response =>
+            $productController->image($request),
+        $productMiddleware('productos.ver')
+    );
+    $router->get(
         '/productos/editar',
         static fn (Request $request): Response =>
             $productController->editForm($request),
@@ -515,6 +521,18 @@ return static function (
         '/productos/actualizar',
         static fn (Request $request): Response =>
             $productController->update($request),
+        $productMiddleware('productos.editar')
+    );
+    $router->post(
+        '/productos/imagen/subir',
+        static fn (Request $request): Response =>
+            $productController->uploadImage($request),
+        $productMiddleware('productos.editar')
+    );
+    $router->post(
+        '/productos/imagen/eliminar',
+        static fn (Request $request): Response =>
+            $productController->deleteImage($request),
         $productMiddleware('productos.editar')
     );
     $router->post(

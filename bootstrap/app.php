@@ -13,6 +13,7 @@ use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
+use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
@@ -32,6 +33,7 @@ use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
@@ -102,7 +104,14 @@ $exchangeRates = new ExchangeRateService(
     new ExchangeRateRepository($connection)
 );
 $satCatalogs = new SatCatalogService(new SatCatalogRepository($connection));
-$products = new ProductService(new ProductRepository($connection));
+$productRepository = new ProductRepository($connection);
+$productDocuments = new ProductDocumentRepository($connection);
+$products = new ProductService($productRepository);
+$productImages = new ProductImageService(
+    $productRepository,
+    $productDocuments,
+    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -146,7 +155,8 @@ $productController = new ProductController(
     $permissions,
     $scopeContext,
     $csrf,
-    $products
+    $products,
+    $productImages
 );
 
 $router = new Router();

@@ -9,6 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
 use App\Domain\Security\PermissionService;
@@ -23,7 +24,8 @@ final class ProductController
         private readonly PermissionService $permissions,
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
-        private readonly ProductService $products
+        private readonly ProductService $products,
+        private readonly ProductImageService $images
     ) {
     }
 
@@ -77,8 +79,11 @@ final class ProductController
             return $this->notFound();
         }
 
+        $productId = (string) ($product['id_producto'] ?? '');
+
         return $this->render('products/detail', [
             'abilities' => $this->abilities($this->user()['user_id']),
+            'image' => $this->safeImage($productId),
             'notice' => $this->resultMessage($request),
             'product' => $product,
         ], 'Detalle de producto');
@@ -128,6 +133,82 @@ final class ProductController
         );
     }
 
+    public function image(Request $request): Response
+    {
+        $productId = $request->query()['id_producto'] ?? null;
+
+        if (!is_string($productId)) {
+            return $this->notFound();
+        }
+
+        try {
+            $image = $this->images->content($productId);
+        } catch (ProductValidationException) {
+            return $this->notFound();
+        }
+
+        return Response::binary(
+            $image['body'],
+            $image['mime_type'],
+            [
+                'Cache-Control' => 'no-cache, private',
+                'Content-Disposition' => 'inline',
+            ]
+        );
+    }
+
+    public function uploadImage(Request $request): Response
+    {
+        $user = $this->user();
+        $productId = $request->input('id_producto');
+        $productId = is_string($productId) ? $productId : '';
+
+        try {
+            $this->images->replace(
+                $productId,
+                $request->file('imagen'),
+                $user['user_id']
+            );
+        } catch (ProductValidationException $exception) {
+            try {
+                $product = $this->products->get($productId);
+            } catch (ProductValidationException) {
+                return $this->notFound();
+            }
+
+            return $this->renderForm(
+                $this->formValues($product),
+                $exception->errors(),
+                true,
+                422,
+                $productId
+            );
+        }
+
+        return Response::redirect(
+            '/productos/editar?id_producto=' . rawurlencode($productId)
+            . '&result=image_uploaded'
+        );
+    }
+
+    public function deleteImage(Request $request): Response
+    {
+        $user = $this->user();
+        $productId = $request->input('id_producto');
+        $productId = is_string($productId) ? $productId : '';
+
+        try {
+            $this->images->delete($productId, $user['user_id']);
+        } catch (ProductValidationException) {
+            return $this->notFound();
+        }
+
+        return Response::redirect(
+            '/productos/editar?id_producto=' . rawurlencode($productId)
+            . '&result=image_deleted'
+        );
+    }
+
     public function state(Request $request, bool $active): Response
     {
         $user = $this->user();
@@ -164,10 +245,17 @@ final class ProductController
             $values['original_id_producto'] = $originalId;
         }
 
+        $image = null;
+
+        if ($editing && is_string($values['id_producto'] ?? null)) {
+            $image = $this->safeImage((string) $values['id_producto']);
+        }
+
         return $this->render('products/form', [
             'catalogs' => $this->products->catalogs(),
             'editing' => $editing,
             'errors' => $errors,
+            'image' => $image,
             'values' => $values,
         ], $editing ? 'Editar producto' : 'Crear producto', $status);
     }
@@ -327,10 +415,24 @@ final class ProductController
         return match ($request->query()['result'] ?? null) {
             'created' => 'Producto creado correctamente.',
             'updated' => 'Producto actualizado correctamente.',
+            'image_uploaded' => 'Imagen principal actualizada correctamente.',
+            'image_deleted' => 'Imagen principal eliminada correctamente.',
             'activated' => 'Producto activado correctamente.',
             'deactivated' => 'Producto desactivado correctamente.',
             default => null,
         };
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function safeImage(string $productId): ?array
+    {
+        try {
+            return $this->images->current($productId);
+        } catch (ProductValidationException) {
+            return null;
+        }
     }
 
     private function notFound(): Response

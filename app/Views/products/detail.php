@@ -12,6 +12,7 @@ if (
     throw new RuntimeException('Product detail data is incomplete.');
 }
 
+$image = is_array($image ?? null) ? $image : null;
 $notice = is_string($notice ?? null) ? $notice : null;
 $productId = (string) ($product['id_producto'] ?? '');
 $active = (int) ($product['activo'] ?? 0) === 1;
@@ -59,6 +60,28 @@ $satUnit = trim(
 <?php if ($notice !== null): ?>
     <p class="product-notice" role="status"><?= e($notice) ?></p>
 <?php endif; ?>
+
+<section class="product-detail product-image-detail" aria-labelledby="product-image-title">
+    <div class="product-section-heading">
+        <div>
+            <h2 id="product-image-title">Imagen principal</h2>
+            <p>Vista privada del producto; sin rutas físicas ni metadatos internos.</p>
+        </div>
+    </div>
+    <div class="product-image-display">
+        <?php if ($image !== null): ?>
+            <img
+                src="/productos/imagen?id_producto=<?= e(rawurlencode($productId)) ?>&v=<?= e(rawurlencode((string) ($image['actualizado_en'] ?? $image['creado_en'] ?? ''))) ?>"
+                alt="Imagen principal de <?= e($productId) ?>"
+            >
+        <?php else: ?>
+            <div class="product-image-placeholder" role="img" aria-label="Producto sin imagen principal">
+                <span aria-hidden="true">▧</span>
+                <strong>Sin imagen principal</strong>
+            </div>
+        <?php endif; ?>
+    </div>
+</section>
 
 <section class="product-detail" aria-labelledby="product-detail-title">
     <div class="product-section-heading">
