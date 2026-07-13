@@ -28,6 +28,7 @@ $activeNavigation = is_string($activeNavigation ?? null)
     : 'home';
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
+$canAccessInventory = ($canAccessInventory ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
@@ -94,6 +95,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">▤</span>
                         Productos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventory): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory' ? ' is-active' : '' ?>"
+                        href="/inventario/movimientos"
+                        <?= $activeNavigation === 'inventory' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">⇄</span>
+                        Inventario · Movimientos
                     </a>
                 <?php endif; ?>
             </nav>

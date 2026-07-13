@@ -13,6 +13,7 @@ use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
+use App\Domain\Inventory\InventoryService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
@@ -24,6 +25,7 @@ use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
@@ -32,6 +34,8 @@ use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
+use App\Infrastructure\Repositories\InventoryQueryRepository;
+use App\Infrastructure\Repositories\InventoryRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
@@ -112,6 +116,9 @@ $productImages = new ProductImageService(
     $productDocuments,
     (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
 );
+$inventoryRepository = new InventoryRepository($connection);
+$inventory = new InventoryService($inventoryRepository);
+$inventoryQueries = new InventoryQueryRepository($connection);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -158,6 +165,15 @@ $productController = new ProductController(
     $products,
     $productImages
 );
+$inventoryController = new InventoryController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $inventory,
+    $inventoryQueries
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -176,7 +192,8 @@ $registerRoutes(
     $classificationController,
     $exchangeRateController,
     $satCatalogController,
-    $productController
+    $productController,
+    $inventoryController
 );
 
 return new App($router, $config, $debug, $errorHandler);

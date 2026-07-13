@@ -15,6 +15,7 @@ use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
@@ -30,7 +31,8 @@ return static function (
     ClassificationController $classificationController,
     ExchangeRateController $exchangeRateController,
     SatCatalogController $satCatalogController,
-    ProductController $productController
+    ProductController $productController,
+    InventoryController $inventoryController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -94,15 +96,21 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'productos.acceder'
         );
+        $canAccessInventory = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.movimientos.acceder'
+        );
 
         return Response::html(View::render('layouts/app', [
             'activeNavigation' => 'home',
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $canAccessCatalogs,
             'canAccessProducts' => $canAccessProducts,
+            'canAccessInventory' => $canAccessInventory,
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
                 'canAccessProducts' => $canAccessProducts,
+                'canAccessInventory' => $canAccessInventory,
             ],
             'context' => $context->toArray(),
             'contentView' => 'auth/private',
@@ -546,5 +554,54 @@ return static function (
         static fn (Request $request): Response =>
             $productController->state($request, false),
         $productMiddleware('productos.estado')
+    );
+
+    $inventoryBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware(
+            $auth,
+            $permissions,
+            'inventario.movimientos.acceder'
+        ),
+    ];
+    $inventoryMiddleware = static function (string $permission) use (
+        $inventoryBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($inventoryBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/inventario/movimientos',
+        static fn (Request $request): Response =>
+            $inventoryController->index($request),
+        $inventoryBaseMiddleware
+    );
+    $router->get(
+        '/inventario/movimientos/crear',
+        static fn (Request $request): Response =>
+            $inventoryController->createForm($request),
+        $inventoryMiddleware('inventario.movimientos.crear')
+    );
+    $router->post(
+        '/inventario/movimientos',
+        static fn (Request $request): Response =>
+            $inventoryController->create($request),
+        $inventoryMiddleware('inventario.movimientos.crear')
+    );
+    $router->get(
+        '/inventario/movimientos/ver',
+        static fn (Request $request): Response =>
+            $inventoryController->detail($request),
+        $inventoryMiddleware('inventario.movimientos.ver')
+    );
+    $router->get(
+        '/inventario/productos/buscar',
+        static fn (Request $request): Response =>
+            $inventoryController->searchProducts($request),
+        $inventoryMiddleware('inventario.movimientos.crear')
     );
 };
