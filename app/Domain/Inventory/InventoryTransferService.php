@@ -6,7 +6,7 @@ namespace App\Domain\Inventory;
 
 use App\Infrastructure\Repositories\InventoryRepository;
 
-final class InventoryService
+final class InventoryTransferService
 {
     private const MAX_INTEGER_DIGITS = 12;
     private const SCALE = 6;
@@ -19,20 +19,39 @@ final class InventoryService
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function aplicarMovimiento(array $input): array
+    public function transferir(array $input): array
     {
         $request = $this->validateRequestShape($input);
 
         return $this->inventory->transactional(function () use ($request): array {
             $this->assertUser($request['usuario_id']);
-            $this->assertScope($request['empresa_id'], $request['almacen_id']);
-            $concept = $this->assertConcept($request['concepto_codigo']);
+            $this->assertScope(
+                $request['empresa_id'],
+                $request['almacen_origen_id'],
+                $request['almacen_destino_id']
+            );
+
+            $exitConcept = $this->assertConcept(
+                'TRANSFERENCIA_SALIDA',
+                'SALIDA'
+            );
+            $entryConcept = $this->assertConcept(
+                'TRANSFERENCIA_ENTRADA',
+                'ENTRADA'
+            );
             $parts = $this->assertProducts($request['partidas']);
 
-            $movementId = $this->inventory->createDraftMovement(
+            foreach ($parts as $part) {
+                $this->inventory->ensureExistenceRow(
+                    $request['almacen_destino_id'],
+                    $part['id_producto']
+                );
+            }
+
+            $exitMovementId = $this->inventory->createDraftMovement(
                 $request['empresa_id'],
-                $request['almacen_id'],
-                $concept['id'],
+                $request['almacen_origen_id'],
+                $exitConcept['id'],
                 $request['fecha_movimiento'],
                 $request['referencia'],
                 $request['observaciones'],
@@ -41,7 +60,7 @@ final class InventoryService
 
             foreach ($parts as $part) {
                 $this->inventory->insertMovementDetail(
-                    $movementId,
+                    $exitMovementId,
                     $part['id_producto'],
                     $part['cantidad'],
                     $part['observaciones'],
@@ -49,74 +68,98 @@ final class InventoryService
                 );
             }
 
-            $appliedParts = [];
+            $entryMovementId = $this->inventory->createDraftMovement(
+                $request['empresa_id'],
+                $request['almacen_destino_id'],
+                $entryConcept['id'],
+                $request['fecha_movimiento'],
+                $request['referencia'],
+                $request['observaciones'],
+                $request['usuario_id']
+            );
 
             foreach ($parts as $part) {
-                if ($concept['naturaleza'] === 'ENTRADA') {
-                    $this->inventory->ensureExistenceRow(
-                        $request['almacen_id'],
-                        $part['id_producto']
-                    );
-                }
+                $this->inventory->insertMovementDetail(
+                    $entryMovementId,
+                    $part['id_producto'],
+                    $part['cantidad'],
+                    $part['observaciones'],
+                    $request['usuario_id']
+                );
+            }
 
-                $locked = $this->inventory->lockExistence(
-                    $request['almacen_id'],
+            $transferredParts = [];
+
+            foreach ($parts as $part) {
+                $origin = $this->inventory->lockExistence(
+                    $request['almacen_origen_id'],
                     $part['id_producto']
                 );
-                $previous = $locked['cantidad_actual'] ?? '0.000000';
+                $originBefore = $origin['cantidad_actual'] ?? '0.000000';
 
-                if (
-                    $concept['naturaleza'] === 'SALIDA'
-                    && $this->compareDecimals($previous, $part['cantidad']) < 0
-                ) {
+                if ($this->compareDecimals($originBefore, $part['cantidad']) < 0) {
                     throw new InventoryValidationException([
                         'existencia' =>
-                            'La salida no puede dejar existencia negativa.',
+                            'La transferencia no puede dejar existencia negativa en origen.',
                     ]);
                 }
 
-                if ($concept['naturaleza'] === 'ENTRADA') {
-                    $this->inventory->increaseExistence(
-                        $request['almacen_id'],
-                        $part['id_producto'],
-                        $part['cantidad']
-                    );
-                } else {
-                    $this->inventory->decreaseExistence(
-                        $request['almacen_id'],
-                        $part['id_producto'],
-                        $part['cantidad']
-                    );
-                }
+                $destination = $this->inventory->lockExistence(
+                    $request['almacen_destino_id'],
+                    $part['id_producto']
+                );
+                $destinationBefore = $destination['cantidad_actual'] ?? '0.000000';
 
-                $updated = $this->inventory->lockExistence(
-                    $request['almacen_id'],
+                $this->inventory->decreaseExistence(
+                    $request['almacen_origen_id'],
+                    $part['id_producto'],
+                    $part['cantidad']
+                );
+                $this->inventory->increaseExistence(
+                    $request['almacen_destino_id'],
+                    $part['id_producto'],
+                    $part['cantidad']
+                );
+
+                $originAfter = $this->inventory->lockExistence(
+                    $request['almacen_origen_id'],
+                    $part['id_producto']
+                );
+                $destinationAfter = $this->inventory->lockExistence(
+                    $request['almacen_destino_id'],
                     $part['id_producto']
                 );
 
-                $appliedParts[] = [
+                $transferredParts[] = [
                     'id_producto' => $part['id_producto'],
                     'cantidad' => $part['cantidad'],
-                    'saldo_anterior' => $previous,
-                    'saldo_nuevo' => $updated['cantidad_actual'] ?? '0.000000',
+                    'origen_saldo_anterior' => $originBefore,
+                    'origen_saldo_nuevo' =>
+                        $originAfter['cantidad_actual'] ?? '0.000000',
+                    'destino_saldo_anterior' => $destinationBefore,
+                    'destino_saldo_nuevo' =>
+                        $destinationAfter['cantidad_actual'] ?? '0.000000',
                 ];
             }
 
             $this->inventory->markMovementApplied(
-                $movementId,
+                $exitMovementId,
                 $request['usuario_id']
             );
-            $movement = $this->inventory->movementResult($movementId);
+            $this->inventory->markMovementApplied(
+                $entryMovementId,
+                $request['usuario_id']
+            );
 
             return [
-                'movimiento_id' => (int) $movement['id'],
-                'estado' => (string) $movement['estado'],
-                'empresa_id' => (int) $movement['empresa_id'],
-                'almacen_id' => (int) $movement['almacen_id'],
-                'concepto_codigo' => (string) $movement['concepto_codigo'],
-                'naturaleza' => (string) $movement['naturaleza'],
-                'fecha_movimiento' => (string) $movement['fecha_movimiento'],
-                'partidas_aplicadas' => $appliedParts,
+                'referencia_transferencia' => $request['referencia'],
+                'movimiento_salida_id' => $exitMovementId,
+                'movimiento_entrada_id' => $entryMovementId,
+                'estado' => 'APLICADO',
+                'empresa_id' => $request['empresa_id'],
+                'almacen_origen_id' => $request['almacen_origen_id'],
+                'almacen_destino_id' => $request['almacen_destino_id'],
+                'partidas_transferidas' => $transferredParts,
             ];
         });
     }
@@ -125,10 +168,10 @@ final class InventoryService
      * @param array<string, mixed> $input
      * @return array{
      *     empresa_id: int,
-     *     almacen_id: int,
-     *     concepto_codigo: string,
+     *     almacen_origen_id: int,
+     *     almacen_destino_id: int,
      *     fecha_movimiento: string,
-     *     referencia: string|null,
+     *     referencia: string,
      *     observaciones: string|null,
      *     usuario_id: int,
      *     partidas: list<array{
@@ -142,32 +185,43 @@ final class InventoryService
     {
         $errors = [];
         $companyId = $this->positiveId($input['empresa_id'] ?? null);
-        $warehouseId = $this->positiveId($input['almacen_id'] ?? null);
+        $originWarehouseId = $this->positiveId(
+            $input['almacen_origen_id'] ?? null
+        );
+        $destinationWarehouseId = $this->positiveId(
+            $input['almacen_destino_id'] ?? null
+        );
         $actorId = $this->positiveId($input['usuario_id'] ?? null);
-        $conceptCode = strtoupper($this->text($input, 'concepto_codigo'));
         $movementDate = $this->movementDate($input['fecha_movimiento'] ?? null);
-        $reference = $this->nullableText($input, 'referencia', 100);
+        $reference = $this->reference($input['referencia'] ?? null);
         $notes = $this->nullableText($input, 'observaciones', 500);
 
         if ($companyId === null) {
             $errors['empresa_id'] = 'La empresa es obligatoria.';
         }
-        if ($warehouseId === null) {
-            $errors['almacen_id'] = 'El almacén es obligatorio.';
+        if ($originWarehouseId === null) {
+            $errors['almacen_origen_id'] = 'El almacén origen es obligatorio.';
+        }
+        if ($destinationWarehouseId === null) {
+            $errors['almacen_destino_id'] = 'El almacén destino es obligatorio.';
+        }
+        if (
+            $originWarehouseId !== null
+            && $destinationWarehouseId !== null
+            && $originWarehouseId === $destinationWarehouseId
+        ) {
+            $errors['almacen_destino_id'] =
+                'El almacén destino debe ser distinto del origen.';
         }
         if ($actorId === null) {
             $errors['usuario_id'] = 'El usuario es obligatorio.';
-        }
-        if (preg_match('/^[A-Z0-9_]{1,32}$/', $conceptCode) !== 1) {
-            $errors['concepto_codigo'] = 'El concepto no es válido.';
         }
         if ($movementDate === null) {
             $errors['fecha_movimiento'] =
                 'La fecha debe tener formato YYYY-MM-DD HH:MM:SS.';
         }
-        if ($reference === false) {
-            $errors['referencia'] = 'La referencia admite hasta 100 caracteres.';
-            $reference = null;
+        if ($reference === null) {
+            $errors['referencia'] = 'La referencia de transferencia no es válida.';
         }
         if ($notes === false) {
             $errors['observaciones'] =
@@ -198,7 +252,7 @@ final class InventoryService
                         'El producto no es válido.';
                 } elseif (isset($seen[$productId])) {
                     $errors['partidas.' . $index . '.id_producto'] =
-                        'No repitas productos en el movimiento.';
+                        'No repitas productos en la transferencia.';
                 }
 
                 if ($quantity === null) {
@@ -240,8 +294,8 @@ final class InventoryService
 
         return [
             'empresa_id' => $companyId,
-            'almacen_id' => $warehouseId,
-            'concepto_codigo' => $conceptCode,
+            'almacen_origen_id' => $originWarehouseId,
+            'almacen_destino_id' => $destinationWarehouseId,
             'fecha_movimiento' => $movementDate,
             'referencia' => $reference,
             'observaciones' => $notes,
@@ -259,8 +313,11 @@ final class InventoryService
         }
     }
 
-    private function assertScope(int $companyId, int $warehouseId): void
-    {
+    private function assertScope(
+        int $companyId,
+        int $originWarehouseId,
+        int $destinationWarehouseId
+    ): void {
         if ($this->inventory->activeCompany($companyId) === null) {
             throw new InventoryValidationException([
                 'empresa_id' => 'La empresa no existe o no está activa.',
@@ -270,12 +327,24 @@ final class InventoryService
         if (
             $this->inventory->activeWarehouseForCompany(
                 $companyId,
-                $warehouseId
+                $originWarehouseId
             ) === null
         ) {
             throw new InventoryValidationException([
-                'almacen_id' =>
-                    'El almacén no existe, no está activo o no pertenece a la empresa.',
+                'almacen_origen_id' =>
+                    'El almacén origen no existe, no está activo o no pertenece a la empresa.',
+            ]);
+        }
+
+        if (
+            $this->inventory->activeWarehouseForCompany(
+                $companyId,
+                $destinationWarehouseId
+            ) === null
+        ) {
+            throw new InventoryValidationException([
+                'almacen_destino_id' =>
+                    'El almacén destino no existe, no está activo o no pertenece a la empresa.',
             ]);
         }
     }
@@ -283,18 +352,14 @@ final class InventoryService
     /**
      * @return array{id: int, codigo: string, naturaleza: string}
      */
-    private function assertConcept(string $code): array
+    private function assertConcept(string $code, string $nature): array
     {
         $concept = $this->inventory->activeConceptByCode($code);
 
-        if ($concept === null) {
+        if ($concept === null || $concept['naturaleza'] !== $nature) {
             throw new InventoryValidationException([
-                'concepto_codigo' => 'El concepto no existe o no está activo.',
-            ]);
-        }
-        if (!in_array($concept['naturaleza'], ['ENTRADA', 'SALIDA'], true)) {
-            throw new InventoryValidationException([
-                'concepto_codigo' => 'La naturaleza del concepto no es válida.',
+                'concepto_codigo' =>
+                    'El concepto de transferencia no existe o no está activo.',
             ]);
         }
 
@@ -327,7 +392,7 @@ final class InventoryService
             if ($product['tipo_codigo'] === 'SERVICIO') {
                 throw new InventoryValidationException([
                     'id_producto' =>
-                        'Un servicio no participa en movimientos de inventario.',
+                        'Un servicio no participa en transferencias de inventario.',
                 ]);
             }
             if (!in_array($product['tipo_codigo'], ['PRODUCTO', 'KIT'], true)) {
@@ -381,6 +446,32 @@ final class InventoryService
         }
 
         return $value;
+    }
+
+    private function reference(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $this->generateReference();
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        if (
+            preg_match('/^TRF-[A-Z0-9-]{1,96}$/', $value) !== 1
+            || strlen($value) > 100
+        ) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function generateReference(): string
+    {
+        return 'TRF-' . date('Ymd-His') . '-' . strtoupper(bin2hex(random_bytes(3)));
     }
 
     /**

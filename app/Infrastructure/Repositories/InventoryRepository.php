@@ -358,6 +358,7 @@ final class InventoryRepository
                 m.almacen_id,
                 m.fecha_movimiento,
                 m.estado,
+                m.referencia,
                 c.codigo AS concepto_codigo,
                 c.naturaleza
              FROM movimientos_inventario m
