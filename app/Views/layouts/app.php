@@ -30,6 +30,7 @@ $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $canAccessInventory = ($canAccessInventory ?? false) === true;
 $canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
+$canAccessInventoryKardex = ($canAccessInventoryKardex ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
@@ -116,6 +117,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">≡</span>
                         Inventario · Existencias
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventoryKardex): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-kardex' ? ' is-active' : '' ?>"
+                        href="/inventario/kardex"
+                        <?= $activeNavigation === 'inventory-kardex' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">↕</span>
+                        Inventario · Kardex
                     </a>
                 <?php endif; ?>
             </nav>

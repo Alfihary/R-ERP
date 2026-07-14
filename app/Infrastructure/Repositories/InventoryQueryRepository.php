@@ -312,6 +312,186 @@ final class InventoryQueryRepository
     }
 
     /**
+     * @param array{
+     *     company_id: int,
+     *     warehouse_id: int,
+     *     product_id: string,
+     *     concept: string,
+     *     nature: string,
+     *     date_from: string,
+     *     date_to: string,
+     *     page: int,
+     *     per_page: int
+     * } $filters
+     * @return array{
+     *     rows: list<array<string, mixed>>,
+     *     pagination: array{page: int, per_page: int, total: int, total_pages: int}
+     * }
+     */
+    public function kardex(array $filters): array
+    {
+        $conditions = $this->kardexConditions($filters);
+        $where = implode(' AND ', $conditions['where']);
+        $parameters = $conditions['parameters'];
+
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM movimientos_inventario m
+             INNER JOIN movimientos_inventario_detalle d
+                ON d.movimiento_id = m.id
+             INNER JOIN conceptos_movimiento_inventario c
+                ON c.id = m.concepto_movimiento_id
+             INNER JOIN productos p
+                ON p.id_producto = d.id_producto
+             INNER JOIN tipos_producto tp
+                ON tp.id = p.tipo_producto_id
+             INNER JOIN almacenes a
+                ON a.id = m.almacen_id
+             INNER JOIN empresas e
+                ON e.id = m.empresa_id
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $page = max(1, $filters['page']);
+        $perPage = max(1, min(50, $filters['per_page']));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                movimiento_id,
+                fecha_movimiento,
+                estado,
+                referencia,
+                concepto_codigo,
+                concepto_nombre,
+                naturaleza,
+                id_producto,
+                producto_descripcion,
+                tipo_codigo,
+                almacen_nombre,
+                empresa_nombre,
+                entrada,
+                salida,
+                saldo_resultante
+             FROM (
+                SELECT
+                    m.id AS movimiento_id,
+                    m.fecha_movimiento,
+                    m.estado,
+                    m.referencia,
+                    c.codigo AS concepto_codigo,
+                    c.nombre AS concepto_nombre,
+                    c.naturaleza,
+                    d.id_producto,
+                    p.descripcion AS producto_descripcion,
+                    tp.codigo AS tipo_codigo,
+                    a.nombre AS almacen_nombre,
+                    e.nombre AS empresa_nombre,
+                    CASE WHEN c.naturaleza = \'ENTRADA\'
+                        THEN CAST(d.cantidad AS CHAR)
+                        ELSE NULL
+                    END AS entrada,
+                    CASE WHEN c.naturaleza = \'SALIDA\'
+                        THEN CAST(d.cantidad AS CHAR)
+                        ELSE NULL
+                    END AS salida,
+                    CAST(
+                        SUM(
+                            CASE WHEN c.naturaleza = \'ENTRADA\'
+                                THEN d.cantidad
+                                ELSE -d.cantidad
+                            END
+                        ) OVER (
+                            ORDER BY m.fecha_movimiento ASC, m.id ASC
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                        )
+                        AS CHAR
+                    ) AS saldo_resultante
+                 FROM movimientos_inventario m
+                 INNER JOIN movimientos_inventario_detalle d
+                    ON d.movimiento_id = m.id
+                 INNER JOIN conceptos_movimiento_inventario c
+                    ON c.id = m.concepto_movimiento_id
+                 INNER JOIN productos p
+                    ON p.id_producto = d.id_producto
+                 INNER JOIN tipos_producto tp
+                    ON tp.id = p.tipo_producto_id
+                 INNER JOIN almacenes a
+                    ON a.id = m.almacen_id
+                 INNER JOIN empresas e
+                    ON e.id = m.empresa_id
+                 WHERE ' . $where . '
+             ) ordered_kardex
+             ORDER BY fecha_movimiento ASC, movimiento_id ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        foreach ($parameters as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function kardexProduct(string $productId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                p.id_producto,
+                p.descripcion,
+                tp.codigo AS tipo_codigo,
+                tp.nombre AS tipo_nombre
+             FROM productos p
+             INNER JOIN tipos_producto tp
+                ON tp.id = p.tipo_producto_id
+             WHERE p.id_producto = :id_producto
+               AND p.activo = 1
+               AND p.eliminado_en IS NULL
+               AND tp.activo = 1
+               AND tp.eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id_producto' => $productId]);
+        $product = $statement->fetch();
+
+        return $product === false ? null : $product;
+    }
+
+    public function kardexCurrentStock(int $warehouseId, string $productId): string
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT CAST(cantidad_actual AS CHAR)
+             FROM existencias_producto
+             WHERE almacen_id = :almacen_id
+               AND id_producto = :id_producto
+             LIMIT 1'
+        );
+        $statement->execute([
+            'almacen_id' => $warehouseId,
+            'id_producto' => $productId,
+        ]);
+        $stock = $statement->fetchColumn();
+
+        return is_string($stock) ? $stock : '0.000000';
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function movement(int $movementId, int $companyId, int $warehouseId): ?array
@@ -395,6 +575,67 @@ final class InventoryQueryRepository
         ]);
 
         return $statement->fetchAll();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function searchKardexProducts(string $query): array
+    {
+        return $this->searchProducts($query);
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     where: list<string>,
+     *     parameters: array<string, mixed>
+     * }
+     */
+    private function kardexConditions(array $filters): array
+    {
+        $where = [
+            'm.empresa_id = :empresa_id',
+            'm.almacen_id = :almacen_id',
+            'm.estado = \'APLICADO\'',
+            'd.id_producto = :id_producto',
+            'a.activo = 1',
+            'a.eliminado_en IS NULL',
+            'e.activo = 1',
+            'e.eliminado_en IS NULL',
+            'p.activo = 1',
+            'p.eliminado_en IS NULL',
+            'tp.activo = 1',
+            'tp.eliminado_en IS NULL',
+            'tp.codigo IN (\'PRODUCTO\', \'KIT\')',
+        ];
+        $parameters = [
+            'empresa_id' => $filters['company_id'],
+            'almacen_id' => $filters['warehouse_id'],
+            'id_producto' => $filters['product_id'],
+        ];
+
+        if ($filters['concept'] !== '') {
+            $where[] = 'c.codigo = :concepto';
+            $parameters['concepto'] = $filters['concept'];
+        }
+
+        if ($filters['nature'] !== '') {
+            $where[] = 'c.naturaleza = :naturaleza';
+            $parameters['naturaleza'] = $filters['nature'];
+        }
+
+        if ($filters['date_from'] !== '') {
+            $where[] = 'm.fecha_movimiento >= :fecha_desde';
+            $parameters['fecha_desde'] = $filters['date_from'] . ' 00:00:00';
+        }
+
+        if ($filters['date_to'] !== '') {
+            $where[] = 'm.fecha_movimiento <= :fecha_hasta';
+            $parameters['fecha_hasta'] = $filters['date_to'] . ' 23:59:59';
+        }
+
+        return ['where' => $where, 'parameters' => $parameters];
     }
 
     /**

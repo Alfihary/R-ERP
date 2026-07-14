@@ -594,6 +594,19 @@ return static function (
         ]
     );
     $router->get(
+        '/inventario/kardex',
+        static fn (Request $request): Response =>
+            $inventoryController->kardex($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                'inventario.kardex.acceder'
+            ),
+        ]
+    );
+    $router->get(
         '/inventario/movimientos/crear',
         static fn (Request $request): Response =>
             $inventoryController->createForm($request),
@@ -616,5 +629,18 @@ return static function (
         static fn (Request $request): Response =>
             $inventoryController->searchProducts($request),
         $inventoryMiddleware('inventario.movimientos.crear')
+    );
+    $router->get(
+        '/inventario/kardex/productos/buscar',
+        static fn (Request $request): Response =>
+            $inventoryController->searchKardexProducts($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                'inventario.kardex.acceder'
+            ),
+        ]
     );
 };

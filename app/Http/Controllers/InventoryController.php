@@ -123,6 +123,80 @@ final class InventoryController
         ]);
     }
 
+    public function kardex(Request $request): Response
+    {
+        $context = $this->context();
+        $filters = $this->kardexFilters($request->query());
+        $warehouses = [];
+        $errors = [];
+        $product = null;
+        $currentStock = null;
+        $result = [
+            'rows' => [],
+            'pagination' => [
+                'page' => $filters['page'],
+                'per_page' => $filters['per_page'],
+                'total' => 0,
+                'total_pages' => 1,
+            ],
+        ];
+
+        if ($context->hasActiveContext()) {
+            $company = $context->activeCompany();
+            $warehouse = $context->activeWarehouse();
+            $companyId = (int) ($company['id'] ?? 0);
+            $activeWarehouseId = (int) ($warehouse['id'] ?? 0);
+            $warehouses = $this->queries->warehousesForCompany($companyId);
+            $allowedWarehouseIds = array_map(
+                static fn (array $row): int => (int) $row['id'],
+                $warehouses
+            );
+            $warehouseFilter = $filters['warehouse_id'] ?? $activeWarehouseId;
+            $filters['warehouse_id'] = $warehouseFilter;
+
+            if (!in_array($warehouseFilter, $allowedWarehouseIds, true)) {
+                $errors['warehouse_id'] = 'Selecciona un almacén válido de la empresa activa.';
+            }
+
+            if ($filters['product_id'] !== '') {
+                $product = $this->queries->kardexProduct($filters['product_id']);
+
+                if ($product === null) {
+                    $errors['product_id'] = 'Selecciona un producto activo válido para inventario.';
+                } elseif (!in_array((string) ($product['tipo_codigo'] ?? ''), ['PRODUCTO', 'KIT'], true)) {
+                    $errors['product_id'] = 'Los servicios no participan en kardex de inventario.';
+                }
+            }
+
+            if ($errors === [] && $filters['product_id'] !== '') {
+                $result = $this->queries->kardex($filters + [
+                    'company_id' => $companyId,
+                    'warehouse_id' => $warehouseFilter,
+                ]);
+                $currentStock = $this->queries->kardexCurrentStock(
+                    $warehouseFilter,
+                    $filters['product_id']
+                );
+            }
+        }
+
+        return $this->render('inventory/kardex/index', [
+            'canViewMovement' => $this->permissions->allows($this->user()['user_id'], 'inventario.movimientos.ver'),
+            'currentStock' => $currentStock,
+            'errors' => $errors,
+            'filters' => $filters,
+            'hasActiveContext' => $context->hasActiveContext(),
+            'pagination' => $result['pagination'],
+            'product' => $product,
+            'rows' => $result['rows'],
+            'warehouses' => $warehouses,
+        ], 'Kardex de inventario', empty($errors) ? 200 : 422, [
+            'activeNavigation' => 'inventory-kardex',
+            'stylesheets' => ['/css/modules/inventory-kardex.css'],
+            'scripts' => ['/js/modules/inventory-kardex.js'],
+        ]);
+    }
+
     public function createForm(Request $request): Response
     {
         return $this->renderForm($this->defaultValues(), [], 200);
@@ -233,6 +307,28 @@ final class InventoryController
         ]);
     }
 
+    public function searchKardexProducts(Request $request): Response
+    {
+        $query = trim((string) ($request->query()['q'] ?? ''));
+
+        if ($this->length($query) < 2) {
+            return Response::json(['items' => []]);
+        }
+
+        $query = $this->length($query) > 40 ? substr($query, 0, 40) : $query;
+
+        return Response::json([
+            'items' => array_map(
+                static fn (array $row): array => [
+                    'id_producto' => (string) $row['id_producto'],
+                    'descripcion' => (string) $row['descripcion'],
+                    'tipo_codigo' => (string) $row['tipo_codigo'],
+                ],
+                $this->queries->searchKardexProducts($query)
+            ),
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $values
      * @param array<string, string> $errors
@@ -271,6 +367,7 @@ final class InventoryController
             'canAccessProducts' => $this->permissions->allows($user['user_id'], 'productos.acceder'),
             'canAccessInventory' => $this->permissions->allows($user['user_id'], 'inventario.movimientos.acceder'),
             'canAccessInventoryStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias.acceder'),
+            'canAccessInventoryKardex' => $this->permissions->allows($user['user_id'], 'inventario.kardex.acceder'),
             'contentData' => $contentData,
             'contentView' => $contentView,
             'context' => $context->toArray(),
@@ -348,6 +445,42 @@ final class InventoryController
             'warehouse_id' => $warehouse === false ? null : $warehouse,
             'type' => $type,
             'balance_state' => $balanceState,
+            'page' => $this->positiveInt($query['page'] ?? null, 1),
+            'per_page' => 15,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{product_id: string, product_search: string, warehouse_id: int|null, concept: string, nature: string, date_from: string, date_to: string, page: int, per_page: int}
+     */
+    private function kardexFilters(array $query): array
+    {
+        $concept = in_array($query['concept'] ?? '', self::ALLOWED_CONCEPTS, true)
+            ? (string) $query['concept']
+            : '';
+        $nature = in_array($query['nature'] ?? '', ['ENTRADA', 'SALIDA'], true)
+            ? (string) $query['nature']
+            : '';
+        $warehouse = filter_var(
+            $query['warehouse_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $productId = strtoupper($this->limitedText($query, 'product_id', 16));
+
+        if (preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
+            $productId = '';
+        }
+
+        return [
+            'product_id' => $productId,
+            'product_search' => $this->limitedText($query, 'product_search', 80),
+            'warehouse_id' => $warehouse === false ? null : $warehouse,
+            'concept' => $concept,
+            'nature' => $nature,
+            'date_from' => $this->date($query, 'date_from'),
+            'date_to' => $this->date($query, 'date_to'),
             'page' => $this->positiveInt($query['page'] ?? null, 1),
             'per_page' => 15,
         ];
