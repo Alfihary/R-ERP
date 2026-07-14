@@ -128,6 +128,190 @@ final class InventoryQueryRepository
     }
 
     /**
+     * @param array{
+     *     company_id: int,
+     *     warehouse_id: int,
+     *     search: string,
+     *     warehouse_filter: int|null,
+     *     type: string,
+     *     balance_state: string,
+     *     page: int,
+     *     per_page: int
+     * } $filters
+     * @return array{
+     *     rows: list<array<string, mixed>>,
+     *     pagination: array{page: int, per_page: int, total: int, total_pages: int}
+     * }
+     */
+    public function stock(array $filters): array
+    {
+        $warehouseId = $filters['warehouse_filter'] ?? $filters['warehouse_id'];
+        $conditions = [
+            'a.empresa_id = :empresa_id',
+            'e.almacen_id = :almacen_id',
+            'a.activo = 1',
+            'a.eliminado_en IS NULL',
+            'em.activo = 1',
+            'em.eliminado_en IS NULL',
+            'p.activo = 1',
+            'p.eliminado_en IS NULL',
+            'tp.activo = 1',
+            'tp.eliminado_en IS NULL',
+        ];
+        $parameters = [
+            'empresa_id' => $filters['company_id'],
+            'almacen_id' => $warehouseId,
+        ];
+
+        if ($filters['search'] !== '') {
+            $conditions[] = '(e.id_producto LIKE :search_id OR p.descripcion LIKE :search_description)';
+            $parameters['search_id'] = '%' . $filters['search'] . '%';
+            $parameters['search_description'] = '%' . $filters['search'] . '%';
+        }
+
+        if ($filters['type'] !== '') {
+            $conditions[] = 'tp.codigo = :tipo_producto';
+            $parameters['tipo_producto'] = $filters['type'];
+        }
+
+        if ($filters['balance_state'] === 'positive') {
+            $conditions[] = 'e.cantidad_actual > 0';
+        } elseif ($filters['balance_state'] === 'zero') {
+            $conditions[] = 'e.cantidad_actual = 0';
+        } elseif ($filters['balance_state'] === 'negative') {
+            $conditions[] = 'e.cantidad_actual < 0';
+        }
+
+        $where = implode(' AND ', $conditions);
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM existencias_producto e
+             INNER JOIN almacenes a ON a.id = e.almacen_id
+             INNER JOIN empresas em ON em.id = a.empresa_id
+             INNER JOIN productos p ON p.id_producto = e.id_producto
+             INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $page = max(1, $filters['page']);
+        $perPage = max(1, min(50, $filters['per_page']));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                e.id,
+                e.almacen_id,
+                e.id_producto,
+                e.cantidad_actual,
+                e.actualizado_en,
+                a.nombre AS almacen_nombre,
+                em.nombre AS empresa_nombre,
+                p.descripcion,
+                tp.codigo AS tipo_codigo,
+                tp.nombre AS tipo_nombre
+             FROM existencias_producto e
+             INNER JOIN almacenes a ON a.id = e.almacen_id
+             INNER JOIN empresas em ON em.id = a.empresa_id
+             INNER JOIN productos p ON p.id_producto = e.id_producto
+             INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
+             WHERE ' . $where . '
+             ORDER BY a.nombre ASC, e.id_producto ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        foreach ($parameters as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, nombre: string}>
+     */
+    public function warehousesForCompany(int $companyId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, nombre
+             FROM almacenes
+             WHERE empresa_id = :empresa_id
+               AND activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY nombre ASC'
+        );
+        $statement->execute(['empresa_id' => $companyId]);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @return list<array{codigo: string, nombre: string}>
+     */
+    public function productTypes(): array
+    {
+        $statement = $this->connection->pdo()->query(
+            'SELECT codigo, nombre
+             FROM tipos_producto
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY nombre ASC'
+        );
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @return array{positive: int, zero: int, negative: int, total: int}
+     */
+    public function stockSummary(int $companyId, int $warehouseId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                SUM(CASE WHEN e.cantidad_actual > 0 THEN 1 ELSE 0 END) AS positive,
+                SUM(CASE WHEN e.cantidad_actual = 0 THEN 1 ELSE 0 END) AS zero,
+                SUM(CASE WHEN e.cantidad_actual < 0 THEN 1 ELSE 0 END) AS negative,
+                COUNT(*) AS total
+             FROM existencias_producto e
+             INNER JOIN almacenes a ON a.id = e.almacen_id
+             INNER JOIN empresas em ON em.id = a.empresa_id
+             INNER JOIN productos p ON p.id_producto = e.id_producto
+             WHERE a.empresa_id = :empresa_id
+               AND e.almacen_id = :almacen_id
+               AND a.activo = 1
+               AND a.eliminado_en IS NULL
+               AND em.activo = 1
+               AND em.eliminado_en IS NULL
+               AND p.activo = 1
+               AND p.eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+        ]);
+        $row = $statement->fetch() ?: [];
+
+        return [
+            'positive' => (int) ($row['positive'] ?? 0),
+            'zero' => (int) ($row['zero'] ?? 0),
+            'negative' => (int) ($row['negative'] ?? 0),
+            'total' => (int) ($row['total'] ?? 0),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function movement(int $movementId, int $companyId, int $warehouseId): ?array

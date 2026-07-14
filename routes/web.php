@@ -581,6 +581,19 @@ return static function (
         $inventoryBaseMiddleware
     );
     $router->get(
+        '/inventario/existencias',
+        static fn (Request $request): Response =>
+            $inventoryController->stock($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                'inventario.existencias.acceder'
+            ),
+        ]
+    );
+    $router->get(
         '/inventario/movimientos/crear',
         static fn (Request $request): Response =>
             $inventoryController->createForm($request),

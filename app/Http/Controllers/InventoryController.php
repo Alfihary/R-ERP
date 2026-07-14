@@ -64,6 +64,65 @@ final class InventoryController
         ], 'Movimientos de inventario');
     }
 
+    public function stock(Request $request): Response
+    {
+        $context = $this->context();
+        $filters = $this->stockFilters($request->query());
+        $warehouses = [];
+        $types = $this->queries->productTypes();
+        $summary = ['positive' => 0, 'zero' => 0, 'negative' => 0, 'total' => 0];
+        $result = [
+            'rows' => [],
+            'pagination' => [
+                'page' => $filters['page'],
+                'per_page' => $filters['per_page'],
+                'total' => 0,
+                'total_pages' => 1,
+            ],
+        ];
+        $errors = [];
+
+        if ($context->hasActiveContext()) {
+            $company = $context->activeCompany();
+            $warehouse = $context->activeWarehouse();
+            $companyId = (int) ($company['id'] ?? 0);
+            $activeWarehouseId = (int) ($warehouse['id'] ?? 0);
+            $warehouses = $this->queries->warehousesForCompany($companyId);
+            $allowedWarehouseIds = array_map(
+                static fn (array $row): int => (int) $row['id'],
+                $warehouses
+            );
+            $warehouseFilter = $filters['warehouse_id'] ?? $activeWarehouseId;
+            $filters['warehouse_id'] = $warehouseFilter;
+
+            if (!in_array($warehouseFilter, $allowedWarehouseIds, true)) {
+                $errors['warehouse_id'] = 'Selecciona un almacén válido de la empresa activa.';
+            } else {
+                $result = $this->queries->stock($filters + [
+                    'company_id' => $companyId,
+                    'warehouse_id' => $activeWarehouseId,
+                    'warehouse_filter' => $warehouseFilter,
+                ]);
+                $summary = $this->queries->stockSummary($companyId, $warehouseFilter);
+            }
+        }
+
+        return $this->render('inventory/stock/index', [
+            'errors' => $errors,
+            'filters' => $filters,
+            'hasActiveContext' => $context->hasActiveContext(),
+            'pagination' => $result['pagination'],
+            'rows' => $result['rows'],
+            'summary' => $summary,
+            'types' => $types,
+            'warehouses' => $warehouses,
+        ], 'Existencias de inventario', empty($errors) ? 200 : 422, [
+            'activeNavigation' => 'inventory-stock',
+            'stylesheets' => ['/css/modules/inventory-stock.css'],
+            'scripts' => [],
+        ]);
+    }
+
     public function createForm(Request $request): Response
     {
         return $this->renderForm($this->defaultValues(), [], 200);
@@ -194,24 +253,31 @@ final class InventoryController
         string $contentView,
         array $contentData,
         string $pageTitle,
-        int $status = 200
+        int $status = 200,
+        array $assets = []
     ): Response {
         $user = $this->user();
         $context = $this->scopeContext->resolveForUser($user['user_id']);
+        $stylesheets = $assets['stylesheets'] ?? ['/css/modules/inventory-movements.css'];
+        $scripts = $assets['scripts'] ?? ['/js/modules/inventory-movements.js'];
+        $activeNavigation = is_string($assets['activeNavigation'] ?? null)
+            ? $assets['activeNavigation']
+            : 'inventory';
 
         return Response::html(View::render('layouts/app', [
-            'activeNavigation' => 'inventory',
+            'activeNavigation' => $activeNavigation,
             'appName' => (string) $this->config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $this->permissions->allows($user['user_id'], 'catalogos.acceder'),
             'canAccessProducts' => $this->permissions->allows($user['user_id'], 'productos.acceder'),
-            'canAccessInventory' => true,
+            'canAccessInventory' => $this->permissions->allows($user['user_id'], 'inventario.movimientos.acceder'),
+            'canAccessInventoryStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias.acceder'),
             'contentData' => $contentData,
             'contentView' => $contentView,
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
             'pageTitle' => $pageTitle,
-            'scripts' => ['/js/modules/inventory-movements.js'],
-            'stylesheets' => ['/css/modules/inventory-movements.css'],
+            'scripts' => is_array($scripts) ? $scripts : [],
+            'stylesheets' => is_array($stylesheets) ? $stylesheets : [],
             'user' => $user,
         ]), $status);
     }
@@ -254,6 +320,34 @@ final class InventoryController
             'status' => $status,
             'date_from' => $this->date($query, 'date_from'),
             'date_to' => $this->date($query, 'date_to'),
+            'page' => $this->positiveInt($query['page'] ?? null, 1),
+            'per_page' => 15,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{search: string, warehouse_id: int|null, type: string, balance_state: string, page: int, per_page: int}
+     */
+    private function stockFilters(array $query): array
+    {
+        $type = in_array($query['type'] ?? '', ['PRODUCTO', 'KIT', 'SERVICIO'], true)
+            ? (string) $query['type']
+            : '';
+        $balanceState = in_array($query['balance_state'] ?? '', ['positive', 'zero', 'negative'], true)
+            ? (string) $query['balance_state']
+            : '';
+        $warehouse = filter_var(
+            $query['warehouse_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+
+        return [
+            'search' => $this->limitedText($query, 'search', 80),
+            'warehouse_id' => $warehouse === false ? null : $warehouse,
+            'type' => $type,
+            'balance_state' => $balanceState,
             'page' => $this->positiveInt($query['page'] ?? null, 1),
             'per_page' => 15,
         ];
