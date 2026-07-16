@@ -14,6 +14,7 @@ use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
 use App\Domain\Inventory\InventoryService;
+use App\Domain\Inventory\InventoryTransferService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
@@ -26,6 +27,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
@@ -118,6 +120,7 @@ $productImages = new ProductImageService(
 );
 $inventoryRepository = new InventoryRepository($connection);
 $inventory = new InventoryService($inventoryRepository);
+$inventoryTransfers = new InventoryTransferService($inventoryRepository);
 $inventoryQueries = new InventoryQueryRepository($connection);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
@@ -174,6 +177,15 @@ $inventoryController = new InventoryController(
     $inventory,
     $inventoryQueries
 );
+$inventoryTransferController = new InventoryTransferController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $inventoryTransfers,
+    $inventoryQueries
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -193,7 +205,8 @@ $registerRoutes(
     $exchangeRateController,
     $satCatalogController,
     $productController,
-    $inventoryController
+    $inventoryController,
+    $inventoryTransferController
 );
 
 return new App($router, $config, $debug, $errorHandler);

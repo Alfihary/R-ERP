@@ -368,6 +368,7 @@ final class InventoryController
             'canAccessInventory' => $this->permissions->allows($user['user_id'], 'inventario.movimientos.acceder'),
             'canAccessInventoryStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias.acceder'),
             'canAccessInventoryKardex' => $this->permissions->allows($user['user_id'], 'inventario.kardex.acceder'),
+            'canAccessInventoryTransfers' => $this->permissions->allows($user['user_id'], 'inventario.transferencias.acceder'),
             'contentData' => $contentData,
             'contentView' => $contentView,
             'context' => $context->toArray(),

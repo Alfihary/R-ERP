@@ -16,6 +16,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Support\Security\CsrfTokenService;
@@ -32,7 +33,8 @@ return static function (
     ExchangeRateController $exchangeRateController,
     SatCatalogController $satCatalogController,
     ProductController $productController,
-    InventoryController $inventoryController
+    InventoryController $inventoryController,
+    InventoryTransferController $inventoryTransferController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -100,6 +102,10 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'inventario.movimientos.acceder'
         );
+        $canAccessInventoryTransfers = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.transferencias.acceder'
+        );
 
         return Response::html(View::render('layouts/app', [
             'activeNavigation' => 'home',
@@ -107,10 +113,12 @@ return static function (
             'canAccessCatalogs' => $canAccessCatalogs,
             'canAccessProducts' => $canAccessProducts,
             'canAccessInventory' => $canAccessInventory,
+            'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
                 'canAccessProducts' => $canAccessProducts,
                 'canAccessInventory' => $canAccessInventory,
+                'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
             ],
             'context' => $context->toArray(),
             'contentView' => 'auth/private',
@@ -642,5 +650,47 @@ return static function (
                 'inventario.kardex.acceder'
             ),
         ]
+    );
+
+    $transferMiddleware = static function (string $permission) use (
+        $authMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ];
+    };
+
+    $router->get(
+        '/inventario/transferencias',
+        static fn (Request $request): Response =>
+            $inventoryTransferController->index($request),
+        $transferMiddleware('inventario.transferencias.acceder')
+    );
+    $router->get(
+        '/inventario/transferencias/crear',
+        static fn (Request $request): Response =>
+            $inventoryTransferController->createForm($request),
+        $transferMiddleware('inventario.transferencias.crear')
+    );
+    $router->post(
+        '/inventario/transferencias',
+        static fn (Request $request): Response =>
+            $inventoryTransferController->create($request),
+        $transferMiddleware('inventario.transferencias.crear')
+    );
+    $router->get(
+        '/inventario/transferencias/ver',
+        static fn (Request $request): Response =>
+            $inventoryTransferController->detail($request),
+        $transferMiddleware('inventario.transferencias.ver')
+    );
+    $router->get(
+        '/inventario/transferencias/productos/buscar',
+        static fn (Request $request): Response =>
+            $inventoryTransferController->searchProducts($request),
+        $transferMiddleware('inventario.transferencias.crear')
     );
 };

@@ -631,14 +631,19 @@ a {
     }
 
     .app-account {
-        align-items: center;
-        flex-direction: row;
-        justify-content: space-between;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.5rem;
     }
 
     .app-account__identity {
-        max-width: min(13rem, 60vw);
+        max-width: 100%;
         text-align: left;
+    }
+
+    .app-account form,
+    .app-account .button {
+        width: 100%;
     }
 
     .page-heading__eyebrow,

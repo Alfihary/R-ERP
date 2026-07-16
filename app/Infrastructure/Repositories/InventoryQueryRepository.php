@@ -545,6 +545,172 @@ final class InventoryQueryRepository
     }
 
     /**
+     * @param array{
+     *     company_id: int,
+     *     search: string,
+     *     warehouse_id: int|null,
+     *     date_from: string,
+     *     date_to: string,
+     *     page: int,
+     *     per_page: int
+     * } $filters
+     * @return array{
+     *     rows: list<array<string, mixed>>,
+     *     pagination: array{page: int, per_page: int, total: int, total_pages: int}
+     * }
+     */
+    public function transfers(array $filters): array
+    {
+        $conditions = $this->transferConditions($filters);
+        $where = implode(' AND ', $conditions['where']);
+        $parameters = $conditions['parameters'];
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM (
+                SELECT s.referencia
+                FROM movimientos_inventario s
+                INNER JOIN conceptos_movimiento_inventario cs
+                   ON cs.id = s.concepto_movimiento_id
+                  AND cs.codigo = \'TRANSFERENCIA_SALIDA\'
+                INNER JOIN movimientos_inventario e
+                   ON e.referencia = s.referencia
+                  AND e.empresa_id = s.empresa_id
+                  AND e.estado = \'APLICADO\'
+                INNER JOIN conceptos_movimiento_inventario ce
+                   ON ce.id = e.concepto_movimiento_id
+                  AND ce.codigo = \'TRANSFERENCIA_ENTRADA\'
+                INNER JOIN almacenes ao ON ao.id = s.almacen_id
+                INNER JOIN almacenes ad ON ad.id = e.almacen_id
+                WHERE ' . $where . '
+                GROUP BY s.referencia
+             ) transferencias'
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $page = max(1, $filters['page']);
+        $perPage = max(1, min(50, $filters['per_page']));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                s.referencia,
+                s.fecha_movimiento,
+                s.id AS movimiento_salida_id,
+                e.id AS movimiento_entrada_id,
+                ao.nombre AS almacen_origen_nombre,
+                ad.nombre AS almacen_destino_nombre,
+                COUNT(d.id) AS partidas,
+                \'APLICADA\' AS estado
+             FROM movimientos_inventario s
+             INNER JOIN conceptos_movimiento_inventario cs
+                ON cs.id = s.concepto_movimiento_id
+               AND cs.codigo = \'TRANSFERENCIA_SALIDA\'
+             INNER JOIN movimientos_inventario e
+                ON e.referencia = s.referencia
+               AND e.empresa_id = s.empresa_id
+               AND e.estado = \'APLICADO\'
+             INNER JOIN conceptos_movimiento_inventario ce
+                ON ce.id = e.concepto_movimiento_id
+               AND ce.codigo = \'TRANSFERENCIA_ENTRADA\'
+             INNER JOIN almacenes ao ON ao.id = s.almacen_id
+             INNER JOIN almacenes ad ON ad.id = e.almacen_id
+             LEFT JOIN movimientos_inventario_detalle d
+                ON d.movimiento_id = s.id
+             WHERE ' . $where . '
+             GROUP BY
+                s.referencia,
+                s.fecha_movimiento,
+                s.id,
+                e.id,
+                ao.nombre,
+                ad.nombre
+             ORDER BY s.fecha_movimiento DESC, s.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        foreach ($parameters as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function transfer(string $reference, int $companyId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                s.referencia,
+                s.fecha_movimiento,
+                s.estado AS estado_salida,
+                e.estado AS estado_entrada,
+                s.id AS movimiento_salida_id,
+                e.id AS movimiento_entrada_id,
+                s.observaciones,
+                s.creado_en,
+                s.aplicado_en,
+                empresa.nombre AS empresa_nombre,
+                ao.nombre AS almacen_origen_nombre,
+                ad.nombre AS almacen_destino_nombre,
+                uc.username AS creado_por_username,
+                uc.email AS creado_por_email,
+                ua.username AS aplicado_por_username,
+                ua.email AS aplicado_por_email
+             FROM movimientos_inventario s
+             INNER JOIN conceptos_movimiento_inventario cs
+                ON cs.id = s.concepto_movimiento_id
+               AND cs.codigo = \'TRANSFERENCIA_SALIDA\'
+             INNER JOIN movimientos_inventario e
+                ON e.referencia = s.referencia
+               AND e.empresa_id = s.empresa_id
+               AND e.estado = \'APLICADO\'
+             INNER JOIN conceptos_movimiento_inventario ce
+                ON ce.id = e.concepto_movimiento_id
+               AND ce.codigo = \'TRANSFERENCIA_ENTRADA\'
+             INNER JOIN empresas empresa ON empresa.id = s.empresa_id
+             INNER JOIN almacenes ao ON ao.id = s.almacen_id
+             INNER JOIN almacenes ad ON ad.id = e.almacen_id
+             LEFT JOIN usuarios uc ON uc.id = s.creado_por
+             LEFT JOIN usuarios ua ON ua.id = s.aplicado_por
+             WHERE s.empresa_id = :empresa_id
+               AND s.referencia = :referencia
+               AND s.estado = \'APLICADO\'
+               AND s.referencia LIKE \'TRF-%\'
+             LIMIT 1'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'referencia' => $reference,
+        ]);
+        $transfer = $statement->fetch();
+
+        if ($transfer === false) {
+            return null;
+        }
+
+        $transfer['estado'] = 'APLICADA';
+        $transfer['partidas'] = $this->transferDetails(
+            (int) $transfer['movimiento_salida_id']
+        );
+
+        return $transfer;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function searchProducts(string $query): array
@@ -655,6 +821,70 @@ final class InventoryQueryRepository
              ORDER BY d.id_producto'
         );
         $statement->execute(['movimiento_id' => $movementId]);
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     where: list<string>,
+     *     parameters: array<string, mixed>
+     * }
+     */
+    private function transferConditions(array $filters): array
+    {
+        $where = [
+            's.empresa_id = :empresa_id',
+            's.estado = \'APLICADO\'',
+            's.referencia LIKE \'TRF-%\'',
+            'ao.activo = 1',
+            'ao.eliminado_en IS NULL',
+            'ad.activo = 1',
+            'ad.eliminado_en IS NULL',
+        ];
+        $parameters = ['empresa_id' => $filters['company_id']];
+
+        if ($filters['search'] !== '') {
+            $where[] = 's.referencia LIKE :search';
+            $parameters['search'] = '%' . $filters['search'] . '%';
+        }
+        if ($filters['warehouse_id'] !== null) {
+            $where[] = '(s.almacen_id = :almacen_origen_id OR e.almacen_id = :almacen_destino_id)';
+            $parameters['almacen_origen_id'] = $filters['warehouse_id'];
+            $parameters['almacen_destino_id'] = $filters['warehouse_id'];
+        }
+        if ($filters['date_from'] !== '') {
+            $where[] = 's.fecha_movimiento >= :fecha_desde';
+            $parameters['fecha_desde'] = $filters['date_from'] . ' 00:00:00';
+        }
+        if ($filters['date_to'] !== '') {
+            $where[] = 's.fecha_movimiento <= :fecha_hasta';
+            $parameters['fecha_hasta'] = $filters['date_to'] . ' 23:59:59';
+        }
+
+        return ['where' => $where, 'parameters' => $parameters];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function transferDetails(int $exitMovementId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                d.id_producto,
+                p.descripcion,
+                tp.codigo AS tipo_codigo,
+                d.cantidad,
+                d.observaciones
+             FROM movimientos_inventario_detalle d
+             INNER JOIN productos p ON p.id_producto = d.id_producto
+             INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
+             WHERE d.movimiento_id = :movimiento_id
+             ORDER BY d.id_producto'
+        );
+        $statement->execute(['movimiento_id' => $exitMovementId]);
 
         return $statement->fetchAll();
     }
