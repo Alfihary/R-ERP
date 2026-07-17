@@ -704,7 +704,8 @@ final class InventoryQueryRepository
 
         $transfer['estado'] = 'APLICADA';
         $transfer['partidas'] = $this->transferDetails(
-            (int) $transfer['movimiento_salida_id']
+            (int) $transfer['movimiento_salida_id'],
+            (int) $transfer['movimiento_entrada_id']
         );
 
         return $transfer;
@@ -719,6 +720,7 @@ final class InventoryQueryRepository
             'SELECT
                 p.id_producto,
                 p.descripcion,
+                p.controla_series,
                 tp.codigo AS tipo_codigo
              FROM productos p
              INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
@@ -811,8 +813,10 @@ final class InventoryQueryRepository
     {
         $statement = $this->connection->pdo()->prepare(
             'SELECT
+                d.id AS detalle_id,
                 d.id_producto,
                 p.descripcion,
+                p.controla_series,
                 d.cantidad,
                 d.observaciones
              FROM movimientos_inventario_detalle d
@@ -822,7 +826,18 @@ final class InventoryQueryRepository
         );
         $statement->execute(['movimiento_id' => $movementId]);
 
-        return $statement->fetchAll();
+        $rows = $statement->fetchAll();
+        $seriesByDetail = $this->seriesByDetailIds(array_map(
+            static fn (array $row): int => (int) $row['detalle_id'],
+            $rows
+        ));
+
+        foreach ($rows as &$row) {
+            $row['series'] = $seriesByDetail[(int) $row['detalle_id']] ?? [];
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**
@@ -869,12 +884,14 @@ final class InventoryQueryRepository
     /**
      * @return list<array<string, mixed>>
      */
-    private function transferDetails(int $exitMovementId): array
+    private function transferDetails(int $exitMovementId, int $entryMovementId): array
     {
         $statement = $this->connection->pdo()->prepare(
             'SELECT
+                d.id AS detalle_salida_id,
                 d.id_producto,
                 p.descripcion,
+                p.controla_series,
                 tp.codigo AS tipo_codigo,
                 d.cantidad,
                 d.observaciones
@@ -886,6 +903,83 @@ final class InventoryQueryRepository
         );
         $statement->execute(['movimiento_id' => $exitMovementId]);
 
-        return $statement->fetchAll();
+        $rows = $statement->fetchAll();
+        $entryDetails = $this->entryTransferDetailsByProduct($entryMovementId);
+        $seriesByDetail = $this->seriesByDetailIds(array_merge(
+            array_map(
+                static fn (array $row): int => (int) $row['detalle_salida_id'],
+                $rows
+            ),
+            array_values($entryDetails)
+        ));
+
+        foreach ($rows as &$row) {
+            $exitDetailId = (int) $row['detalle_salida_id'];
+            $entryDetailId = $entryDetails[(string) $row['id_producto']] ?? 0;
+            $row['detalle_entrada_id'] = $entryDetailId;
+            $row['series_salida'] = $seriesByDetail[$exitDetailId] ?? [];
+            $row['series_entrada'] = $entryDetailId > 0
+                ? ($seriesByDetail[$entryDetailId] ?? [])
+                : [];
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * @param list<int> $detailIds
+     * @return array<int, list<string>>
+     */
+    private function seriesByDetailIds(array $detailIds): array
+    {
+        $detailIds = array_values(array_unique(array_filter(
+            array_map('intval', $detailIds),
+            static fn (int $id): bool => $id > 0
+        )));
+
+        if ($detailIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($detailIds), '?'));
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                mds.movimiento_detalle_id,
+                ps.numero_serie
+             FROM movimiento_detalle_series mds
+             INNER JOIN producto_series ps ON ps.id = mds.serie_id
+             WHERE mds.movimiento_detalle_id IN (' . $placeholders . ')
+             ORDER BY mds.movimiento_detalle_id, ps.numero_serie'
+        );
+        $statement->execute($detailIds);
+        $series = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $series[(int) $row['movimiento_detalle_id']][] =
+                (string) $row['numero_serie'];
+        }
+
+        return $series;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function entryTransferDetailsByProduct(int $entryMovementId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, id_producto
+             FROM movimientos_inventario_detalle
+             WHERE movimiento_id = :movimiento_id'
+        );
+        $statement->execute(['movimiento_id' => $entryMovementId]);
+        $details = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $details[(string) $row['id_producto']] = (int) $row['id'];
+        }
+
+        return $details;
     }
 }

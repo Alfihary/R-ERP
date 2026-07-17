@@ -50,6 +50,28 @@
         }
     };
 
+    const setSeriesMode = (part, tracksSeries) => {
+        const flag = part.querySelector('[data-product-tracks-series]');
+        const panel = part.querySelector('[data-series-panel]');
+        const input = part.querySelector('[data-series-input]');
+        const quantity = part.querySelector('[name$="[cantidad]"]');
+
+        if (flag instanceof HTMLInputElement) {
+            flag.value = tracksSeries ? '1' : '0';
+        }
+        if (panel instanceof HTMLElement) {
+            panel.hidden = !tracksSeries;
+        }
+        if (input instanceof HTMLTextAreaElement && !tracksSeries) {
+            input.value = '';
+        }
+        if (quantity instanceof HTMLInputElement) {
+            quantity.step = tracksSeries ? '1' : '0.000001';
+            quantity.placeholder = tracksSeries ? '1' : '1.000000';
+            quantity.inputMode = tracksSeries ? 'numeric' : 'decimal';
+        }
+    };
+
     const bindSearch = (part) => {
         const idInput = part.querySelector('[data-product-id]');
         const searchInput = part.querySelector('[data-product-search]');
@@ -92,10 +114,17 @@
                 }
 
                 option.addEventListener('click', () => {
+                    const tracksSeries = item.controla_series === true;
                     idInput.value = productId;
                     searchInput.value = `${productId} · ${item.descripcion || ''}`;
+                    setSeriesMode(part, tracksSeries);
                     hideResults(part);
-                    setStatus(part, `${item.tipo_codigo || ''} seleccionado.`);
+                    setStatus(
+                        part,
+                        tracksSeries
+                            ? `${item.tipo_codigo || ''} seriado seleccionado. Captura una serie por unidad.`
+                            : `${item.tipo_codigo || ''} seleccionado.`
+                    );
                 });
                 results.append(option);
             });
@@ -107,6 +136,7 @@
         const search = () => {
             const query = searchInput.value.trim();
             idInput.value = '';
+            setSeriesMode(part, false);
             hideResults(part);
 
             if (query.length < minLength) {
@@ -199,6 +229,10 @@
             clone.querySelectorAll('input').forEach((input) => {
                 input.value = '';
             });
+            clone.querySelectorAll('textarea').forEach((textarea) => {
+                textarea.value = '';
+            });
+            setSeriesMode(clone, false);
             hideResults(clone);
             setStatus(clone, 'Escribe al menos 2 caracteres.');
             partsRoot.append(clone);

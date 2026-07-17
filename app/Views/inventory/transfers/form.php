@@ -159,6 +159,12 @@ $parts = is_array($values['partidas'] ?? null) ? $values['partidas'] : [];
                             data-product-id
                         >
                         <input
+                            type="hidden"
+                            name="partidas[<?= e((string) $index) ?>][controla_series]"
+                            value="<?= e((string) ($part['controla_series'] ?? '0')) ?>"
+                            data-product-tracks-series
+                        >
+                        <input
                             type="search"
                             value="<?= e((string) ($part['producto_label'] ?? $part['id_producto'] ?? '')) ?>"
                             placeholder="Buscar por ID o descripción"
@@ -188,6 +194,22 @@ $parts = is_array($values['partidas'] ?? null) ? $values['partidas'] : [];
                             maxlength="500"
                             value="<?= e((string) ($part['observaciones'] ?? '')) ?>"
                         >
+                    </label>
+                    <label
+                        class="transfer-field transfer-field--series"
+                        data-series-panel
+                        <?= (string) ($part['controla_series'] ?? '0') === '1' ? '' : 'hidden' ?>
+                    >
+                        <span>Números de serie</span>
+                        <textarea
+                            name="partidas[<?= e((string) $index) ?>][series_text]"
+                            rows="4"
+                            data-series-input
+                            placeholder="SERIE-001&#10;SERIE-002"
+                        ><?= e((string) ($part['series_text'] ?? '')) ?></textarea>
+                        <small data-series-help>
+                            Este producto controla números de serie. Captura una serie por cada unidad.
+                        </small>
                     </label>
                     <button
                         class="button button--secondary transfer-remove-part"

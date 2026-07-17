@@ -86,11 +86,14 @@ try {
     $test = require BASE_PATH . '/database/tests/series_1_test.php';
     $serviceTest = require BASE_PATH
         . '/database/tests/series_service_1_test.php';
+    $uiTest = require BASE_PATH
+        . '/database/tests/series_ui_1_test.php';
 
     if (
         !$migration instanceof Migration
         || !$test instanceof DatabaseTest
         || !$serviceTest instanceof DatabaseTest
+        || !$uiTest instanceof DatabaseTest
     ) {
         throw new RuntimeException(
             'A SERIES database artifact has an invalid contract.'
@@ -110,6 +113,7 @@ try {
         'db:test' => [
             'schema' => $test->run($pdo, $expectedDatabase),
             'service' => $serviceTest->run($pdo, $expectedDatabase),
+            'ui' => $uiTest->run($pdo, $expectedDatabase),
         ],
         'status' => ['migrations' => $runner->status()],
     };

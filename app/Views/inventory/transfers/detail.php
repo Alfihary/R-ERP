@@ -83,6 +83,7 @@ $parts = is_array($transfer['partidas'] ?? null) ? $transfer['partidas'] : [];
                     <th>Descripción</th>
                     <th>Tipo</th>
                     <th>Cantidad</th>
+                    <th>Series</th>
                     <th>Observaciones</th>
                 </tr>
             </thead>
@@ -93,6 +94,34 @@ $parts = is_array($transfer['partidas'] ?? null) ? $transfer['partidas'] : [];
                         <td><?= e((string) ($part['descripcion'] ?? '')) ?></td>
                         <td><?= e((string) ($part['tipo_codigo'] ?? '')) ?></td>
                         <td><?= e((string) ($part['cantidad'] ?? '')) ?></td>
+                        <td>
+                            <?php
+                            $seriesSalida = is_array($part['series_salida'] ?? null) ? $part['series_salida'] : [];
+                            $seriesEntrada = is_array($part['series_entrada'] ?? null) ? $part['series_entrada'] : [];
+                            ?>
+                            <?php if ($seriesSalida !== [] || $seriesEntrada !== []): ?>
+                                <div class="transfer-series-pair">
+                                    <div>
+                                        <span>Salida</span>
+                                        <ul class="transfer-series-list">
+                                            <?php foreach ($seriesSalida as $number): ?>
+                                                <li><?= e((string) $number) ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <span>Entrada</span>
+                                        <ul class="transfer-series-list">
+                                            <?php foreach ($seriesEntrada as $number): ?>
+                                                <li><?= e((string) $number) ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <span class="transfer-muted">No aplica</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= e((string) ($part['observaciones'] ?? '')) ?></td>
                     </tr>
                 <?php endforeach; ?>

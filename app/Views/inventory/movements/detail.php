@@ -64,6 +64,7 @@ $parts = is_array($movement['partidas'] ?? null) ? $movement['partidas'] : [];
                     <th>ID producto</th>
                     <th>Descripción</th>
                     <th>Cantidad</th>
+                    <th>Series</th>
                     <th>Observaciones</th>
                 </tr>
             </thead>
@@ -73,6 +74,18 @@ $parts = is_array($movement['partidas'] ?? null) ? $movement['partidas'] : [];
                         <td><?= e((string) ($part['id_producto'] ?? '')) ?></td>
                         <td><?= e((string) ($part['descripcion'] ?? '')) ?></td>
                         <td><?= e((string) ($part['cantidad'] ?? '')) ?></td>
+                        <td>
+                            <?php $series = is_array($part['series'] ?? null) ? $part['series'] : []; ?>
+                            <?php if ($series !== []): ?>
+                                <ul class="inventory-series-list">
+                                    <?php foreach ($series as $number): ?>
+                                        <li><?= e((string) $number) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <span class="inventory-muted">No aplica</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= e((string) ($part['observaciones'] ?? '')) ?></td>
                     </tr>
                 <?php endforeach; ?>

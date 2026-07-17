@@ -301,6 +301,7 @@ final class InventoryController
                     'id_producto' => (string) $row['id_producto'],
                     'descripcion' => (string) $row['descripcion'],
                     'tipo_codigo' => (string) $row['tipo_codigo'],
+                    'controla_series' => (int) ($row['controla_series'] ?? 0) === 1,
                 ],
                 $this->queries->searchProducts($query)
             ),
@@ -489,7 +490,7 @@ final class InventoryController
 
     /**
      * @param array<string, mixed> $input
-     * @return list<array{id_producto: string, cantidad: string, observaciones: string}>
+     * @return list<array{id_producto: string, cantidad: string, observaciones: string, series: list<string>}>
      */
     private function parts(array $input): array
     {
@@ -510,6 +511,7 @@ final class InventoryController
                 'id_producto' => $this->text($part, 'id_producto'),
                 'cantidad' => $this->text($part, 'cantidad'),
                 'observaciones' => $this->text($part, 'observaciones'),
+                'series' => $this->series($part),
             ];
         }
 
@@ -525,8 +527,9 @@ final class InventoryController
         $parts = $input['partidas'] ?? [];
 
         if (!is_array($parts) || $parts === []) {
-            $parts = [['id_producto' => '', 'producto_label' => '', 'cantidad' => '', 'observaciones' => '']];
+            $parts = [$this->emptyPart()];
         }
+        $parts = $this->formParts($parts);
 
         return [
             'concepto_codigo' => $this->text($input, 'concepto_codigo'),
@@ -548,9 +551,88 @@ final class InventoryController
             'referencia' => '',
             'observaciones' => '',
             'partidas' => [
-                ['id_producto' => '', 'producto_label' => '', 'cantidad' => '', 'observaciones' => ''],
+                $this->emptyPart(),
             ],
         ];
+    }
+
+    /**
+     * @return array{id_producto: string, producto_label: string, cantidad: string, observaciones: string, series_text: string, controla_series: string}
+     */
+    private function emptyPart(): array
+    {
+        return [
+            'id_producto' => '',
+            'producto_label' => '',
+            'cantidad' => '',
+            'observaciones' => '',
+            'series_text' => '',
+            'controla_series' => '0',
+        ];
+    }
+
+    /**
+     * @param array<int|string, mixed> $parts
+     * @return list<array<string, mixed>>
+     */
+    private function formParts(array $parts): array
+    {
+        $normalized = [];
+
+        foreach ($parts as $part) {
+            $part = is_array($part) ? $part : [];
+            $seriesText = $this->text($part, 'series_text');
+
+            if ($seriesText === '' && is_array($part['series'] ?? null)) {
+                $seriesText = implode("\n", $this->series($part));
+            }
+
+            $normalized[] = [
+                'id_producto' => $this->text($part, 'id_producto'),
+                'producto_label' => $this->text($part, 'producto_label'),
+                'cantidad' => $this->text($part, 'cantidad'),
+                'observaciones' => $this->text($part, 'observaciones'),
+                'series_text' => $seriesText,
+                'controla_series' => $this->text($part, 'controla_series') === '1'
+                    ? '1'
+                    : '0',
+            ];
+        }
+
+        return $normalized === [] ? [$this->emptyPart()] : $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $part
+     * @return list<string>
+     */
+    private function series(array $part): array
+    {
+        $raw = $part['series_text'] ?? $part['series'] ?? '';
+
+        if (is_array($raw)) {
+            $items = $raw;
+        } elseif (is_string($raw) || is_int($raw)) {
+            $items = preg_split('/\R/', (string) $raw) ?: [];
+        } else {
+            return [];
+        }
+
+        $series = [];
+
+        foreach ($items as $item) {
+            if (!is_string($item) && !is_int($item)) {
+                continue;
+            }
+
+            $number = trim((string) $item);
+
+            if ($number !== '') {
+                $series[] = $number;
+            }
+        }
+
+        return $series;
     }
 
     /**

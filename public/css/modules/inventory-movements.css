@@ -242,6 +242,40 @@
     background: var(--color-surface);
 }
 
+.inventory-field--series {
+    grid-column: 1 / -2;
+}
+
+.inventory-field--series textarea {
+    min-height: 6.5rem;
+    resize: vertical;
+}
+
+.inventory-series-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.inventory-series-list li {
+    max-width: 100%;
+    padding: 0.25rem 0.5rem;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.inventory-muted {
+    color: var(--color-muted);
+}
+
 .inventory-product-search {
     position: relative;
 }
@@ -321,6 +355,10 @@
     .inventory-detail-grid,
     .inventory-part {
         grid-template-columns: 1fr;
+    }
+
+    .inventory-field--series {
+        grid-column: auto;
     }
 
     .inventory-filter-actions {

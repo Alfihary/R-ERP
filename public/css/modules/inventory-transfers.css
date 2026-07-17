@@ -244,6 +244,53 @@
     background: var(--color-surface);
 }
 
+.transfer-field--series {
+    grid-column: 1 / -2;
+}
+
+.transfer-field--series textarea {
+    min-height: 6.5rem;
+    resize: vertical;
+}
+
+.transfer-series-pair {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.transfer-series-pair span {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.transfer-series-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.transfer-series-list li {
+    max-width: 100%;
+    padding: 0.25rem 0.5rem;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.transfer-muted {
+    color: var(--color-muted);
+}
+
 .transfer-product-search {
     position: relative;
 }
@@ -324,6 +371,10 @@
     .transfer-detail-grid,
     .transfer-part {
         grid-template-columns: 1fr;
+    }
+
+    .transfer-field--series {
+        grid-column: auto;
     }
 
     .transfer-filter-actions {

@@ -125,8 +125,8 @@ El runner `database/series.php db:test` ejecuta:
 
 ## Limitaciones pendientes
 
-- No hay UI de captura o consulta de series.
-- No hay buscador/autocomplete de series.
+- La UI inicial de captura manual queda documentada en `docs/series-ui-1.md`.
+- No hay buscador/autocomplete avanzado de series.
 - No hay lotes ni pedimentos.
 - No hay costos ni valuación.
 - No hay reservas.
