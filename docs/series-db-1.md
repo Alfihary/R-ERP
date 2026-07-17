@@ -6,10 +6,8 @@ SERIES-DB-1 crea la estructura base de datos para controlar números de serie
 en inventario. La fase prepara el modelo para productos con
 `productos.controla_series = 1`, pero no activa todavía el control funcional.
 
-SERIES-DB-1 NO ACTIVA EL CONTROL FUNCIONAL DE SERIES.
-
-PRODUCTOS CON `controla_series = 1` TODAVÍA NO ESTÁN OBLIGADOS A CAPTURAR
-SERIES HASTA SERIES-SERVICE-1.
+SERIES-DB-1 no activó el control funcional de series. Ese comportamiento se
+documenta y prueba en `docs/series-service-1.md`.
 
 ## Tablas creadas
 

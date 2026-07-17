@@ -130,7 +130,7 @@ final class InventoryRepository
 
     /**
      * @param list<string> $productIds
-     * @return array<string, array{id_producto: string, tipo_codigo: string, activo: int}>
+     * @return array<string, array{id_producto: string, tipo_codigo: string, activo: int, controla_series: int}>
      */
     public function activeProductsByIds(array $productIds): array
     {
@@ -143,6 +143,7 @@ final class InventoryRepository
             'SELECT
                 p.id_producto,
                 p.activo,
+                p.controla_series,
                 tp.codigo AS tipo_codigo
              FROM productos p
              INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
@@ -159,6 +160,7 @@ final class InventoryRepository
                 'id_producto' => (string) $row['id_producto'],
                 'tipo_codigo' => (string) $row['tipo_codigo'],
                 'activo' => (int) $row['activo'],
+                'controla_series' => (int) $row['controla_series'],
             ];
         }
 
@@ -215,7 +217,7 @@ final class InventoryRepository
         string $quantity,
         ?string $notes,
         int $actorId
-    ): void {
+    ): int {
         $statement = $this->connection->pdo()->prepare(
             'INSERT INTO movimientos_inventario_detalle (
                 movimiento_id,
@@ -238,6 +240,148 @@ final class InventoryRepository
             'cantidad' => $quantity,
             'observaciones' => $notes,
             'creado_por' => $actorId,
+        ]);
+
+        return (int) $this->connection->pdo()->lastInsertId();
+    }
+
+    /**
+     * @param list<string> $seriesNumbers
+     * @return array<string, array{id: int, id_producto: string, numero_serie: string, activo: int}>
+     */
+    public function activeSeriesByNumbers(
+        string $productId,
+        array $seriesNumbers
+    ): array {
+        if ($seriesNumbers === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($seriesNumbers), '?'));
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, id_producto, numero_serie, activo
+             FROM producto_series
+             WHERE id_producto = ?
+               AND numero_serie IN (' . $placeholders . ')
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute(array_merge([$productId], $seriesNumbers));
+        $rows = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $rows[(string) $row['numero_serie']] = [
+                'id' => (int) $row['id'],
+                'id_producto' => (string) $row['id_producto'],
+                'numero_serie' => (string) $row['numero_serie'],
+                'activo' => (int) $row['activo'],
+            ];
+        }
+
+        return $rows;
+    }
+
+    public function createSeries(
+        string $productId,
+        string $seriesNumber
+    ): int {
+        $statement = $this->connection->pdo()->prepare(
+            'INSERT INTO producto_series (
+                id_producto,
+                numero_serie
+             )
+             VALUES (
+                :id_producto,
+                :numero_serie
+             )'
+        );
+        $statement->execute([
+            'id_producto' => $productId,
+            'numero_serie' => $seriesNumber,
+        ]);
+
+        return (int) $this->connection->pdo()->lastInsertId();
+    }
+
+    /**
+     * @param list<int> $seriesIds
+     * @return array<int, array{serie_id: int, almacen_id: int|null, estado: string}>
+     */
+    public function lockSeriesStocks(array $seriesIds): array
+    {
+        if ($seriesIds === []) {
+            return [];
+        }
+
+        $seriesIds = array_values(array_unique(array_map('intval', $seriesIds)));
+        sort($seriesIds);
+        $placeholders = implode(', ', array_fill(0, count($seriesIds), '?'));
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT serie_id, almacen_id, estado
+             FROM existencias_serie
+             WHERE serie_id IN (' . $placeholders . ')
+             ORDER BY serie_id
+             FOR UPDATE'
+        );
+        $statement->execute($seriesIds);
+        $rows = [];
+
+        foreach ($statement->fetchAll() as $row) {
+            $rows[(int) $row['serie_id']] = [
+                'serie_id' => (int) $row['serie_id'],
+                'almacen_id' => $row['almacen_id'] === null
+                    ? null
+                    : (int) $row['almacen_id'],
+                'estado' => (string) $row['estado'],
+            ];
+        }
+
+        return $rows;
+    }
+
+    public function saveSeriesStock(
+        int $seriesId,
+        ?int $warehouseId,
+        string $state
+    ): void {
+        $statement = $this->connection->pdo()->prepare(
+            'INSERT INTO existencias_serie (
+                serie_id,
+                almacen_id,
+                estado
+             )
+             VALUES (
+                :serie_id,
+                :almacen_id,
+                :estado
+             )
+             ON DUPLICATE KEY UPDATE
+                almacen_id = VALUES(almacen_id),
+                estado = VALUES(estado)'
+        );
+        $statement->execute([
+            'serie_id' => $seriesId,
+            'almacen_id' => $warehouseId,
+            'estado' => $state,
+        ]);
+    }
+
+    public function insertMovementDetailSeries(
+        int $movementDetailId,
+        int $seriesId
+    ): void {
+        $statement = $this->connection->pdo()->prepare(
+            'INSERT INTO movimiento_detalle_series (
+                movimiento_detalle_id,
+                serie_id
+             )
+             VALUES (
+                :movimiento_detalle_id,
+                :serie_id
+             )'
+        );
+        $statement->execute([
+            'movimiento_detalle_id' => $movementDetailId,
+            'serie_id' => $seriesId,
         ]);
     }
 

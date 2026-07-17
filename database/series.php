@@ -84,13 +84,16 @@ try {
         . '/database/migrations/'
         . 'series_1_001_create_inventory_series_tables.php';
     $test = require BASE_PATH . '/database/tests/series_1_test.php';
+    $serviceTest = require BASE_PATH
+        . '/database/tests/series_service_1_test.php';
 
     if (
         !$migration instanceof Migration
         || !$test instanceof DatabaseTest
+        || !$serviceTest instanceof DatabaseTest
     ) {
         throw new RuntimeException(
-            'A SERIES-DB-1 database artifact has an invalid contract.'
+            'A SERIES database artifact has an invalid contract.'
         );
     }
 
@@ -104,7 +107,10 @@ try {
             'migration' => $migration->id(),
             'result' => $runner->rollback($migration),
         ],
-        'db:test' => $test->run($pdo, $expectedDatabase),
+        'db:test' => [
+            'schema' => $test->run($pdo, $expectedDatabase),
+            'service' => $serviceTest->run($pdo, $expectedDatabase),
+        ],
         'status' => ['migrations' => $runner->status()],
     };
 

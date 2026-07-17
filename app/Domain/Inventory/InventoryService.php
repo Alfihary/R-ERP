@@ -39,8 +39,10 @@ final class InventoryService
                 $request['usuario_id']
             );
 
+            $detailIds = [];
+
             foreach ($parts as $part) {
-                $this->inventory->insertMovementDetail(
+                $detailIds[$part['id_producto']] = $this->inventory->insertMovementDetail(
                     $movementId,
                     $part['id_producto'],
                     $part['cantidad'],
@@ -75,6 +77,22 @@ final class InventoryService
                     ]);
                 }
 
+                if ((int) $part['controla_series'] === 1) {
+                    if ($concept['naturaleza'] === 'ENTRADA') {
+                        $this->applySeriesEntry(
+                            $part,
+                            $detailIds[$part['id_producto']],
+                            $request['almacen_id']
+                        );
+                    } else {
+                        $this->applySeriesExit(
+                            $part,
+                            $detailIds[$part['id_producto']],
+                            $request['almacen_id']
+                        );
+                    }
+                }
+
                 if ($concept['naturaleza'] === 'ENTRADA') {
                     $this->inventory->increaseExistence(
                         $request['almacen_id'],
@@ -99,6 +117,7 @@ final class InventoryService
                     'cantidad' => $part['cantidad'],
                     'saldo_anterior' => $previous,
                     'saldo_nuevo' => $updated['cantidad_actual'] ?? '0.000000',
+                    'series_aplicadas' => count($part['series']),
                 ];
             }
 
@@ -134,7 +153,8 @@ final class InventoryService
      *     partidas: list<array{
      *         id_producto: string,
      *         cantidad: string,
-     *         observaciones: string|null
+     *         observaciones: string|null,
+     *         series: list<string>
      *     }>
      * }
      */
@@ -192,6 +212,7 @@ final class InventoryService
                 $productId = strtoupper($this->text($rawPart, 'id_producto'));
                 $quantity = $this->quantity($rawPart['cantidad'] ?? null);
                 $partNotes = $this->nullableText($rawPart, 'observaciones', 500);
+                $series = $this->seriesList($rawPart['series'] ?? null);
 
                 if (preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
                     $errors['partidas.' . $index . '.id_producto'] =
@@ -210,6 +231,11 @@ final class InventoryService
                         'Las observaciones de partida admiten hasta 500 caracteres.';
                     $partNotes = null;
                 }
+                if ($series === false) {
+                    $errors['partidas.' . $index . '.series'] =
+                        'Las series deben ser una lista de textos de 1 a 80 caracteres.';
+                    $series = [];
+                }
 
                 if ($productId !== '') {
                     $seen[$productId] = true;
@@ -223,6 +249,7 @@ final class InventoryService
                         'id_producto' => $productId,
                         'cantidad' => $quantity,
                         'observaciones' => $partNotes,
+                        'series' => $series,
                     ];
                 }
             }
@@ -302,13 +329,14 @@ final class InventoryService
     }
 
     /**
-     * @param list<array{id_producto: string, cantidad: string, observaciones: string|null}> $parts
-     * @return list<array{id_producto: string, cantidad: string, observaciones: string|null}>
+     * @param list<array{id_producto: string, cantidad: string, observaciones: string|null, series: list<string>}> $parts
+     * @return list<array{id_producto: string, cantidad: string, observaciones: string|null, series: list<string>, controla_series: int}>
      */
     private function assertProducts(array $parts): array
     {
         $ids = array_column($parts, 'id_producto');
         $products = $this->inventory->activeProductsByIds($ids);
+        $validated = [];
 
         foreach ($parts as $part) {
             $product = $products[$part['id_producto']] ?? null;
@@ -335,9 +363,165 @@ final class InventoryService
                     'id_producto' => 'El tipo de producto no es inventariable.',
                 ]);
             }
+
+            $tracksSeries = (int) $product['controla_series'];
+
+            if ($tracksSeries === 1) {
+                if (!$this->isIntegerQuantity($part['cantidad'])) {
+                    throw new InventoryValidationException([
+                        'cantidad' =>
+                            'Los productos con series requieren cantidad entera positiva.',
+                    ]);
+                }
+
+                if ($part['series'] === []) {
+                    throw new InventoryValidationException([
+                        'series' =>
+                            'Los productos con series requieren números de serie.',
+                    ]);
+                }
+
+                if (count($part['series']) !== $this->quantityAsInteger($part['cantidad'])) {
+                    throw new InventoryValidationException([
+                        'series' =>
+                            'La cantidad debe coincidir con el número de series.',
+                    ]);
+                }
+
+                if (count($part['series']) !== count(array_unique($part['series']))) {
+                    throw new InventoryValidationException([
+                        'series' =>
+                            'No repitas números de serie en la misma partida.',
+                    ]);
+                }
+            } elseif ($part['series'] !== []) {
+                throw new InventoryValidationException([
+                    'series' =>
+                        'Los productos sin control de series no aceptan números de serie.',
+                ]);
+            }
+
+            $part['controla_series'] = $tracksSeries;
+            $validated[] = $part;
         }
 
-        return $parts;
+        return $validated;
+    }
+
+    /**
+     * @param array{id_producto: string, series: list<string>} $part
+     */
+    private function applySeriesEntry(
+        array $part,
+        int $detailId,
+        int $warehouseId
+    ): void {
+        $seriesByNumber = $this->inventory->activeSeriesByNumbers(
+            $part['id_producto'],
+            $part['series']
+        );
+        $seriesIds = [];
+
+        foreach ($part['series'] as $number) {
+            $series = $seriesByNumber[$number] ?? null;
+
+            if ($series === null) {
+                $seriesIds[$number] = $this->inventory->createSeries(
+                    $part['id_producto'],
+                    $number
+                );
+                continue;
+            }
+
+            if ((int) $series['activo'] !== 1) {
+                throw new InventoryValidationException([
+                    'series' => 'Una serie no está activa.',
+                ]);
+            }
+
+            $seriesIds[$number] = (int) $series['id'];
+        }
+
+        $lockedStocks = $this->inventory->lockSeriesStocks(
+            array_values($seriesIds)
+        );
+
+        foreach ($part['series'] as $number) {
+            $seriesId = $seriesIds[$number];
+            $stock = $lockedStocks[$seriesId] ?? null;
+
+            if (
+                $stock !== null
+                && $stock['estado'] === 'EN_EXISTENCIA'
+            ) {
+                throw new InventoryValidationException([
+                    'series' =>
+                        'No se puede ingresar una serie que ya está en existencia.',
+                ]);
+            }
+
+            $this->inventory->insertMovementDetailSeries($detailId, $seriesId);
+            $this->inventory->saveSeriesStock(
+                $seriesId,
+                $warehouseId,
+                'EN_EXISTENCIA'
+            );
+        }
+    }
+
+    /**
+     * @param array{id_producto: string, series: list<string>} $part
+     */
+    private function applySeriesExit(
+        array $part,
+        int $detailId,
+        int $warehouseId
+    ): void {
+        $seriesByNumber = $this->inventory->activeSeriesByNumbers(
+            $part['id_producto'],
+            $part['series']
+        );
+        $seriesIds = [];
+
+        foreach ($part['series'] as $number) {
+            $series = $seriesByNumber[$number] ?? null;
+
+            if ($series === null || (int) $series['activo'] !== 1) {
+                throw new InventoryValidationException([
+                    'series' =>
+                        'Una serie no existe, no pertenece al producto o no está activa.',
+                ]);
+            }
+
+            $seriesIds[$number] = (int) $series['id'];
+        }
+
+        $lockedStocks = $this->inventory->lockSeriesStocks(
+            array_values($seriesIds)
+        );
+
+        foreach ($part['series'] as $number) {
+            $seriesId = $seriesIds[$number];
+            $stock = $lockedStocks[$seriesId] ?? null;
+
+            if (
+                $stock === null
+                || $stock['estado'] !== 'EN_EXISTENCIA'
+                || $stock['almacen_id'] !== $warehouseId
+            ) {
+                throw new InventoryValidationException([
+                    'series' =>
+                        'La serie no está disponible en el almacén del movimiento.',
+                ]);
+            }
+
+            $this->inventory->insertMovementDetailSeries($detailId, $seriesId);
+            $this->inventory->saveSeriesStock(
+                $seriesId,
+                null,
+                'FUERA_EXISTENCIA'
+            );
+        }
     }
 
     /**
@@ -398,6 +582,37 @@ final class InventoryService
         return $this->length($value) <= $max ? $value : false;
     }
 
+    /**
+     * @return list<string>|false
+     */
+    private function seriesList(mixed $value): array|false
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (!is_array($value)) {
+            return false;
+        }
+
+        $series = [];
+
+        foreach (array_values($value) as $item) {
+            if (!is_string($item) && !is_int($item)) {
+                return false;
+            }
+
+            $number = trim((string) $item);
+
+            if ($number === '' || strlen($number) > 80) {
+                return false;
+            }
+
+            $series[] = $number;
+        }
+
+        return $series;
+    }
+
     private function quantity(mixed $value): ?string
     {
         if (!is_string($value) && !is_int($value)) {
@@ -421,6 +636,16 @@ final class InventoryService
         [$integer, $fraction] = array_pad(explode('.', $value, 2), 2, '');
 
         return $integer . '.' . str_pad($fraction, self::SCALE, '0');
+    }
+
+    private function isIntegerQuantity(string $value): bool
+    {
+        return $this->decimalUnits($value) % 1_000_000 === 0;
+    }
+
+    private function quantityAsInteger(string $value): int
+    {
+        return intdiv($this->decimalUnits($value), 1_000_000);
     }
 
     private function compareDecimals(string $left, string $right): int
