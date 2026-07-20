@@ -602,6 +602,19 @@ return static function (
         ]
     );
     $router->get(
+        '/inventario/existencias-series',
+        static fn (Request $request): Response =>
+            $inventoryController->serialStock($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                'inventario.existencias_series.acceder'
+            ),
+        ]
+    );
+    $router->get(
         '/inventario/kardex',
         static fn (Request $request): Response =>
             $inventoryController->kardex($request),

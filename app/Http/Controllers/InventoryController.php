@@ -197,6 +197,68 @@ final class InventoryController
         ]);
     }
 
+    public function serialStock(Request $request): Response
+    {
+        $context = $this->context();
+        $filters = $this->serialStockFilters($request->query());
+        $warehouses = [];
+        $errors = [];
+        $result = [
+            'rows' => [],
+            'pagination' => [
+                'page' => $filters['page'],
+                'per_page' => $filters['per_page'],
+                'total' => 0,
+                'total_pages' => 1,
+            ],
+        ];
+
+        if ($context->hasActiveContext()) {
+            $company = $context->activeCompany();
+            $warehouse = $context->activeWarehouse();
+            $companyId = (int) ($company['id'] ?? 0);
+            $activeWarehouseId = (int) ($warehouse['id'] ?? 0);
+            $warehouses = $this->queries->warehousesForCompany($companyId);
+            $allowedWarehouseIds = array_map(
+                static fn (array $row): int => (int) $row['id'],
+                $warehouses
+            );
+
+            if (
+                $filters['warehouse_id'] !== null
+                && !in_array($filters['warehouse_id'], $allowedWarehouseIds, true)
+            ) {
+                $errors['warehouse_id'] = 'Selecciona un almacén válido de la empresa activa.';
+            }
+
+            if ($errors === []) {
+                $result = $this->queries->serialStock([
+                    'company_id' => $companyId,
+                    'warehouse_id' => $activeWarehouseId,
+                    'search' => $filters['search'],
+                    'product_id' => $filters['product_id'],
+                    'status' => $filters['status'],
+                    'warehouse_filter' => $filters['warehouse_id'],
+                    'page' => $filters['page'],
+                    'per_page' => $filters['per_page'],
+                ]);
+            }
+        }
+
+        return $this->render('inventory/serial-stock/index', [
+            'errors' => $errors,
+            'filters' => $filters,
+            'hasActiveContext' => $context->hasActiveContext(),
+            'pagination' => $result['pagination'],
+            'rows' => $result['rows'],
+            'warehouses' => $warehouses,
+        ], 'Existencias por serie', empty($errors) ? 200 : 422, [
+            'activeNavigation' => 'inventory-serial-stock',
+            'stylesheets' => ['/css/modules/inventory-serial-stock.css'],
+            'scripts' => [],
+        ]);
+    }
+
     public function createForm(Request $request): Response
     {
         return $this->renderForm($this->defaultValues(), [], 200);
@@ -368,6 +430,7 @@ final class InventoryController
             'canAccessProducts' => $this->permissions->allows($user['user_id'], 'productos.acceder'),
             'canAccessInventory' => $this->permissions->allows($user['user_id'], 'inventario.movimientos.acceder'),
             'canAccessInventoryStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias.acceder'),
+            'canAccessInventorySerialStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias_series.acceder'),
             'canAccessInventoryKardex' => $this->permissions->allows($user['user_id'], 'inventario.kardex.acceder'),
             'canAccessInventoryTransfers' => $this->permissions->allows($user['user_id'], 'inventario.transferencias.acceder'),
             'contentData' => $contentData,
@@ -449,6 +512,36 @@ final class InventoryController
             'balance_state' => $balanceState,
             'page' => $this->positiveInt($query['page'] ?? null, 1),
             'per_page' => 15,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{search: string, product_id: string, status: string, warehouse_id: int|null, page: int, per_page: int}
+     */
+    private function serialStockFilters(array $query): array
+    {
+        $status = in_array($query['estado'] ?? '', ['EN_EXISTENCIA', 'FUERA_EXISTENCIA'], true)
+            ? (string) $query['estado']
+            : '';
+        $warehouse = filter_var(
+            $query['almacen_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $productId = strtoupper($this->limitedText($query, 'id_producto', 16));
+
+        if ($productId !== '' && preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
+            $productId = '';
+        }
+
+        return [
+            'search' => $this->limitedText($query, 'q', 80),
+            'product_id' => $productId,
+            'status' => $status,
+            'warehouse_id' => $warehouse === false ? null : $warehouse,
+            'page' => $this->positiveInt($query['page'] ?? null, 1),
+            'per_page' => 25,
         ];
     }
 

@@ -30,6 +30,7 @@ $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $canAccessInventory = ($canAccessInventory ?? false) === true;
 $canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
+$canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === true;
 $canAccessInventoryKardex = ($canAccessInventoryKardex ?? false) === true;
 $canAccessInventoryTransfers = ($canAccessInventoryTransfers ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
@@ -118,6 +119,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">≡</span>
                         Inventario · Existencias
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventorySerialStock): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-stock' ? ' is-active' : '' ?>"
+                        href="/inventario/existencias-series"
+                        <?= $activeNavigation === 'inventory-serial-stock' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">#</span>
+                        Inventario · Existencias por serie
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessInventoryKardex): ?>

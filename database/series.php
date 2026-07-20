@@ -6,6 +6,7 @@ use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
+use App\Infrastructure\Database\Seed;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -37,6 +38,7 @@ try {
         'db:migrate',
         'db:rollback',
         'db:test',
+        'seed',
         'status',
     ];
 
@@ -88,12 +90,18 @@ try {
         . '/database/tests/series_service_1_test.php';
     $uiTest = require BASE_PATH
         . '/database/tests/series_ui_1_test.php';
+    $serialStockSeed = require BASE_PATH
+        . '/database/seeds/existencias_series_1_seed_permissions.php';
+    $serialStockTest = require BASE_PATH
+        . '/database/tests/existencias_series_1_test.php';
 
     if (
         !$migration instanceof Migration
         || !$test instanceof DatabaseTest
         || !$serviceTest instanceof DatabaseTest
         || !$uiTest instanceof DatabaseTest
+        || !$serialStockSeed instanceof Seed
+        || !$serialStockTest instanceof DatabaseTest
     ) {
         throw new RuntimeException(
             'A SERIES database artifact has an invalid contract.'
@@ -110,10 +118,24 @@ try {
             'migration' => $migration->id(),
             'result' => $runner->rollback($migration),
         ],
+        'seed' => (static function () use ($serialStockSeed, $pdo): array {
+            $serialStockSeed->run($pdo);
+            return ['seed' => $serialStockSeed->id(), 'result' => 'applied'];
+        })(),
         'db:test' => [
             'schema' => $test->run($pdo, $expectedDatabase),
             'service' => $serviceTest->run($pdo, $expectedDatabase),
             'ui' => $uiTest->run($pdo, $expectedDatabase),
+            'serial_stock' => (static function () use (
+                $serialStockSeed,
+                $serialStockTest,
+                $pdo,
+                $expectedDatabase
+            ): array {
+                $serialStockSeed->run($pdo);
+                $serialStockSeed->run($pdo);
+                return $serialStockTest->run($pdo, $expectedDatabase);
+            })(),
         ],
         'status' => ['migrations' => $runner->status()],
     };

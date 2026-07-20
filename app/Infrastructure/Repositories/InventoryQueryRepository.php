@@ -315,6 +315,82 @@ final class InventoryQueryRepository
      * @param array{
      *     company_id: int,
      *     warehouse_id: int,
+     *     search: string,
+     *     product_id: string,
+     *     status: string,
+     *     warehouse_filter: int|null,
+     *     page: int,
+     *     per_page: int
+     * } $filters
+     * @return array{
+     *     rows: list<array<string, mixed>>,
+     *     pagination: array{page: int, per_page: int, total: int, total_pages: int}
+     * }
+     */
+    public function serialStock(array $filters): array
+    {
+        $conditions = $this->serialStockConditions($filters);
+        $where = implode(' AND ', $conditions['where']);
+        $parameters = $conditions['parameters'];
+
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM producto_series ps
+             INNER JOIN productos p ON p.id_producto = ps.id_producto
+             INNER JOIN existencias_serie es ON es.serie_id = ps.id
+             LEFT JOIN almacenes a ON a.id = es.almacen_id
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $page = max(1, $filters['page']);
+        $perPage = max(1, min(50, $filters['per_page']));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                ps.id,
+                ps.id_producto,
+                ps.numero_serie,
+                ps.activo,
+                ps.actualizado_en,
+                p.descripcion,
+                es.estado,
+                es.almacen_id,
+                es.actualizado_en AS existencia_actualizada_en,
+                a.nombre AS almacen_nombre
+             FROM producto_series ps
+             INNER JOIN productos p ON p.id_producto = ps.id_producto
+             INNER JOIN existencias_serie es ON es.serie_id = ps.id
+             LEFT JOIN almacenes a ON a.id = es.almacen_id
+             WHERE ' . $where . '
+             ORDER BY p.id_producto ASC, ps.numero_serie ASC
+             LIMIT :limit OFFSET :offset'
+        );
+        foreach ($parameters as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
+    }
+
+    /**
+     * @param array{
+     *     company_id: int,
+     *     warehouse_id: int,
      *     product_id: string,
      *     concept: string,
      *     nature: string,
@@ -801,6 +877,77 @@ final class InventoryQueryRepository
         if ($filters['date_to'] !== '') {
             $where[] = 'm.fecha_movimiento <= :fecha_hasta';
             $parameters['fecha_hasta'] = $filters['date_to'] . ' 23:59:59';
+        }
+
+        return ['where' => $where, 'parameters' => $parameters];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     where: list<string>,
+     *     parameters: array<string, mixed>
+     * }
+     */
+    private function serialStockConditions(array $filters): array
+    {
+        $where = [
+            'p.activo = 1',
+            'p.eliminado_en IS NULL',
+            'ps.eliminado_en IS NULL',
+            'EXISTS (
+                SELECT 1
+                FROM movimiento_detalle_series mds
+                INNER JOIN movimientos_inventario_detalle mid
+                    ON mid.id = mds.movimiento_detalle_id
+                INNER JOIN movimientos_inventario mi
+                    ON mi.id = mid.movimiento_id
+                WHERE mds.serie_id = ps.id
+                  AND mi.empresa_id = :empresa_id
+                  AND mi.estado = \'APLICADO\'
+            )',
+            '(
+                (es.almacen_id IS NOT NULL
+                    AND a.empresa_id = :almacen_empresa_id
+                    AND a.activo = 1
+                    AND a.eliminado_en IS NULL)
+                OR es.almacen_id IS NULL
+            )',
+            '(
+                es.estado = \'FUERA_EXISTENCIA\'
+                OR es.almacen_id = :active_warehouse_id
+            )',
+        ];
+        $parameters = [
+            'empresa_id' => $filters['company_id'],
+            'almacen_empresa_id' => $filters['company_id'],
+            'active_warehouse_id' => $filters['warehouse_id'],
+        ];
+
+        if ($filters['search'] !== '') {
+            $where[] = '(
+                ps.numero_serie LIKE :q_serie
+                OR ps.id_producto LIKE :q_producto
+                OR p.descripcion LIKE :q_descripcion
+            )';
+            $parameters['q_serie'] = '%' . $filters['search'] . '%';
+            $parameters['q_producto'] = '%' . $filters['search'] . '%';
+            $parameters['q_descripcion'] = '%' . $filters['search'] . '%';
+        }
+
+        if ($filters['product_id'] !== '') {
+            $where[] = 'ps.id_producto = :id_producto';
+            $parameters['id_producto'] = $filters['product_id'];
+        }
+
+        if ($filters['status'] !== '') {
+            $where[] = 'es.estado = :estado';
+            $parameters['estado'] = $filters['status'];
+        }
+
+        if ($filters['warehouse_filter'] !== null) {
+            $where[] = 'es.almacen_id = :warehouse_filter';
+            $parameters['warehouse_filter'] = $filters['warehouse_filter'];
         }
 
         return ['where' => $where, 'parameters' => $parameters];
