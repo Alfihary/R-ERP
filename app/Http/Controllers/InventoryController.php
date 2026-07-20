@@ -259,6 +259,82 @@ final class InventoryController
         ]);
     }
 
+    public function serialKardex(Request $request): Response
+    {
+        $context = $this->context();
+        $filters = $this->serialKardexFilters($request->query());
+        $warehouses = [];
+        $errors = [];
+        $summary = [
+            'selected_series' => false,
+            'total_series' => 0,
+            'total_movements' => 0,
+            'ultima_fecha_movimiento' => null,
+            'numero_serie' => null,
+            'id_producto' => null,
+            'producto_descripcion' => null,
+            'estado_actual' => null,
+            'almacen_actual_nombre' => null,
+        ];
+        $result = [
+            'rows' => [],
+            'pagination' => [
+                'page' => $filters['page'],
+                'per_page' => $filters['per_page'],
+                'total' => 0,
+                'total_pages' => 1,
+            ],
+        ];
+
+        if ($context->hasActiveContext()) {
+            $company = $context->activeCompany();
+            $companyId = (int) ($company['id'] ?? 0);
+            $warehouses = $this->queries->warehousesForCompany($companyId);
+            $allowedWarehouseIds = array_map(
+                static fn (array $row): int => (int) $row['id'],
+                $warehouses
+            );
+
+            if (
+                $filters['warehouse_id'] !== null
+                && !in_array($filters['warehouse_id'], $allowedWarehouseIds, true)
+            ) {
+                $errors['warehouse_id'] = 'Selecciona un almacén válido de la empresa activa.';
+            }
+
+            if ($errors === []) {
+                $queryFilters = [
+                    'company_id' => $companyId,
+                    'search' => $filters['search'],
+                    'product_id' => $filters['product_id'],
+                    'serial_number' => $filters['serial_number'],
+                    'current_status' => $filters['current_status'],
+                    'warehouse_id' => $filters['warehouse_id'],
+                    'date_from' => $filters['date_from'],
+                    'date_to' => $filters['date_to'],
+                    'page' => $filters['page'],
+                    'per_page' => $filters['per_page'],
+                ];
+                $result = $this->queries->serialKardex($queryFilters);
+                $summary = $this->queries->serialKardexSummary($queryFilters);
+            }
+        }
+
+        return $this->render('inventory/serial-kardex/index', [
+            'errors' => $errors,
+            'filters' => $filters,
+            'hasActiveContext' => $context->hasActiveContext(),
+            'pagination' => $result['pagination'],
+            'rows' => $result['rows'],
+            'summary' => $summary,
+            'warehouses' => $warehouses,
+        ], 'Kardex por serie', empty($errors) ? 200 : 422, [
+            'activeNavigation' => 'inventory-serial-kardex',
+            'stylesheets' => ['/css/modules/inventory-serial-kardex.css'],
+            'scripts' => [],
+        ]);
+    }
+
     public function createForm(Request $request): Response
     {
         return $this->renderForm($this->defaultValues(), [], 200);
@@ -432,6 +508,7 @@ final class InventoryController
             'canAccessInventoryStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias.acceder'),
             'canAccessInventorySerialStock' => $this->permissions->allows($user['user_id'], 'inventario.existencias_series.acceder'),
             'canAccessInventoryKardex' => $this->permissions->allows($user['user_id'], 'inventario.kardex.acceder'),
+            'canAccessInventorySerialKardex' => $this->permissions->allows($user['user_id'], 'inventario.kardex_series.acceder'),
             'canAccessInventoryTransfers' => $this->permissions->allows($user['user_id'], 'inventario.transferencias.acceder'),
             'contentData' => $contentData,
             'contentView' => $contentView,
@@ -540,6 +617,39 @@ final class InventoryController
             'product_id' => $productId,
             'status' => $status,
             'warehouse_id' => $warehouse === false ? null : $warehouse,
+            'page' => $this->positiveInt($query['page'] ?? null, 1),
+            'per_page' => 25,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{search: string, product_id: string, serial_number: string, current_status: string, warehouse_id: int|null, date_from: string, date_to: string, page: int, per_page: int}
+     */
+    private function serialKardexFilters(array $query): array
+    {
+        $status = in_array($query['estado_actual'] ?? '', ['EN_EXISTENCIA', 'FUERA_EXISTENCIA'], true)
+            ? (string) $query['estado_actual']
+            : '';
+        $warehouse = filter_var(
+            $query['almacen_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]]
+        );
+        $productId = strtoupper($this->limitedText($query, 'id_producto', 16));
+
+        if ($productId !== '' && preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
+            $productId = '';
+        }
+
+        return [
+            'search' => $this->limitedText($query, 'q', 80),
+            'product_id' => $productId,
+            'serial_number' => $this->limitedText($query, 'numero_serie', 80),
+            'current_status' => $status,
+            'warehouse_id' => $warehouse === false ? null : $warehouse,
+            'date_from' => $this->date($query, 'fecha_desde'),
+            'date_to' => $this->date($query, 'fecha_hasta'),
             'page' => $this->positiveInt($query['page'] ?? null, 1),
             'per_page' => 25,
         ];

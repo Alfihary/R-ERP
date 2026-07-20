@@ -94,6 +94,10 @@ try {
         . '/database/seeds/existencias_series_1_seed_permissions.php';
     $serialStockTest = require BASE_PATH
         . '/database/tests/existencias_series_1_test.php';
+    $serialKardexSeed = require BASE_PATH
+        . '/database/seeds/kardex_series_1_seed_permissions.php';
+    $serialKardexTest = require BASE_PATH
+        . '/database/tests/kardex_series_1_test.php';
 
     if (
         !$migration instanceof Migration
@@ -102,6 +106,8 @@ try {
         || !$uiTest instanceof DatabaseTest
         || !$serialStockSeed instanceof Seed
         || !$serialStockTest instanceof DatabaseTest
+        || !$serialKardexSeed instanceof Seed
+        || !$serialKardexTest instanceof DatabaseTest
     ) {
         throw new RuntimeException(
             'A SERIES database artifact has an invalid contract.'
@@ -118,9 +124,20 @@ try {
             'migration' => $migration->id(),
             'result' => $runner->rollback($migration),
         ],
-        'seed' => (static function () use ($serialStockSeed, $pdo): array {
+        'seed' => (static function () use (
+            $serialStockSeed,
+            $serialKardexSeed,
+            $pdo
+        ): array {
             $serialStockSeed->run($pdo);
-            return ['seed' => $serialStockSeed->id(), 'result' => 'applied'];
+            $serialKardexSeed->run($pdo);
+            return [
+                'seeds' => [
+                    $serialStockSeed->id(),
+                    $serialKardexSeed->id(),
+                ],
+                'result' => 'applied',
+            ];
         })(),
         'db:test' => [
             'schema' => $test->run($pdo, $expectedDatabase),
@@ -135,6 +152,16 @@ try {
                 $serialStockSeed->run($pdo);
                 $serialStockSeed->run($pdo);
                 return $serialStockTest->run($pdo, $expectedDatabase);
+            })(),
+            'serial_kardex' => (static function () use (
+                $serialKardexSeed,
+                $serialKardexTest,
+                $pdo,
+                $expectedDatabase
+            ): array {
+                $serialKardexSeed->run($pdo);
+                $serialKardexSeed->run($pdo);
+                return $serialKardexTest->run($pdo, $expectedDatabase);
             })(),
         ],
         'status' => ['migrations' => $runner->status()],

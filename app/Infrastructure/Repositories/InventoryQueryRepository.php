@@ -390,6 +390,165 @@ final class InventoryQueryRepository
     /**
      * @param array{
      *     company_id: int,
+     *     search: string,
+     *     product_id: string,
+     *     serial_number: string,
+     *     current_status: string,
+     *     warehouse_id: int|null,
+     *     date_from: string,
+     *     date_to: string,
+     *     page: int,
+     *     per_page: int
+     * } $filters
+     * @return array{
+     *     rows: list<array<string, mixed>>,
+     *     pagination: array{page: int, per_page: int, total: int, total_pages: int}
+     * }
+     */
+    public function serialKardex(array $filters): array
+    {
+        $conditions = $this->serialKardexConditions($filters);
+        $where = implode(' AND ', $conditions['where']);
+        $parameters = $conditions['parameters'];
+
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM movimiento_detalle_series mds
+             INNER JOIN producto_series ps ON ps.id = mds.serie_id
+             INNER JOIN movimientos_inventario_detalle d
+                ON d.id = mds.movimiento_detalle_id
+             INNER JOIN movimientos_inventario m
+                ON m.id = d.movimiento_id
+             INNER JOIN conceptos_movimiento_inventario c
+                ON c.id = m.concepto_movimiento_id
+             INNER JOIN productos p ON p.id_producto = ps.id_producto
+             INNER JOIN almacenes a ON a.id = m.almacen_id
+             INNER JOIN empresas e ON e.id = m.empresa_id
+             LEFT JOIN existencias_serie es ON es.serie_id = ps.id
+             LEFT JOIN almacenes ac ON ac.id = es.almacen_id
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $page = max(1, $filters['page']);
+        $perPage = max(1, min(50, $filters['per_page']));
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                m.id AS movimiento_id,
+                m.fecha_movimiento,
+                m.referencia,
+                m.observaciones,
+                c.codigo AS concepto_codigo,
+                c.nombre AS concepto_nombre,
+                c.naturaleza,
+                d.id_producto,
+                p.descripcion AS producto_descripcion,
+                ps.numero_serie,
+                a.id AS almacen_movimiento_id,
+                a.nombre AS almacen_movimiento_nombre,
+                es.estado AS estado_actual,
+                es.almacen_id AS almacen_actual_id,
+                ac.nombre AS almacen_actual_nombre,
+                CASE WHEN c.naturaleza = \'ENTRADA\' THEN \'ENTRADA\' ELSE NULL END AS entrada,
+                CASE WHEN c.naturaleza = \'SALIDA\' THEN \'SALIDA\' ELSE NULL END AS salida
+             FROM movimiento_detalle_series mds
+             INNER JOIN producto_series ps ON ps.id = mds.serie_id
+             INNER JOIN movimientos_inventario_detalle d
+                ON d.id = mds.movimiento_detalle_id
+             INNER JOIN movimientos_inventario m
+                ON m.id = d.movimiento_id
+             INNER JOIN conceptos_movimiento_inventario c
+                ON c.id = m.concepto_movimiento_id
+             INNER JOIN productos p ON p.id_producto = ps.id_producto
+             INNER JOIN almacenes a ON a.id = m.almacen_id
+             INNER JOIN empresas e ON e.id = m.empresa_id
+             LEFT JOIN existencias_serie es ON es.serie_id = ps.id
+             LEFT JOIN almacenes ac ON ac.id = es.almacen_id
+             WHERE ' . $where . '
+             ORDER BY m.fecha_movimiento ASC, m.id ASC, ps.numero_serie ASC
+             LIMIT :limit OFFSET :offset'
+        );
+
+        foreach ($parameters as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function serialKardexSummary(array $filters): array
+    {
+        $conditions = $this->serialKardexConditions($filters);
+        $where = implode(' AND ', $conditions['where']);
+        $parameters = $conditions['parameters'];
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                COUNT(*) AS total_movements,
+                COUNT(DISTINCT ps.id) AS total_series,
+                MAX(m.fecha_movimiento) AS ultima_fecha_movimiento,
+                MIN(ps.numero_serie) AS numero_serie,
+                MIN(ps.id_producto) AS id_producto,
+                MIN(p.descripcion) AS producto_descripcion,
+                MIN(es.estado) AS estado_actual,
+                MIN(ac.nombre) AS almacen_actual_nombre
+             FROM movimiento_detalle_series mds
+             INNER JOIN producto_series ps ON ps.id = mds.serie_id
+             INNER JOIN movimientos_inventario_detalle d
+                ON d.id = mds.movimiento_detalle_id
+             INNER JOIN movimientos_inventario m
+                ON m.id = d.movimiento_id
+             INNER JOIN conceptos_movimiento_inventario c
+                ON c.id = m.concepto_movimiento_id
+             INNER JOIN productos p ON p.id_producto = ps.id_producto
+             INNER JOIN almacenes a ON a.id = m.almacen_id
+             INNER JOIN empresas e ON e.id = m.empresa_id
+             LEFT JOIN existencias_serie es ON es.serie_id = ps.id
+             LEFT JOIN almacenes ac ON ac.id = es.almacen_id
+             WHERE ' . $where
+        );
+        $statement->execute($parameters);
+        $row = $statement->fetch() ?: [];
+        $totalSeries = (int) ($row['total_series'] ?? 0);
+
+        return [
+            'selected_series' => $totalSeries === 1,
+            'total_series' => $totalSeries,
+            'total_movements' => (int) ($row['total_movements'] ?? 0),
+            'ultima_fecha_movimiento' => $row['ultima_fecha_movimiento'] ?? null,
+            'numero_serie' => $totalSeries === 1 ? ($row['numero_serie'] ?? null) : null,
+            'id_producto' => $totalSeries === 1 ? ($row['id_producto'] ?? null) : null,
+            'producto_descripcion' => $totalSeries === 1
+                ? ($row['producto_descripcion'] ?? null)
+                : null,
+            'estado_actual' => $totalSeries === 1 ? ($row['estado_actual'] ?? null) : null,
+            'almacen_actual_nombre' => $totalSeries === 1
+                ? ($row['almacen_actual_nombre'] ?? null)
+                : null,
+        ];
+    }
+
+    /**
+     * @param array{
+     *     company_id: int,
      *     warehouse_id: int,
      *     product_id: string,
      *     concept: string,
@@ -948,6 +1107,87 @@ final class InventoryQueryRepository
         if ($filters['warehouse_filter'] !== null) {
             $where[] = 'es.almacen_id = :warehouse_filter';
             $parameters['warehouse_filter'] = $filters['warehouse_filter'];
+        }
+
+        return ['where' => $where, 'parameters' => $parameters];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     where: list<string>,
+     *     parameters: array<string, mixed>
+     * }
+     */
+    private function serialKardexConditions(array $filters): array
+    {
+        $where = [
+            'm.empresa_id = :empresa_id',
+            'm.estado = \'APLICADO\'',
+            'a.empresa_id = :almacen_empresa_id',
+            'a.activo = 1',
+            'a.eliminado_en IS NULL',
+            'e.activo = 1',
+            'e.eliminado_en IS NULL',
+            'p.activo = 1',
+            'p.eliminado_en IS NULL',
+            'ps.eliminado_en IS NULL',
+            '(
+                es.almacen_id IS NULL
+                OR (
+                    ac.empresa_id = :almacen_actual_empresa_id
+                    AND ac.activo = 1
+                    AND ac.eliminado_en IS NULL
+                )
+            )',
+        ];
+        $parameters = [
+            'empresa_id' => $filters['company_id'],
+            'almacen_empresa_id' => $filters['company_id'],
+            'almacen_actual_empresa_id' => $filters['company_id'],
+        ];
+
+        if (($filters['search'] ?? '') !== '') {
+            $where[] = '(
+                ps.numero_serie LIKE :q_serie
+                OR ps.id_producto LIKE :q_producto
+                OR p.descripcion LIKE :q_descripcion
+                OR m.referencia LIKE :q_referencia
+            )';
+            $parameters['q_serie'] = '%' . $filters['search'] . '%';
+            $parameters['q_producto'] = '%' . $filters['search'] . '%';
+            $parameters['q_descripcion'] = '%' . $filters['search'] . '%';
+            $parameters['q_referencia'] = '%' . $filters['search'] . '%';
+        }
+
+        if (($filters['product_id'] ?? '') !== '') {
+            $where[] = 'ps.id_producto = :id_producto';
+            $parameters['id_producto'] = $filters['product_id'];
+        }
+
+        if (($filters['serial_number'] ?? '') !== '') {
+            $where[] = 'ps.numero_serie LIKE :numero_serie';
+            $parameters['numero_serie'] = '%' . $filters['serial_number'] . '%';
+        }
+
+        if (($filters['current_status'] ?? '') !== '') {
+            $where[] = 'es.estado = :estado_actual';
+            $parameters['estado_actual'] = $filters['current_status'];
+        }
+
+        if (($filters['warehouse_id'] ?? null) !== null) {
+            $where[] = 'm.almacen_id = :almacen_id';
+            $parameters['almacen_id'] = $filters['warehouse_id'];
+        }
+
+        if (($filters['date_from'] ?? '') !== '') {
+            $where[] = 'm.fecha_movimiento >= :fecha_desde';
+            $parameters['fecha_desde'] = $filters['date_from'] . ' 00:00:00';
+        }
+
+        if (($filters['date_to'] ?? '') !== '') {
+            $where[] = 'm.fecha_movimiento <= :fecha_hasta';
+            $parameters['fecha_hasta'] = $filters['date_to'] . ' 23:59:59';
         }
 
         return ['where' => $where, 'parameters' => $parameters];

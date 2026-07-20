@@ -628,6 +628,19 @@ return static function (
         ]
     );
     $router->get(
+        '/inventario/kardex-series',
+        static fn (Request $request): Response =>
+            $inventoryController->serialKardex($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware(
+                $auth,
+                $permissions,
+                'inventario.kardex_series.acceder'
+            ),
+        ]
+    );
+    $router->get(
         '/inventario/movimientos/crear',
         static fn (Request $request): Response =>
             $inventoryController->createForm($request),

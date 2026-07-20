@@ -32,6 +32,7 @@ $canAccessInventory = ($canAccessInventory ?? false) === true;
 $canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
 $canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === true;
 $canAccessInventoryKardex = ($canAccessInventoryKardex ?? false) === true;
+$canAccessInventorySerialKardex = ($canAccessInventorySerialKardex ?? false) === true;
 $canAccessInventoryTransfers = ($canAccessInventoryTransfers ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
@@ -139,6 +140,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">↕</span>
                         Inventario · Kardex
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventorySerialKardex): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-kardex' ? ' is-active' : '' ?>"
+                        href="/inventario/kardex-series"
+                        <?= $activeNavigation === 'inventory-serial-kardex' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">⌁</span>
+                        Inventario · Kardex por serie
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessInventoryTransfers): ?>
