@@ -29,6 +29,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
@@ -41,6 +42,7 @@ use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
 use App\Infrastructure\Repositories\CompanyRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
+use App\Infrastructure\Repositories\FolioSeriesRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
 use App\Infrastructure\Repositories\ProductRepository;
@@ -118,6 +120,7 @@ $exchangeRates = new ExchangeRateService(
 $satCatalogs = new SatCatalogService(new SatCatalogRepository($connection));
 $companyRepository = new CompanyRepository($connection);
 $warehouseRepository = new WarehouseRepository($connection);
+$folioSeriesRepository = new FolioSeriesRepository($connection);
 $companies = new CompanyService($companyRepository);
 $warehouses = new WarehouseService($warehouseRepository);
 $productRepository = new ProductRepository($connection);
@@ -186,6 +189,14 @@ $warehouseController = new WarehouseController(
     $warehouses,
     $companies
 );
+$folioSeriesController = new FolioSeriesController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $folioSeriesRepository
+);
 $productController = new ProductController(
     $config,
     $auth,
@@ -233,6 +244,7 @@ $registerRoutes(
     $satCatalogController,
     $companyController,
     $warehouseController,
+    $folioSeriesController,
     $productController,
     $inventoryController,
     $inventoryTransferController

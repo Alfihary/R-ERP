@@ -1,3 +1,5 @@
+@import url("/css/modules/config-folios.css");
+
 :root {
     color-scheme: light;
     --color-bg: oklch(1 0 0);

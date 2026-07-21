@@ -16,6 +16,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
@@ -36,6 +37,7 @@ return static function (
     SatCatalogController $satCatalogController,
     CompanyController $companyController,
     WarehouseController $warehouseController,
+    FolioSeriesController $folioSeriesController,
     ProductController $productController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController
@@ -116,6 +118,9 @@ return static function (
         ) || $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'configuracion.almacenes.acceder'
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'configuracion.folios.acceder'
         );
 
         return Response::html(View::render('layouts/app', [
@@ -133,6 +138,10 @@ return static function (
             'canAccessConfigWarehouses' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
                 'configuracion.almacenes.acceder'
+            ),
+            'canAccessConfigFolios' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                'configuracion.folios.acceder'
             ),
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
@@ -305,6 +314,69 @@ return static function (
         static fn (Request $request): Response =>
             $warehouseController->activate($request),
         $warehouseMiddleware('configuracion.almacenes.desactivar')
+    );
+
+    $folioBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'configuracion.folios.acceder'),
+    ];
+    $folioMiddleware = static function (string $permission) use (
+        $folioBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($folioBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/configuracion/folios',
+        static fn (Request $request): Response =>
+            $folioSeriesController->index($request),
+        $folioBaseMiddleware
+    );
+    $router->get(
+        '/configuracion/folios/crear',
+        static fn (Request $request): Response =>
+            $folioSeriesController->createForm($request),
+        $folioMiddleware('configuracion.folios.crear')
+    );
+    $router->post(
+        '/configuracion/folios',
+        static fn (Request $request): Response =>
+            $folioSeriesController->create($request),
+        $folioMiddleware('configuracion.folios.crear')
+    );
+    $router->get(
+        '/configuracion/folios/ver',
+        static fn (Request $request): Response =>
+            $folioSeriesController->show($request),
+        $folioMiddleware('configuracion.folios.ver')
+    );
+    $router->get(
+        '/configuracion/folios/editar',
+        static fn (Request $request): Response =>
+            $folioSeriesController->editForm($request),
+        $folioMiddleware('configuracion.folios.editar')
+    );
+    $router->post(
+        '/configuracion/folios/actualizar',
+        static fn (Request $request): Response =>
+            $folioSeriesController->update($request),
+        $folioMiddleware('configuracion.folios.editar')
+    );
+    $router->post(
+        '/configuracion/folios/desactivar',
+        static fn (Request $request): Response =>
+            $folioSeriesController->deactivate($request),
+        $folioMiddleware('configuracion.folios.desactivar')
+    );
+    $router->post(
+        '/configuracion/folios/activar',
+        static fn (Request $request): Response =>
+            $folioSeriesController->activate($request),
+        $folioMiddleware('configuracion.folios.desactivar')
     );
 
     $catalogAccessMiddleware = new PermissionMiddleware(

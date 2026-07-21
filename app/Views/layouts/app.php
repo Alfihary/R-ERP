@@ -37,6 +37,7 @@ $canAccessInventoryTransfers = ($canAccessInventoryTransfers ?? false) === true;
 $canAccessConfiguration = ($canAccessConfiguration ?? false) === true;
 $canAccessConfigCompanies = ($canAccessConfigCompanies ?? false) === true;
 $canAccessConfigWarehouses = ($canAccessConfigWarehouses ?? false) === true;
+$canAccessConfigFolios = ($canAccessConfigFolios ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
@@ -186,6 +187,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">▣</span>
                         Almacenes
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfigFolios): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-folios' ? ' is-active' : '' ?>"
+                        href="/configuracion/folios"
+                        <?= $activeNavigation === 'configuration-folios' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">№</span>
+                        Folios
                     </a>
                 <?php endif; ?>
             </nav>

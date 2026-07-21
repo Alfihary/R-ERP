@@ -1,0 +1,136 @@
+.folio-page {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 76rem;
+}
+
+.folio-page__header,
+.folio-toolbar,
+.folio-rule,
+.folio-form,
+.folio-preview {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+}
+
+.folio-page__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.folio-page__header h1,
+.folio-page__header p {
+    margin: 0;
+}
+
+.folio-page__header p:last-child {
+    margin-top: 0.35rem;
+    color: var(--color-muted);
+}
+
+.folio-rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    color: var(--color-muted);
+}
+
+.folio-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.875rem;
+    padding: 1rem;
+}
+
+.folio-toolbar .field {
+    min-width: min(100%, 13rem);
+}
+
+.folio-form {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+}
+
+.folio-form fieldset {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+}
+
+.folio-form legend {
+    padding: 0 0.35rem;
+    font-weight: 750;
+}
+
+.folio-preview {
+    padding: 1rem;
+}
+
+.folio-preview span,
+.folio-preview strong,
+.folio-preview p {
+    display: block;
+}
+
+.folio-preview span {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.folio-preview strong {
+    margin-top: 0.25rem;
+    font-size: 1.4rem;
+    letter-spacing: 0.03em;
+}
+
+.folio-preview p {
+    margin: 0.35rem 0 0;
+    color: var(--color-muted);
+}
+
+.folio-preview--detail {
+    border-left: 0.25rem solid var(--color-primary);
+}
+
+.folio-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.folio-table {
+    min-width: 72rem;
+}
+
+.folio-table small {
+    display: block;
+    color: var(--color-muted);
+}
+
+@media (max-width: 48rem) {
+    .folio-page__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .folio-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .folio-form fieldset {
+        grid-template-columns: 1fr;
+    }
+}
