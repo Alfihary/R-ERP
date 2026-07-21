@@ -14,11 +14,13 @@ use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
+use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
 
 return static function (
@@ -32,6 +34,8 @@ return static function (
     ClassificationController $classificationController,
     ExchangeRateController $exchangeRateController,
     SatCatalogController $satCatalogController,
+    CompanyController $companyController,
+    WarehouseController $warehouseController,
     ProductController $productController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController
@@ -106,6 +110,13 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'inventario.transferencias.acceder'
         );
+        $canAccessConfiguration = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'configuracion.empresas.acceder'
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'configuracion.almacenes.acceder'
+        );
 
         return Response::html(View::render('layouts/app', [
             'activeNavigation' => 'home',
@@ -114,6 +125,15 @@ return static function (
             'canAccessProducts' => $canAccessProducts,
             'canAccessInventory' => $canAccessInventory,
             'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
+            'canAccessConfiguration' => $canAccessConfiguration,
+            'canAccessConfigCompanies' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                'configuracion.empresas.acceder'
+            ),
+            'canAccessConfigWarehouses' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                'configuracion.almacenes.acceder'
+            ),
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
                 'canAccessProducts' => $canAccessProducts,
@@ -160,6 +180,132 @@ return static function (
 
         return Response::redirect('/login');
     }, [$authMiddleware]);
+
+    $companyBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'configuracion.empresas.acceder'),
+    ];
+    $companyMiddleware = static function (string $permission) use (
+        $companyBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($companyBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/configuracion/empresas',
+        static fn (Request $request): Response =>
+            $companyController->index($request),
+        $companyBaseMiddleware
+    );
+    $router->get(
+        '/configuracion/empresas/crear',
+        static fn (Request $request): Response =>
+            $companyController->createForm($request),
+        $companyMiddleware('configuracion.empresas.crear')
+    );
+    $router->post(
+        '/configuracion/empresas',
+        static fn (Request $request): Response =>
+            $companyController->create($request),
+        $companyMiddleware('configuracion.empresas.crear')
+    );
+    $router->get(
+        '/configuracion/empresas/ver',
+        static fn (Request $request): Response =>
+            $companyController->show($request),
+        $companyMiddleware('configuracion.empresas.ver')
+    );
+    $router->get(
+        '/configuracion/empresas/editar',
+        static fn (Request $request): Response =>
+            $companyController->editForm($request),
+        $companyMiddleware('configuracion.empresas.editar')
+    );
+    $router->post(
+        '/configuracion/empresas/actualizar',
+        static fn (Request $request): Response =>
+            $companyController->update($request),
+        $companyMiddleware('configuracion.empresas.editar')
+    );
+    $router->post(
+        '/configuracion/empresas/desactivar',
+        static fn (Request $request): Response =>
+            $companyController->deactivate($request),
+        $companyMiddleware('configuracion.empresas.desactivar')
+    );
+    $router->post(
+        '/configuracion/empresas/activar',
+        static fn (Request $request): Response =>
+            $companyController->activate($request),
+        $companyMiddleware('configuracion.empresas.desactivar')
+    );
+
+    $warehouseBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'configuracion.almacenes.acceder'),
+    ];
+    $warehouseMiddleware = static function (string $permission) use (
+        $warehouseBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($warehouseBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/configuracion/almacenes',
+        static fn (Request $request): Response =>
+            $warehouseController->index($request),
+        $warehouseBaseMiddleware
+    );
+    $router->get(
+        '/configuracion/almacenes/crear',
+        static fn (Request $request): Response =>
+            $warehouseController->createForm($request),
+        $warehouseMiddleware('configuracion.almacenes.crear')
+    );
+    $router->post(
+        '/configuracion/almacenes',
+        static fn (Request $request): Response =>
+            $warehouseController->create($request),
+        $warehouseMiddleware('configuracion.almacenes.crear')
+    );
+    $router->get(
+        '/configuracion/almacenes/ver',
+        static fn (Request $request): Response =>
+            $warehouseController->show($request),
+        $warehouseMiddleware('configuracion.almacenes.ver')
+    );
+    $router->get(
+        '/configuracion/almacenes/editar',
+        static fn (Request $request): Response =>
+            $warehouseController->editForm($request),
+        $warehouseMiddleware('configuracion.almacenes.editar')
+    );
+    $router->post(
+        '/configuracion/almacenes/actualizar',
+        static fn (Request $request): Response =>
+            $warehouseController->update($request),
+        $warehouseMiddleware('configuracion.almacenes.editar')
+    );
+    $router->post(
+        '/configuracion/almacenes/desactivar',
+        static fn (Request $request): Response =>
+            $warehouseController->deactivate($request),
+        $warehouseMiddleware('configuracion.almacenes.desactivar')
+    );
+    $router->post(
+        '/configuracion/almacenes/activar',
+        static fn (Request $request): Response =>
+            $warehouseController->activate($request),
+        $warehouseMiddleware('configuracion.almacenes.desactivar')
+    );
 
     $catalogAccessMiddleware = new PermissionMiddleware(
         $auth,

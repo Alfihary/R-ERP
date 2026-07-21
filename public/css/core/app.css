@@ -125,6 +125,16 @@ a {
     margin-top: 2rem;
 }
 
+.app-navigation__section {
+    color: var(--color-sidebar-muted);
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin: 1rem 0 0.35rem;
+    text-transform: uppercase;
+}
+
 .app-navigation__item {
     display: flex;
     align-items: center;

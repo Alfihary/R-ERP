@@ -1,0 +1,8 @@
+@import url("/css/modules/config-companies.css");
+
+.flags {
+    color: var(--color-muted);
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--config-space-2);
+}

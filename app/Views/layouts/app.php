@@ -34,6 +34,9 @@ $canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === t
 $canAccessInventoryKardex = ($canAccessInventoryKardex ?? false) === true;
 $canAccessInventorySerialKardex = ($canAccessInventorySerialKardex ?? false) === true;
 $canAccessInventoryTransfers = ($canAccessInventoryTransfers ?? false) === true;
+$canAccessConfiguration = ($canAccessConfiguration ?? false) === true;
+$canAccessConfigCompanies = ($canAccessConfigCompanies ?? false) === true;
+$canAccessConfigWarehouses = ($canAccessConfigWarehouses ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
@@ -160,6 +163,29 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">⇆</span>
                         Inventario · Transferencias
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfiguration): ?>
+                    <span class="app-navigation__section">Configuración</span>
+                <?php endif; ?>
+                <?php if ($canAccessConfigCompanies): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-companies' ? ' is-active' : '' ?>"
+                        href="/configuracion/empresas"
+                        <?= $activeNavigation === 'configuration-companies' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▧</span>
+                        Empresas
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfigWarehouses): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-warehouses' ? ' is-active' : '' ?>"
+                        href="/configuracion/almacenes"
+                        <?= $activeNavigation === 'configuration-warehouses' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▣</span>
+                        Almacenes
                     </a>
                 <?php endif; ?>
             </nav>

@@ -13,6 +13,8 @@ use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
 use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
+use App\Domain\Configuration\CompanyService;
+use App\Domain\Configuration\WarehouseService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
 use App\Domain\Products\ProductImageService;
@@ -25,16 +27,19 @@ use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
+use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
+use App\Infrastructure\Repositories\CompanyRepository;
 use App\Infrastructure\Repositories\ExchangeRateRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
@@ -43,6 +48,7 @@ use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\WarehouseRepository;
 
 if (!defined('BASE_PATH')) {
     throw new RuntimeException('BASE_PATH must be defined before bootstrapping the application.');
@@ -110,6 +116,10 @@ $exchangeRates = new ExchangeRateService(
     new ExchangeRateRepository($connection)
 );
 $satCatalogs = new SatCatalogService(new SatCatalogRepository($connection));
+$companyRepository = new CompanyRepository($connection);
+$warehouseRepository = new WarehouseRepository($connection);
+$companies = new CompanyService($companyRepository);
+$warehouses = new WarehouseService($warehouseRepository);
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
 $products = new ProductService($productRepository);
@@ -159,6 +169,23 @@ $satCatalogController = new SatCatalogController(
     $catalogs,
     $satCatalogs
 );
+$companyController = new CompanyController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $companies
+);
+$warehouseController = new WarehouseController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $warehouses,
+    $companies
+);
 $productController = new ProductController(
     $config,
     $auth,
@@ -204,6 +231,8 @@ $registerRoutes(
     $classificationController,
     $exchangeRateController,
     $satCatalogController,
+    $companyController,
+    $warehouseController,
     $productController,
     $inventoryController,
     $inventoryTransferController
