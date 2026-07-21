@@ -181,6 +181,7 @@ $selectedSeries = ($summary['selected_series'] ?? false) === true;
                     <th>Concepto</th>
                     <th>Entrada / salida</th>
                     <th>Movimiento</th>
+                    <th>Folio</th>
                     <th>Referencia</th>
                     <th>Producto</th>
                     <th>Serie</th>
@@ -193,7 +194,7 @@ $selectedSeries = ($summary['selected_series'] ?? false) === true;
             <tbody>
                 <?php if ($rows === []): ?>
                     <tr>
-                        <td colspan="11">
+                        <td colspan="12">
                             No hay historial de series para estos filtros. Esta vista no crea ni modifica series.
                         </td>
                     </tr>
@@ -215,6 +216,7 @@ $selectedSeries = ($summary['selected_series'] ?? false) === true;
                             </span>
                         </td>
                         <td>#<?= e((string) ($row['movimiento_id'] ?? '')) ?></td>
+                        <td><?= e((string) ($row['folio'] ?? 'Sin folio')) ?></td>
                         <td><?= e((string) ($row['referencia'] ?? '')) ?></td>
                         <td>
                             <strong><?= e((string) ($row['id_producto'] ?? '')) ?></strong>

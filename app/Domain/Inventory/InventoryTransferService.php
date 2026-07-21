@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Inventory;
 
+use App\Domain\Folios\FolioService;
+use App\Domain\Folios\FolioValidationException;
 use App\Infrastructure\Repositories\InventoryRepository;
 
 final class InventoryTransferService
@@ -11,7 +13,13 @@ final class InventoryTransferService
     private const MAX_INTEGER_DIGITS = 12;
     private const SCALE = 6;
 
-    public function __construct(private readonly InventoryRepository $inventory)
+    private const MISSING_SERIES_MESSAGE =
+        'No existe una serie documental activa para este almacén y tipo de operación.';
+
+    public function __construct(
+        private readonly InventoryRepository $inventory,
+        private readonly ?FolioService $folios = null
+    )
     {
     }
 
@@ -40,6 +48,13 @@ final class InventoryTransferService
                 'ENTRADA'
             );
             $parts = $this->assertProducts($request['partidas']);
+            $folio = $this->emitTransferFolio($request);
+
+            if (!empty($request['simulate_failure_after_folio'])) {
+                throw new InventoryValidationException([
+                    'folio' => 'Falla simulada después de emitir folio.',
+                ]);
+            }
 
             foreach ($parts as $part) {
                 $this->inventory->ensureExistenceRow(
@@ -55,7 +70,9 @@ final class InventoryTransferService
                 $request['fecha_movimiento'],
                 $request['referencia'],
                 $request['observaciones'],
-                $request['usuario_id']
+                $request['usuario_id'],
+                $folio === null ? null : (int) $folio['folio_id'],
+                $folio === null ? null : (string) $folio['folio']
             );
 
             $exitDetailIds = [];
@@ -77,7 +94,9 @@ final class InventoryTransferService
                 $request['fecha_movimiento'],
                 $request['referencia'],
                 $request['observaciones'],
-                $request['usuario_id']
+                $request['usuario_id'],
+                $folio === null ? null : (int) $folio['folio_id'],
+                $folio === null ? null : (string) $folio['folio']
             );
 
             $entryDetailIds = [];
@@ -170,6 +189,8 @@ final class InventoryTransferService
                 'referencia_transferencia' => $request['referencia'],
                 'movimiento_salida_id' => $exitMovementId,
                 'movimiento_entrada_id' => $entryMovementId,
+                'folio_id' => $folio === null ? null : (int) $folio['folio_id'],
+                'folio' => $folio === null ? null : (string) $folio['folio'],
                 'estado' => 'APLICADO',
                 'empresa_id' => $request['empresa_id'],
                 'almacen_origen_id' => $request['almacen_origen_id'],
@@ -187,6 +208,7 @@ final class InventoryTransferService
      *     almacen_destino_id: int,
      *     fecha_movimiento: string,
      *     referencia: string,
+     *     simulate_failure_after_folio: bool,
      *     observaciones: string|null,
      *     usuario_id: int,
      *     partidas: list<array{
@@ -321,6 +343,8 @@ final class InventoryTransferService
             'almacen_destino_id' => $destinationWarehouseId,
             'fecha_movimiento' => $movementDate,
             'referencia' => $reference,
+            'simulate_failure_after_folio' =>
+                !empty($input['__simulate_failure_after_folio']),
             'observaciones' => $notes,
             'usuario_id' => $actorId,
             'partidas' => $parts,
@@ -368,6 +392,34 @@ final class InventoryTransferService
             throw new InventoryValidationException([
                 'almacen_destino_id' =>
                     'El almacén destino no existe, no está activo o no pertenece a la empresa.',
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>|null
+     */
+    private function emitTransferFolio(array $request): ?array
+    {
+        if ($this->folios === null) {
+            return null;
+        }
+
+        try {
+            return $this->folios->emitir([
+                'empresa_id' => $request['empresa_id'],
+                'almacen_id' => $request['almacen_origen_id'],
+                'tipo_documento' => 'TRANSFERENCIA_INVENTARIO',
+                'codigo_serie' => 'TR',
+                'documento_tipo_origen' => 'TRANSFERENCIA_INVENTARIO',
+                'documento_id_origen' => null,
+                'referencia_externa' => $request['referencia'],
+                'creado_por_usuario_id' => $request['usuario_id'],
+            ]);
+        } catch (FolioValidationException) {
+            throw new InventoryValidationException([
+                'folio' => self::MISSING_SERIES_MESSAGE,
             ]);
         }
     }

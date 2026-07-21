@@ -38,6 +38,7 @@ $parts = is_array($movement['partidas'] ?? null) ? $movement['partidas'] : [];
         <div><dt>Naturaleza</dt><dd><?= e((string) ($movement['naturaleza'] ?? '')) ?></dd></div>
         <div><dt>Empresa</dt><dd><?= e((string) ($movement['empresa_nombre'] ?? '')) ?></dd></div>
         <div><dt>Almacén</dt><dd><?= e((string) ($movement['almacen_nombre'] ?? '')) ?></dd></div>
+        <div><dt>Folio</dt><dd><?= e((string) ($movement['folio'] ?? 'Sin folio')) ?></dd></div>
         <div><dt>Referencia</dt><dd><?= e((string) ($movement['referencia'] ?? 'Sin referencia')) ?></dd></div>
         <div><dt>Creado por</dt><dd><?= e((string) ($movement['creado_por_username'] ?? '')) ?></dd></div>
         <div><dt>Aplicado por</dt><dd><?= e((string) ($movement['aplicado_por_username'] ?? '')) ?></dd></div>

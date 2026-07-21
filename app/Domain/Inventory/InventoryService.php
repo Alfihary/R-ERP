@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Inventory;
 
+use App\Domain\Folios\FolioService;
+use App\Domain\Folios\FolioValidationException;
 use App\Infrastructure\Repositories\InventoryRepository;
 
 final class InventoryService
@@ -11,7 +13,13 @@ final class InventoryService
     private const MAX_INTEGER_DIGITS = 12;
     private const SCALE = 6;
 
-    public function __construct(private readonly InventoryRepository $inventory)
+    private const MISSING_SERIES_MESSAGE =
+        'No existe una serie documental activa para este almacén y tipo de operación.';
+
+    public function __construct(
+        private readonly InventoryRepository $inventory,
+        private readonly ?FolioService $folios = null
+    )
     {
     }
 
@@ -28,6 +36,13 @@ final class InventoryService
             $this->assertScope($request['empresa_id'], $request['almacen_id']);
             $concept = $this->assertConcept($request['concepto_codigo']);
             $parts = $this->assertProducts($request['partidas']);
+            $folio = $this->emitMovementFolio($request);
+
+            if (!empty($request['simulate_failure_after_folio'])) {
+                throw new InventoryValidationException([
+                    'folio' => 'Falla simulada después de emitir folio.',
+                ]);
+            }
 
             $movementId = $this->inventory->createDraftMovement(
                 $request['empresa_id'],
@@ -36,7 +51,9 @@ final class InventoryService
                 $request['fecha_movimiento'],
                 $request['referencia'],
                 $request['observaciones'],
-                $request['usuario_id']
+                $request['usuario_id'],
+                $folio === null ? null : (int) $folio['folio_id'],
+                $folio === null ? null : (string) $folio['folio']
             );
 
             $detailIds = [];
@@ -135,6 +152,15 @@ final class InventoryService
                 'concepto_codigo' => (string) $movement['concepto_codigo'],
                 'naturaleza' => (string) $movement['naturaleza'],
                 'fecha_movimiento' => (string) $movement['fecha_movimiento'],
+                'folio_id' => $movement['folio_id'] === null
+                    ? null
+                    : (int) $movement['folio_id'],
+                'folio' => $movement['folio'] === null
+                    ? null
+                    : (string) $movement['folio'],
+                'referencia' => $movement['referencia'] === null
+                    ? null
+                    : (string) $movement['referencia'],
                 'partidas_aplicadas' => $appliedParts,
             ];
         });
@@ -148,6 +174,8 @@ final class InventoryService
      *     concepto_codigo: string,
      *     fecha_movimiento: string,
      *     referencia: string|null,
+     *     folio: array{tipo_documento: string, codigo_serie: string}|null,
+     *     simulate_failure_after_folio: bool,
      *     observaciones: string|null,
      *     usuario_id: int,
      *     partidas: list<array{
@@ -167,6 +195,7 @@ final class InventoryService
         $conceptCode = strtoupper($this->text($input, 'concepto_codigo'));
         $movementDate = $this->movementDate($input['fecha_movimiento'] ?? null);
         $reference = $this->nullableText($input, 'referencia', 100);
+        $folio = $this->folioInput($input['folio'] ?? null);
         $notes = $this->nullableText($input, 'observaciones', 500);
 
         if ($companyId === null) {
@@ -188,6 +217,10 @@ final class InventoryService
         if ($reference === false) {
             $errors['referencia'] = 'La referencia admite hasta 100 caracteres.';
             $reference = null;
+        }
+        if ($folio === false) {
+            $errors['folio'] = 'La serie documental del folio no es válida.';
+            $folio = null;
         }
         if ($notes === false) {
             $errors['observaciones'] =
@@ -271,6 +304,9 @@ final class InventoryService
             'concepto_codigo' => $conceptCode,
             'fecha_movimiento' => $movementDate,
             'referencia' => $reference,
+            'folio' => $folio,
+            'simulate_failure_after_folio' =>
+                !empty($input['__simulate_failure_after_folio']),
             'observaciones' => $notes,
             'usuario_id' => $actorId,
             'partidas' => $parts,
@@ -303,6 +339,51 @@ final class InventoryService
             throw new InventoryValidationException([
                 'almacen_id' =>
                     'El almacén no existe, no está activo o no pertenece a la empresa.',
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>|null
+     */
+    private function emitMovementFolio(array $request): ?array
+    {
+        if ($this->folios === null) {
+            return null;
+        }
+
+        $folioInput = $request['folio'] ?? null;
+
+        if ($folioInput === null) {
+            if (!in_array(
+                $request['concepto_codigo'],
+                ['ENTRADA_AJUSTE', 'SALIDA_AJUSTE'],
+                true
+            )) {
+                return null;
+            }
+
+            $folioInput = [
+                'tipo_documento' => 'AJUSTE_INVENTARIO',
+                'codigo_serie' => 'AJ',
+            ];
+        }
+
+        try {
+            return $this->folios->emitir([
+                'empresa_id' => $request['empresa_id'],
+                'almacen_id' => $request['almacen_id'],
+                'tipo_documento' => $folioInput['tipo_documento'],
+                'codigo_serie' => $folioInput['codigo_serie'],
+                'documento_tipo_origen' => 'MOVIMIENTO_INVENTARIO',
+                'documento_id_origen' => null,
+                'referencia_externa' => $request['referencia'],
+                'creado_por_usuario_id' => $request['usuario_id'],
+            ]);
+        } catch (FolioValidationException) {
+            throw new InventoryValidationException([
+                'folio' => self::MISSING_SERIES_MESSAGE,
             ]);
         }
     }
@@ -580,6 +661,32 @@ final class InventoryService
         }
 
         return $this->length($value) <= $max ? $value : false;
+    }
+
+    /**
+     * @return array{tipo_documento: string, codigo_serie: string}|null|false
+     */
+    private function folioInput(mixed $value): array|null|false
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (!is_array($value)) {
+            return false;
+        }
+
+        $type = strtoupper($this->text($value, 'tipo_documento'));
+        $series = strtoupper($this->text($value, 'codigo_serie'));
+
+        if (
+            preg_match('/^[A-Z0-9_]{1,60}$/', $type) !== 1
+            || preg_match('/^[A-Z0-9_]{1,20}$/', $series) !== 1
+        ) {
+            return false;
+        }
+
+        return ['tipo_documento' => $type, 'codigo_serie' => $series];
     }
 
     /**

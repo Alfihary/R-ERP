@@ -48,12 +48,12 @@ $notice = is_string($notice ?? null) ? $notice : null;
     </div>
     <form class="inventory-filters" method="get" action="/inventario/movimientos">
         <label class="inventory-field">
-            <span>Referencia o MOV</span>
+            <span>Folio, referencia o MOV</span>
             <input
                 type="search"
                 name="search"
                 value="<?= e((string) ($filters['search'] ?? '')) ?>"
-                placeholder="MOV-125 o referencia"
+                placeholder="AJ-BO000001, MOV-125 o referencia"
             >
         </label>
         <label class="inventory-field">
@@ -115,7 +115,9 @@ $notice = is_string($notice ?? null) ? $notice : null;
             <thead>
                 <tr>
                     <th>Fecha</th>
+                    <th>Folio</th>
                     <th>Movimiento</th>
+                    <th>Referencia</th>
                     <th>Concepto</th>
                     <th>Naturaleza</th>
                     <th>Almacén</th>
@@ -127,14 +129,16 @@ $notice = is_string($notice ?? null) ? $notice : null;
             <tbody>
                 <?php if ($movements === []): ?>
                     <tr>
-                        <td colspan="8">No hay movimientos para estos filtros.</td>
+                        <td colspan="10">No hay movimientos para estos filtros.</td>
                     </tr>
                 <?php endif; ?>
                 <?php foreach ($movements as $movement): ?>
                     <?php $id = (int) ($movement['id'] ?? 0); ?>
                     <tr>
                         <td><?= e((string) ($movement['fecha_movimiento'] ?? '')) ?></td>
+                        <td><?= e((string) ($movement['folio'] ?? 'Sin folio')) ?></td>
                         <td>MOV-<?= e((string) $id) ?></td>
+                        <td><?= e((string) ($movement['referencia'] ?? 'Sin referencia')) ?></td>
                         <td><?= e((string) ($movement['concepto_nombre'] ?? '')) ?></td>
                         <td><?= e((string) ($movement['naturaleza'] ?? '')) ?></td>
                         <td><?= e((string) ($movement['almacen_nombre'] ?? '')) ?></td>

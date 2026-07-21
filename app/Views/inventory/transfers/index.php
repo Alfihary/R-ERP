@@ -60,7 +60,7 @@ $errors = is_array($errors ?? null) ? $errors : [];
     </div>
     <form class="transfer-filters" method="get" action="/inventario/transferencias">
         <label class="transfer-field">
-            <span>Referencia</span>
+            <span>Folio o referencia</span>
             <input
                 type="search"
                 name="search"
@@ -111,6 +111,7 @@ $errors = is_array($errors ?? null) ? $errors : [];
             <thead>
                 <tr>
                     <th>Fecha</th>
+                    <th>Folio</th>
                     <th>Referencia</th>
                     <th>Origen</th>
                     <th>Destino</th>
@@ -122,13 +123,14 @@ $errors = is_array($errors ?? null) ? $errors : [];
             <tbody>
                 <?php if ($transfers === []): ?>
                     <tr>
-                        <td colspan="7">No hay transferencias para estos filtros.</td>
+                        <td colspan="8">No hay transferencias para estos filtros.</td>
                     </tr>
                 <?php endif; ?>
                 <?php foreach ($transfers as $transfer): ?>
                     <?php $reference = (string) ($transfer['referencia'] ?? ''); ?>
                     <tr>
                         <td><?= e((string) ($transfer['fecha_movimiento'] ?? '')) ?></td>
+                        <td><?= e((string) ($transfer['folio'] ?? 'Sin folio')) ?></td>
                         <td><?= e($reference) ?></td>
                         <td><?= e((string) ($transfer['almacen_origen_nombre'] ?? '')) ?></td>
                         <td><?= e((string) ($transfer['almacen_destino_nombre'] ?? '')) ?></td>

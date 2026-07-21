@@ -42,7 +42,8 @@ final class InventoryQueryRepository
         ];
 
         if ($filters['search'] !== '') {
-            $conditions[] = '(m.referencia LIKE :search OR CAST(m.id AS CHAR) LIKE :search_id)';
+            $conditions[] = '(m.folio LIKE :search_folio OR m.referencia LIKE :search OR CAST(m.id AS CHAR) LIKE :search_id)';
+            $parameters['search_folio'] = '%' . $filters['search'] . '%';
             $parameters['search'] = '%' . $filters['search'] . '%';
             $parameters['search_id'] = '%' . $filters['search'] . '%';
         }
@@ -84,6 +85,7 @@ final class InventoryQueryRepository
                 m.id,
                 m.fecha_movimiento,
                 m.estado,
+                m.folio,
                 m.referencia,
                 c.codigo AS concepto_codigo,
                 c.nombre AS concepto_nombre,
@@ -101,6 +103,7 @@ final class InventoryQueryRepository
                 m.id,
                 m.fecha_movimiento,
                 m.estado,
+                m.folio,
                 m.referencia,
                 c.codigo,
                 c.nombre,
@@ -440,6 +443,7 @@ final class InventoryQueryRepository
             'SELECT
                 m.id AS movimiento_id,
                 m.fecha_movimiento,
+                m.folio,
                 m.referencia,
                 m.observaciones,
                 c.codigo AS concepto_codigo,
@@ -599,6 +603,7 @@ final class InventoryQueryRepository
                 movimiento_id,
                 fecha_movimiento,
                 estado,
+                folio,
                 referencia,
                 concepto_codigo,
                 concepto_nombre,
@@ -616,6 +621,7 @@ final class InventoryQueryRepository
                     m.id AS movimiento_id,
                     m.fecha_movimiento,
                     m.estado,
+                    m.folio,
                     m.referencia,
                     c.codigo AS concepto_codigo,
                     c.nombre AS concepto_nombre,
@@ -738,6 +744,8 @@ final class InventoryQueryRepository
                 m.almacen_id,
                 m.fecha_movimiento,
                 m.estado,
+                m.folio,
+                m.folio_id,
                 m.referencia,
                 m.observaciones,
                 m.creado_en,
@@ -831,6 +839,8 @@ final class InventoryQueryRepository
         $statement = $this->connection->pdo()->prepare(
             'SELECT
                 s.referencia,
+                s.folio,
+                s.folio_id,
                 s.fecha_movimiento,
                 s.id AS movimiento_salida_id,
                 e.id AS movimiento_entrada_id,
@@ -856,6 +866,8 @@ final class InventoryQueryRepository
              WHERE ' . $where . '
              GROUP BY
                 s.referencia,
+                s.folio,
+                s.folio_id,
                 s.fecha_movimiento,
                 s.id,
                 e.id,
@@ -890,6 +902,8 @@ final class InventoryQueryRepository
         $statement = $this->connection->pdo()->prepare(
             'SELECT
                 s.referencia,
+                s.folio,
+                s.folio_id,
                 s.fecha_movimiento,
                 s.estado AS estado_salida,
                 e.estado AS estado_entrada,
@@ -1248,7 +1262,8 @@ final class InventoryQueryRepository
         $parameters = ['empresa_id' => $filters['company_id']];
 
         if ($filters['search'] !== '') {
-            $where[] = 's.referencia LIKE :search';
+            $where[] = '(s.folio LIKE :search_folio OR s.referencia LIKE :search)';
+            $parameters['search_folio'] = '%' . $filters['search'] . '%';
             $parameters['search'] = '%' . $filters['search'] . '%';
         }
         if ($filters['warehouse_id'] !== null) {

@@ -13,19 +13,29 @@ final class FolioRepository
     {
     }
 
-    public function beginTransaction(): void
+    public function beginTransaction(): bool
     {
-        $this->connection->pdo()->beginTransaction();
+        $pdo = $this->connection->pdo();
+
+        if ($pdo->inTransaction()) {
+            return false;
+        }
+
+        $pdo->beginTransaction();
+
+        return true;
     }
 
-    public function commit(): void
+    public function commit(bool $ownsTransaction = true): void
     {
-        $this->connection->pdo()->commit();
+        if ($ownsTransaction) {
+            $this->connection->pdo()->commit();
+        }
     }
 
-    public function rollBack(): void
+    public function rollBack(bool $ownsTransaction = true): void
     {
-        if ($this->connection->pdo()->inTransaction()) {
+        if ($ownsTransaction && $this->connection->pdo()->inTransaction()) {
             $this->connection->pdo()->rollBack();
         }
     }

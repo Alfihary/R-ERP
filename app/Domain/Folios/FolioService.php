@@ -37,7 +37,7 @@ final class FolioService
         $creatorId = $this->optionalId($input, 'creado_por_usuario_id');
 
         try {
-            $this->folios->beginTransaction();
+            $ownsTransaction = $this->folios->beginTransaction();
 
             if (!$this->folios->warehouseBelongsToCompany($empresaId, $almacenId)) {
                 throw new FolioValidationException(
@@ -151,19 +151,19 @@ final class FolioService
                 );
             }
 
-            $this->folios->commit();
+            $this->folios->commit($ownsTransaction);
 
             return $created;
         } catch (FolioValidationException $exception) {
-            $this->folios->rollBack();
+            $this->folios->rollBack($ownsTransaction ?? true);
             throw $exception;
         } catch (PDOException) {
-            $this->folios->rollBack();
+            $this->folios->rollBack($ownsTransaction ?? true);
             throw new FolioValidationException(
                 'No fue posible emitir el folio.'
             );
         } catch (Throwable) {
-            $this->folios->rollBack();
+            $this->folios->rollBack($ownsTransaction ?? true);
             throw new FolioValidationException(
                 'No fue posible emitir el folio.'
             );

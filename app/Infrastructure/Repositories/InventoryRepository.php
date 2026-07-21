@@ -174,7 +174,9 @@ final class InventoryRepository
         string $movementDate,
         ?string $reference,
         ?string $notes,
-        int $actorId
+        int $actorId,
+        ?int $folioId = null,
+        ?string $folio = null
     ): int {
         $statement = $this->connection->pdo()->prepare(
             'INSERT INTO movimientos_inventario (
@@ -183,6 +185,8 @@ final class InventoryRepository
                 concepto_movimiento_id,
                 fecha_movimiento,
                 estado,
+                folio_id,
+                folio,
                 referencia,
                 observaciones,
                 creado_por
@@ -193,6 +197,8 @@ final class InventoryRepository
                 :concepto_movimiento_id,
                 :fecha_movimiento,
                 \'BORRADOR\',
+                :folio_id,
+                :folio,
                 :referencia,
                 :observaciones,
                 :creado_por
@@ -203,6 +209,8 @@ final class InventoryRepository
             'almacen_id' => $warehouseId,
             'concepto_movimiento_id' => $conceptId,
             'fecha_movimiento' => $movementDate,
+            'folio_id' => $folioId,
+            'folio' => $folio,
             'referencia' => $reference,
             'observaciones' => $notes,
             'creado_por' => $actorId,
@@ -502,6 +510,8 @@ final class InventoryRepository
                 m.almacen_id,
                 m.fecha_movimiento,
                 m.estado,
+                m.folio_id,
+                m.folio,
                 m.referencia,
                 c.codigo AS concepto_codigo,
                 c.naturaleza

@@ -170,6 +170,7 @@ $currentStock = is_string($currentStock ?? null) ? $currentStock : null;
                         <th>Fecha</th>
                         <th>Movimiento</th>
                         <th>Concepto</th>
+                        <th>Folio</th>
                         <th>Referencia</th>
                         <th>Entrada</th>
                         <th>Salida</th>
@@ -181,7 +182,7 @@ $currentStock = is_string($currentStock ?? null) ? $currentStock : null;
                 <tbody>
                     <?php if ($rows === []): ?>
                         <tr>
-                            <td colspan="9">
+                            <td colspan="10">
                                 No hay movimientos aplicados para este producto en el almacén seleccionado.
                             </td>
                         </tr>
@@ -195,6 +196,7 @@ $currentStock = is_string($currentStock ?? null) ? $currentStock : null;
                                 <strong><?= e((string) ($row['concepto_codigo'] ?? '')) ?></strong>
                                 <span><?= e((string) ($row['concepto_nombre'] ?? '')) ?></span>
                             </td>
+                            <td><?= e((string) ($row['folio'] ?? 'Sin folio')) ?></td>
                             <td><?= e((string) ($row['referencia'] ?? '')) ?></td>
                             <td class="kardex-number"><?= e((string) ($row['entrada'] ?? '—')) ?></td>
                             <td class="kardex-number"><?= e((string) ($row['salida'] ?? '—')) ?></td>

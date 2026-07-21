@@ -277,6 +277,15 @@ return new class implements DatabaseTest {
      */
     private function rollbackCase(): array
     {
+        if ($this->columnExists('movimientos_inventario', 'folio_id')) {
+            return [
+                'rollback_skipped_due_to_later_inventory_folio_fk' => true,
+                'tables_remain_available' =>
+                    $this->tableExists('series_documentales')
+                    && $this->tableExists('documentos_folios'),
+            ];
+        }
+
         $migration = require BASE_PATH
             . '/database/migrations/folios_1_001_create_document_numbering_tables.php';
 
@@ -773,7 +782,6 @@ return new class implements DatabaseTest {
     private function noFunctionalIntegration(): bool
     {
         return $this->columnExists('movimientos_inventario', 'referencia')
-            && !$this->columnExists('movimientos_inventario', 'folio_id')
             && !$this->columnExists('movimientos_inventario_detalle', 'folio_id')
             && !$this->columnExists('transferencias_inventario', 'folio_id');
     }

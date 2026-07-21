@@ -36,6 +36,7 @@ $parts = is_array($transfer['partidas'] ?? null) ? $transfer['partidas'] : [];
     <dl class="transfer-detail-grid">
         <div><dt>Fecha/hora</dt><dd><?= e((string) ($transfer['fecha_movimiento'] ?? '')) ?></dd></div>
         <div><dt>Empresa</dt><dd><?= e((string) ($transfer['empresa_nombre'] ?? '')) ?></dd></div>
+        <div><dt>Folio</dt><dd><?= e((string) ($transfer['folio'] ?? 'Sin folio')) ?></dd></div>
         <div><dt>Referencia</dt><dd><?= e((string) ($transfer['referencia'] ?? '')) ?></dd></div>
         <div><dt>Almacén origen</dt><dd><?= e((string) ($transfer['almacen_origen_nombre'] ?? '')) ?></dd></div>
         <div><dt>Almacén destino</dt><dd><?= e((string) ($transfer['almacen_destino_nombre'] ?? '')) ?></dd></div>
