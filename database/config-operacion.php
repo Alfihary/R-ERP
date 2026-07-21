@@ -74,18 +74,26 @@ try {
     }
 
     $pdo = (new ConnectionProvider($databaseConfig))->pdo();
-    $migration = require BASE_PATH
-        . '/database/migrations/config_operacion_1_001_extend_companies_warehouses.php';
+    $migrations = [
+        require BASE_PATH
+            . '/database/migrations/config_operacion_1_001_extend_companies_warehouses.php',
+        require BASE_PATH
+            . '/database/migrations/config_operacion_codigos_min_2_001_update_company_warehouse_code_checks.php',
+    ];
     $seed = require BASE_PATH
         . '/database/seeds/config_operacion_empresas_almacenes_1_seed_permissions.php';
     $test = require BASE_PATH
         . '/database/tests/config_operacion_empresas_almacenes_1_test.php';
 
-    if (
-        !$migration instanceof Migration
-        || !$seed instanceof Seed
-        || !$test instanceof DatabaseTest
-    ) {
+    foreach ($migrations as $migration) {
+        if (!$migration instanceof Migration) {
+            throw new RuntimeException(
+                'A CONFIG-OPERACION migration has an invalid contract.'
+            );
+        }
+    }
+
+    if (!$seed instanceof Seed || !$test instanceof DatabaseTest) {
         throw new RuntimeException(
             'A CONFIG-OPERACION artifact has an invalid contract.'
         );
@@ -94,20 +102,18 @@ try {
     $runner = new MigrationRunner($pdo);
     $result = match ($command) {
         'migrate' => [
-            'migration' => $migration->id(),
-            'result' => $runner->migrate($migration),
+            'migrations' => migrateAll($runner, $migrations),
         ],
         'rollback' => [
-            'migration' => $migration->id(),
-            'result' => $runner->rollback($migration),
+            'migrations' => rollbackAll($runner, $migrations),
         ],
         'seed' => (static function () use ($seed, $pdo): array {
             $seed->run($pdo);
             return ['seed' => $seed->id(), 'result' => 'applied'];
         })(),
         'db:test' => [
-            'migration' => $runner->migrate($migration),
-            'migration_second_run' => $runner->migrate($migration),
+            'migration' => migrateAll($runner, $migrations),
+            'migration_second_run' => migrateAll($runner, $migrations),
             'seed' => (static function () use ($seed, $pdo): string {
                 $seed->run($pdo);
                 $seed->run($pdo);
@@ -134,4 +140,34 @@ try {
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception->getMessage() . PHP_EOL);
     exit(1);
+}
+
+/**
+ * @param list<Migration> $migrations
+ * @return array<string, string>
+ */
+function migrateAll(MigrationRunner $runner, array $migrations): array
+{
+    $results = [];
+
+    foreach ($migrations as $migration) {
+        $results[$migration->id()] = $runner->migrate($migration);
+    }
+
+    return $results;
+}
+
+/**
+ * @param list<Migration> $migrations
+ * @return array<string, string>
+ */
+function rollbackAll(MigrationRunner $runner, array $migrations): array
+{
+    $results = [];
+
+    foreach (array_reverse($migrations) as $migration) {
+        $results[$migration->id()] = $runner->rollback($migration);
+    }
+
+    return $results;
 }

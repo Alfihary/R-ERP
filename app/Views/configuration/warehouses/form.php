@@ -61,7 +61,7 @@ $error = static fn (string $key): string => (string) ($errors[$key] ?? '');
             <label class="field">
                 <span>Código *</span>
                 <input name="codigo" required maxlength="64" value="<?= e($value('codigo')) ?>">
-                <small><?= e($error('codigo') ?: 'Estable para folios por almacén. Sin espacios ni caracteres inseguros.') ?></small>
+                <small><?= e($error('codigo') ?: 'Usa de 2 a 64 caracteres: minúsculas, números y separadores . _ -. Los espacios se normalizan a guion. Ejemplo: bo o bodega-principal.') ?></small>
             </label>
             <label class="field">
                 <span>Tipo *</span>

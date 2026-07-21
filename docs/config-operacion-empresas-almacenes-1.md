@@ -42,6 +42,49 @@ Campos agregados:
 
 La desactivación es lógica con `activo=0`. No hay hard delete.
 
+### Regla de código de empresa
+
+CONFIG-OPERACION-CODIGOS-MIN-2 actualiza únicamente la restricción de código
+para permitir identificadores operativos cortos. La migración nueva
+`config_operacion_codigos_min_2_001_update_company_warehouse_code_checks`
+reemplaza `chk_empresas_codigo` sin modificar columnas ni datos.
+
+El `CHECK` real de base de datos permite:
+
+- longitud de 2 a 64 caracteres;
+- minúsculas;
+- letras `a-z`;
+- números `0-9`;
+- separadores `.`, `_` y `-` entre segmentos;
+- sin espacios;
+- sin acentos ni caracteres especiales.
+
+Antes de guardar, el servicio aplica:
+
+- `trim`;
+- conversión a minúsculas;
+- conversión de espacios a guion medio.
+
+Ejemplos válidos:
+
+- `grupo-refrigerantes`
+- `gr`
+- `empresa-qa`
+- `sucursal-1`
+- `empresa.qa`
+- `empresa_qa`
+
+Ejemplos inválidos:
+
+- `g`
+- `empresa qa @`
+- `ñandu`
+- `empresa@`
+- `empresa--qa`
+
+`telefono` y `email` permanecen en `empresas`. Ambos siguen siendo opcionales;
+`email` se valida si se captura.
+
 ## Almacenes
 
 La fase conserva la tabla `almacenes` creada en DB-SCOPE-1 y la extiende con
@@ -75,6 +118,64 @@ Tipos permitidos:
 El código de almacén queda como dato estable porque será insumo de folios
 posteriores. En esta fase no existen folios, pero se documenta que el código no
 debe cambiarse libremente cuando existan movimientos o folios asociados.
+
+### Regla de código de almacén
+
+CONFIG-OPERACION-CODIGOS-MIN-2 actualiza únicamente la restricción de código
+para permitir identificadores operativos cortos. La migración nueva
+`config_operacion_codigos_min_2_001_update_company_warehouse_code_checks`
+reemplaza `chk_almacenes_codigo` sin modificar columnas ni datos.
+
+El `CHECK` real de base de datos permite:
+
+- longitud de 2 a 64 caracteres;
+- minúsculas;
+- letras `a-z`;
+- números `0-9`;
+- separadores `.`, `_` y `-` entre segmentos;
+- sin espacios;
+- sin acentos ni caracteres especiales.
+
+Antes de guardar, el servicio aplica:
+
+- `trim`;
+- conversión a minúsculas;
+- conversión de espacios a guion medio.
+
+Ejemplos válidos:
+
+- `bodega`
+- `bo`
+- `mt`
+- `bodega-1`
+- `almacen_qa`
+- `almacen.principal`
+
+Ejemplos inválidos:
+
+- `b`
+- `BODEGA` en SQL directo, aunque el servicio normaliza capturas de usuario a
+  minúsculas;
+- `bodega principal` en SQL directo, aunque el servicio normaliza espacios a
+  guion;
+- `bodega@`
+- `ñandu`
+- `bodega--principal`
+
+`telefono` y `email` permanecen en `almacenes`. Ambos siguen siendo opcionales;
+`email` se valida si se captura.
+
+Para folios por almacén, el código técnico de `almacenes.codigo` se mantiene en
+minúscula segura porque así lo exige el `CHECK` existente. La serie documental
+puede guardar un `codigo_almacen_snapshot` en mayúsculas cuando se configure
+desde la UI de folios, sin cambiar la tabla `almacenes`.
+
+El rollback de la migración restaura el mínimo anterior de 3 caracteres. Si ya
+existen datos reales con códigos de 2 caracteres, el rollback no debe ejecutarse
+sin un plan de datos porque MySQL rechazará reinstalar el `CHECK` de mínimo 3.
+
+Esta fase no toca folios ni inventario; solo cambia las restricciones de código
+y la validación previa en servicios/formularios.
 
 ## Permisos
 

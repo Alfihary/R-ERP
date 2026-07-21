@@ -82,7 +82,7 @@ final class WarehouseService
         try {
             return $this->warehouses->create($data, $adminUserId);
         } catch (PDOException $exception) {
-            $this->convertDuplicate($exception);
+            $this->convertPersistenceError($exception);
             throw $exception;
         }
     }
@@ -121,7 +121,7 @@ final class WarehouseService
         try {
             $this->warehouses->update($id, $data, $actorId);
         } catch (PDOException $exception) {
-            $this->convertDuplicate($exception);
+            $this->convertPersistenceError($exception);
             throw $exception;
         }
     }
@@ -207,7 +207,7 @@ final class WarehouseService
         );
         $data = [
             'empresa_id' => $companyId === false ? 0 : $companyId,
-            'codigo' => strtolower($this->text($input, 'codigo')),
+            'codigo' => $this->code($input, 'codigo'),
             'nombre' => $this->text($input, 'nombre'),
             'tipo_almacen' => strtoupper($this->text($input, 'tipo_almacen')),
             'responsable' => $this->nullableText($input, 'responsable'),
@@ -234,10 +234,11 @@ final class WarehouseService
         }
 
         if (preg_match('/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/', $data['codigo']) !== 1
+            || strlen($data['codigo']) < 2
             || strlen($data['codigo']) > 64
         ) {
             $errors['codigo'] =
-                'Usa letras minúsculas, números y separadores . _ -, sin espacios.';
+                'El código de almacén debe tener de 2 a 64 caracteres: letras minúsculas, números y separadores . _ -, sin espacios.';
         }
 
         if ($data['nombre'] === '' || strlen($data['nombre']) > 150) {
@@ -310,6 +311,16 @@ final class WarehouseService
     /**
      * @param array<string, mixed> $input
      */
+    private function code(array $input, string $key): string
+    {
+        $value = strtolower($this->text($input, $key));
+
+        return (string) preg_replace('/\s+/', '-', $value);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
     private function flag(array $input, string $key): int
     {
         return ($input[$key] ?? null) === '1' ? 1 : 0;
@@ -337,11 +348,17 @@ final class WarehouseService
         }
     }
 
-    private function convertDuplicate(PDOException $exception): void
+    private function convertPersistenceError(PDOException $exception): void
     {
         if ((int) ($exception->errorInfo[1] ?? 0) === 1062) {
             throw new ConfigurationValidationException([
                 'codigo' => 'El almacén ya existe o ya hay un principal para la empresa.',
+            ]);
+        }
+
+        if ((int) ($exception->errorInfo[1] ?? 0) === 3819) {
+            throw new ConfigurationValidationException([
+                'codigo' => 'El código de almacén no cumple el formato permitido.',
             ]);
         }
     }

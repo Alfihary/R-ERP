@@ -63,7 +63,7 @@ final class CompanyService
         try {
             return $this->companies->create($data, $adminUserId);
         } catch (PDOException $exception) {
-            $this->convertDuplicate($exception, 'codigo');
+            $this->convertPersistenceError($exception, 'codigo');
             throw $exception;
         }
     }
@@ -86,7 +86,7 @@ final class CompanyService
         try {
             $this->companies->update($id, $data, $actorId);
         } catch (PDOException $exception) {
-            $this->convertDuplicate($exception, 'codigo');
+            $this->convertPersistenceError($exception, 'codigo');
             throw $exception;
         }
     }
@@ -181,10 +181,11 @@ final class CompanyService
         $errors = [];
 
         if (preg_match('/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/', $data['codigo']) !== 1
+            || strlen($data['codigo']) < 2
             || strlen($data['codigo']) > 64
         ) {
             $errors['codigo'] =
-                'Usa letras minúsculas, números y separadores . _ -, sin espacios.';
+                'El código de empresa debe tener de 2 a 64 caracteres: letras minúsculas, números y separadores . _ -, sin espacios.';
         }
 
         if ($data['nombre'] === '' || strlen($data['nombre']) > 150) {
@@ -282,7 +283,9 @@ final class CompanyService
      */
     private function code(array $input, string $key): string
     {
-        return strtolower($this->text($input, $key));
+        $value = strtolower($this->text($input, $key));
+
+        return (string) preg_replace('/\s+/', '-', $value);
     }
 
     /**
@@ -307,11 +310,17 @@ final class CompanyService
         }
     }
 
-    private function convertDuplicate(PDOException $exception, string $field): void
+    private function convertPersistenceError(PDOException $exception, string $field): void
     {
         if ((int) ($exception->errorInfo[1] ?? 0) === 1062) {
             throw new ConfigurationValidationException([
                 $field => 'El registro ya existe.',
+            ]);
+        }
+
+        if ((int) ($exception->errorInfo[1] ?? 0) === 3819) {
+            throw new ConfigurationValidationException([
+                $field => 'El valor no cumple las reglas de seguridad de la base de datos.',
             ]);
         }
     }
