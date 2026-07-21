@@ -225,6 +225,22 @@ final class ProductService
                 'La descripción larga admite hasta 255 caracteres.';
         }
 
+        $identifiers = $this->identifiers($input);
+
+        foreach ($identifiers['errors'] as $field => $message) {
+            $errors[$field] = $message;
+        }
+
+        if (
+            $identifiers['values']['sku'] !== null
+            && $this->products->skuOwnedByOther(
+                $identifiers['values']['sku'],
+                $productId
+            )
+        ) {
+            $errors['sku'] = 'El SKU ya pertenece a otro producto.';
+        }
+
         $typeCode = strtoupper($this->text($input, 'tipo_producto'));
         $type = in_array(
             $typeCode,
@@ -405,6 +421,14 @@ final class ProductService
                 ...($creating ? ['id_producto' => $productId] : []),
                 'descripcion' => $description,
                 'descripcion_larga' => $longDescription,
+                'sku' => $identifiers['values']['sku'],
+                'sku_alterno' => $identifiers['values']['sku_alterno'],
+                'upc' => $identifiers['values']['upc'],
+                'ean' => $identifiers['values']['ean'],
+                'gtin' => $identifiers['values']['gtin'],
+                'codigo_fabricante' =>
+                    $identifiers['values']['codigo_fabricante'],
+                'modelo' => $identifiers['values']['modelo'],
                 'tipo_producto_id' => $type['id'],
                 'unidad_medida_id' => $unitId,
                 'moneda_id' => $currencyId,
@@ -424,6 +448,84 @@ final class ProductService
             'tax_ids' => $taxIds,
             'barcodes' => $barcodes,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array{
+     *     values: array{
+     *         sku: string|null,
+     *         sku_alterno: string|null,
+     *         upc: string|null,
+     *         ean: string|null,
+     *         gtin: string|null,
+     *         codigo_fabricante: string|null,
+     *         modelo: string|null
+     *     },
+     *     errors: array<string, string>
+     * }
+     */
+    private function identifiers(array $input): array
+    {
+        $values = [
+            'sku' => $this->nullableUpperText($input, 'sku'),
+            'sku_alterno' => $this->nullableUpperText($input, 'sku_alterno'),
+            'upc' => $this->nullableText($input, 'upc'),
+            'ean' => $this->nullableText($input, 'ean'),
+            'gtin' => $this->nullableText($input, 'gtin'),
+            'codigo_fabricante' =>
+                $this->nullableUpperText($input, 'codigo_fabricante'),
+            'modelo' => $this->nullableText($input, 'modelo'),
+        ];
+        $errors = [];
+
+        foreach (['sku' => 'SKU', 'sku_alterno' => 'SKU alterno'] as $field => $label) {
+            if (
+                $values[$field] !== null
+                && preg_match('/^[A-Z0-9._\/-]{1,40}$/', $values[$field]) !== 1
+            ) {
+                $errors[$field] =
+                    $label . ' inválido. Usa letras, números y . _ - /.';
+            }
+        }
+
+        if (
+            $values['upc'] !== null
+            && preg_match('/^[0-9]{12}$/', $values['upc']) !== 1
+        ) {
+            $errors['upc'] = 'UPC inválido. Usa exactamente 12 dígitos.';
+        }
+
+        if (
+            $values['ean'] !== null
+            && preg_match('/^(?:[0-9]{8}|[0-9]{13})$/', $values['ean']) !== 1
+        ) {
+            $errors['ean'] = 'EAN inválido. Usa 8 o 13 dígitos.';
+        }
+
+        if (
+            $values['gtin'] !== null
+            && preg_match('/^(?:[0-9]{8}|[0-9]{12}|[0-9]{13}|[0-9]{14})$/', $values['gtin']) !== 1
+        ) {
+            $errors['gtin'] = 'GTIN inválido. Usa 8, 12, 13 o 14 dígitos.';
+        }
+
+        if (
+            $values['codigo_fabricante'] !== null
+            && preg_match('/^[A-Z0-9._\/-]{1,60}$/', $values['codigo_fabricante']) !== 1
+        ) {
+            $errors['codigo_fabricante'] =
+                'Código fabricante inválido. Usa letras, números y . _ - /.';
+        }
+
+        if (
+            $values['modelo'] !== null
+            && $this->length($values['modelo']) > 80
+        ) {
+            $errors['modelo'] = 'Modelo demasiado largo. Máximo 80 caracteres.';
+        }
+
+        return ['values' => $values, 'errors' => $errors];
     }
 
     private function validatedStoredId(string $productId): string
@@ -455,6 +557,16 @@ final class ProductService
         $value = $this->text($input, $key);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    private function nullableUpperText(array $input, string $key): ?string
+    {
+        $value = $this->nullableText($input, $key);
+
+        return $value === null ? null : strtoupper($value);
     }
 
     /**
@@ -621,7 +733,7 @@ final class ProductService
         if ((int) ($exception->errorInfo[1] ?? 0) === 1062) {
             throw new ProductValidationException([
                 'id_producto' =>
-                    'El ID o un código de barras ya existe.',
+                    'El ID, SKU o un código de barras ya existe.',
             ]);
         }
     }

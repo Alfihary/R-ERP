@@ -85,6 +85,9 @@ try {
     $migration = require BASE_PATH
         . '/database/migrations/'
         . 'db_productos_2_001_extend_product_master.php';
+    $identifierMigration = require BASE_PATH
+        . '/database/migrations/'
+        . 'productos_identificadores_imagen_1_001_add_product_identifiers.php';
     $seed = require BASE_PATH
         . '/database/seeds/db_productos_2_seed_product_types.php';
     $test = require BASE_PATH
@@ -92,6 +95,7 @@ try {
 
     if (
         !$migration instanceof Migration
+        || !$identifierMigration instanceof Migration
         || !$seed instanceof Seed
         || !$test instanceof DatabaseTest
     ) {
@@ -103,12 +107,15 @@ try {
     $runner = new MigrationRunner($pdo);
     $result = match ($command) {
         'migrate' => [
-            'migration' => $migration->id(),
-            'result' => $runner->migrate($migration),
+            'migrations' => [
+                $migration->id() => $runner->migrate($migration),
+                $identifierMigration->id() =>
+                    $runner->migrate($identifierMigration),
+            ],
         ],
         'rollback' => [
-            'migration' => $migration->id(),
-            'result' => $runner->rollback($migration),
+            'migration' => $identifierMigration->id(),
+            'result' => $runner->rollback($identifierMigration),
         ],
         'seed' => (static function () use ($seed, $pdo): array {
             $seed->run($pdo);

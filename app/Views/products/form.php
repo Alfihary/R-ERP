@@ -66,7 +66,7 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     <?php endif; ?>
 
     <fieldset class="product-form-section">
-        <legend>Identidad y descripción</legend>
+        <legend>Datos principales</legend>
         <p class="product-form-section__help">
             El servicio normaliza a mayúsculas durante la creación.
         </p>
@@ -124,7 +124,25 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
         </div>
     </fieldset>
 
-    <?php if ($editing): ?>
+    <?php if (!$editing): ?>
+        <fieldset class="product-form-section product-image-section">
+            <legend>Imagen principal</legend>
+            <p class="product-form-section__help">
+                Primero guarda el producto. Después podrás subir la imagen
+                principal desde la edición.
+            </p>
+            <div class="product-image-create-note">
+                <div class="product-image-placeholder" role="img" aria-label="Producto sin imagen principal">
+                    <span aria-hidden="true">▧</span>
+                    <strong>Imagen pendiente</strong>
+                </div>
+                <p>
+                    La carga valida JPG, PNG o WEBP con MIME real, contenido
+                    decodificable y tamaño máximo de 5 MiB.
+                </p>
+            </div>
+        </fieldset>
+    <?php else: ?>
         <fieldset class="product-form-section product-image-section">
             <legend>Imagen principal</legend>
             <p class="product-form-section__help">
@@ -192,6 +210,86 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     <?php endif; ?>
 
     <fieldset class="product-form-section">
+        <legend>Identificadores</legend>
+        <p class="product-form-section__help">
+            Campos principales de identificación comercial. El ID producto
+            sigue siendo la llave natural del ERP; el SKU no lo reemplaza.
+        </p>
+        <div class="product-form-grid product-form-grid--identifiers">
+            <?php foreach ([
+                'sku' => [
+                    'SKU',
+                    'text',
+                    '40',
+                    'Ej. RF-BOHN/001',
+                    'Interno/comercial principal; se normaliza a mayúsculas.',
+                ],
+                'sku_alterno' => [
+                    'SKU alterno',
+                    'text',
+                    '40',
+                    'Ej. ALT-001',
+                    'Opcional para equivalencias internas futuras.',
+                ],
+                'upc' => [
+                    'UPC',
+                    'text',
+                    '12',
+                    '12 dígitos',
+                    'Código UPC formal de 12 dígitos.',
+                ],
+                'ean' => [
+                    'EAN',
+                    'text',
+                    '14',
+                    '8 o 13 dígitos',
+                    'Código EAN formal de 8 o 13 dígitos.',
+                ],
+                'gtin' => [
+                    'GTIN',
+                    'text',
+                    '14',
+                    '8, 12, 13 o 14 dígitos',
+                    'Identificador global de artículo comercial.',
+                ],
+                'codigo_fabricante' => [
+                    'Código fabricante',
+                    'text',
+                    '60',
+                    'Ej. MOD-AB/22',
+                    'Código publicado por fabricante; se normaliza a mayúsculas.',
+                ],
+                'modelo' => [
+                    'Modelo',
+                    'text',
+                    '80',
+                    'Ej. Bohn serie comercial',
+                    'Modelo, presentación o referencia descriptiva.',
+                ],
+            ] as $field => [$label, $type, $max, $placeholder, $help]): ?>
+                <div class="product-field<?= $field === 'modelo' ? ' product-field--wide' : '' ?>">
+                    <label for="<?= e($field) ?>"><?= e($label) ?></label>
+                    <input
+                        id="<?= e($field) ?>"
+                        name="<?= e($field) ?>"
+                        type="<?= e($type) ?>"
+                        maxlength="<?= e($max) ?>"
+                        value="<?= e((string) ($values[$field] ?? '')) ?>"
+                        placeholder="<?= e($placeholder) ?>"
+                        autocomplete="off"
+                    >
+                    <small><?= e($help) ?></small>
+                    <?php if (isset($errors[$field])): ?>
+                        <span class="product-field-error">
+                            <?= e($errors[$field]) ?>
+                        </span>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </fieldset>
+
+    <fieldset class="product-form-section">
         <legend>Tipo de producto</legend>
         <p class="product-form-section__help">
             El tipo define si admite características físicas y controles de
@@ -230,7 +328,7 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     </fieldset>
 
     <fieldset class="product-form-section">
-        <legend>Clasificación comercial</legend>
+        <legend>Clasificación y catálogos</legend>
         <p class="product-form-section__help">
             Solo se ofrecen registros activos de los catálogos aprobados.
         </p>
@@ -283,7 +381,7 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     </fieldset>
 
     <fieldset class="product-form-section">
-        <legend>Datos SAT</legend>
+        <legend>Clasificación SAT</legend>
         <p class="product-form-section__help">
             Datos fiscales opcionales. El producto puede operar sin clave o
             unidad SAT; CFDI y facturación quedan fuera de esta fase.
@@ -375,7 +473,7 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     </fieldset>
 
     <fieldset class="product-form-section">
-        <legend>Características físicas</legend>
+        <legend>Medidas</legend>
         <p class="product-form-section__help">
             Opcionales para productos y kits. Usa kilogramos para peso y
             centímetros para dimensiones. Solo se aceptan valores positivos.
@@ -413,10 +511,11 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     </fieldset>
 
     <fieldset class="product-form-section">
-        <legend>Control de inventario</legend>
+        <legend>Inventario y trazabilidad</legend>
         <p class="product-form-section__help">
-            Define políticas futuras. Esta fase no crea series, lotes,
-            pedimentos, existencias ni movimientos.
+            Define políticas de trazabilidad. Series ya participa en
+            inventario; lotes y pedimentos siguen pendientes como lógica
+            operativa posterior.
         </p>
         <div class="product-check-grid">
             <?php foreach ([
@@ -490,13 +589,13 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
     </fieldset>
 
     <fieldset class="product-form-section">
-        <legend>Códigos de barras</legend>
+        <legend>Códigos adicionales</legend>
         <p class="product-form-section__help">
-            Captura cero o varios códigos, uno por línea. El primero se
-            considera principal.
+            Captura códigos secundarios, antiguos, de empaque o presentación.
+            No sustituyen SKU, UPC, EAN ni GTIN principales.
         </p>
         <div class="product-field product-field--barcode">
-            <label for="codigos_barras">Códigos</label>
+            <label for="codigos_barras">Códigos adicionales</label>
             <textarea
                 id="codigos_barras"
                 name="codigos_barras"

@@ -80,6 +80,13 @@ final class CrudProductos1FunctionalTest
                 'id_producto' => 'qaprod001',
                 'descripcion' => 'Producto QA',
                 'descripcion_larga' => 'Descripción funcional de prueba.',
+                'sku' => 'sku-qa/001',
+                'sku_alterno' => 'alt_qa.001',
+                'upc' => '123456789012',
+                'ean' => '1234567890123',
+                'gtin' => '12345678901234',
+                'codigo_fabricante' => 'fab-qa/001',
+                'modelo' => ' Modelo QA ',
                 'tipo_producto' => 'PRODUCTO',
                 'unidad_medida_id' => (string) $unitId,
                 'moneda_id' => (string) $currencyId,
@@ -126,6 +133,13 @@ final class CrudProductos1FunctionalTest
                 || (int) ($created['controla_series'] ?? 0) !== 1
                 || (int) ($created['controla_lotes'] ?? 0) !== 1
                 || (int) ($created['controla_pedimentos'] ?? 0) !== 1
+                || ($created['sku'] ?? '') !== 'SKU-QA/001'
+                || ($created['sku_alterno'] ?? '') !== 'ALT_QA.001'
+                || ($created['upc'] ?? '') !== '123456789012'
+                || ($created['ean'] ?? '') !== '1234567890123'
+                || ($created['gtin'] ?? '') !== '12345678901234'
+                || ($created['codigo_fabricante'] ?? '') !== 'FAB-QA/001'
+                || ($created['modelo'] ?? '') !== 'Modelo QA'
             ) {
                 throw new \RuntimeException(
                     'Product children were not created transactionally.'
@@ -142,6 +156,38 @@ final class CrudProductos1FunctionalTest
                     $base,
                     ['id_producto' => 'QAPROD001']
                 ),
+                'invalid_sku' => array_replace($base, [
+                    'id_producto' => 'QASKUBAD',
+                    'sku' => 'SKU CON ESPACIO',
+                ]),
+                'duplicate_sku' => array_replace($base, [
+                    'id_producto' => 'QASKUDUP',
+                    'sku' => 'SKU-QA/001',
+                ]),
+                'invalid_upc_letters' => array_replace($base, [
+                    'id_producto' => 'QAUPCBAD',
+                    'upc' => '12345678901A',
+                ]),
+                'invalid_upc_length' => array_replace($base, [
+                    'id_producto' => 'QAUPCLEN',
+                    'upc' => '12345678901',
+                ]),
+                'invalid_ean_length' => array_replace($base, [
+                    'id_producto' => 'QAEANLEN',
+                    'ean' => '123456789012',
+                ]),
+                'invalid_gtin_length' => array_replace($base, [
+                    'id_producto' => 'QAGTINLEN',
+                    'gtin' => '123456789',
+                ]),
+                'invalid_manufacturer_code' => array_replace($base, [
+                    'id_producto' => 'QAFABBAD',
+                    'codigo_fabricante' => 'FAB CON ESPACIO',
+                ]),
+                'long_model' => array_replace($base, [
+                    'id_producto' => 'QAMODELLONG',
+                    'modelo' => str_repeat('M', 81),
+                ]),
                 'unknown_type' => array_replace($base, [
                     'id_producto' => 'QATYPE',
                     'tipo_producto' => 'INEXISTENTE',
@@ -291,6 +337,13 @@ final class CrudProductos1FunctionalTest
                     'controla_series' => '0',
                     'controla_lotes' => '0',
                     'controla_pedimentos' => '0',
+                    'sku' => '',
+                    'sku_alterno' => '',
+                    'upc' => '',
+                    'ean' => '',
+                    'gtin' => '',
+                    'codigo_fabricante' => '',
+                    'modelo' => '',
                     'codigos_barras' => '',
                 ], $incompatible);
                 $this->expectValidation(
@@ -307,6 +360,13 @@ final class CrudProductos1FunctionalTest
                 'id_producto' => 'QASERVICE',
                 'descripcion' => 'Servicio QA',
                 'tipo_producto' => 'SERVICIO',
+                'sku' => '',
+                'sku_alterno' => '',
+                'upc' => '',
+                'ean' => '',
+                'gtin' => '',
+                'codigo_fabricante' => '',
+                'modelo' => '',
                 'peso_kg' => '',
                 'largo_cm' => '',
                 'ancho_cm' => '',
@@ -337,6 +397,13 @@ final class CrudProductos1FunctionalTest
                 'id_producto' => 'QAKIT',
                 'descripcion' => 'Kit QA',
                 'tipo_producto' => 'KIT',
+                'sku' => 'kit-qa/001',
+                'sku_alterno' => '',
+                'upc' => '',
+                'ean' => '',
+                'gtin' => '',
+                'codigo_fabricante' => 'kit-fab/001',
+                'modelo' => 'Kit Modelo QA',
                 'peso_kg' => '5.5000',
                 'largo_cm' => '20.000',
                 'ancho_cm' => '',
@@ -436,6 +503,13 @@ final class CrudProductos1FunctionalTest
                 'id_producto' => $createdId,
                 'descripcion' => 'Producto QA actualizado',
                 'descripcion_larga' => 'Detalle actualizado.',
+                'sku' => 'sku-qa/099',
+                'sku_alterno' => '',
+                'upc' => '321098765432',
+                'ean' => '12345678',
+                'gtin' => '123456789012',
+                'codigo_fabricante' => 'fab-qa/099',
+                'modelo' => 'Modelo actualizado',
                 'tipo_producto' => 'PRODUCTO',
                 'peso_kg' => '20.1250',
                 'largo_cm' => '110.500',
@@ -464,6 +538,14 @@ final class CrudProductos1FunctionalTest
                 || count($updated['barcodes'] ?? []) !== 1
                 || ($updated['barcodes'][0]['codigo_barras'] ?? '')
                     !== '750000000099'
+                || ($updated['sku'] ?? '') !== 'SKU-QA/099'
+                || !array_key_exists('sku_alterno', $updated)
+                || $updated['sku_alterno'] !== null
+                || ($updated['upc'] ?? '') !== '321098765432'
+                || ($updated['ean'] ?? '') !== '12345678'
+                || ($updated['gtin'] ?? '') !== '123456789012'
+                || ($updated['codigo_fabricante'] ?? '') !== 'FAB-QA/099'
+                || ($updated['modelo'] ?? '') !== 'Modelo actualizado'
             ) {
                 throw new \RuntimeException(
                     'Product update was not applied transactionally.'
@@ -488,6 +570,19 @@ final class CrudProductos1FunctionalTest
                 'id' => count($products->search(['search' => 'QAPROD001'])),
                 'description' => count($products->search([
                     'search' => 'actualizado',
+                ])),
+                'sku' => count($products->search(['search' => 'SKU-QA/099'])),
+                'upc' => count($products->search(['search' => '321098765432'])),
+                'ean' => count($products->search(['search' => '12345678'])),
+                'gtin' => count($products->search(['search' => '123456789012'])),
+                'manufacturer_code' => count($products->search([
+                    'search' => 'FAB-QA/099',
+                ])),
+                'model' => count($products->search([
+                    'search' => 'Modelo actualizado',
+                ])),
+                'additional_barcode' => count($products->search([
+                    'search' => '750000000099',
                 ])),
                 'active' => count($products->search(['status' => 'active'])),
                 'type_product' => count($products->search([

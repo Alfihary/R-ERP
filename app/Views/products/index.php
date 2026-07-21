@@ -22,7 +22,8 @@ $notice = is_string($notice ?? null) ? $notice : null;
         <h1>Productos</h1>
         <p>
             Consulta y administra la identidad comercial del producto.
-            Inventario, existencias y precios no forman parte de esta fase.
+            Inventario, existencias, series y folios consumen esta identidad;
+            precios y compras quedan fuera de esta fase.
         </p>
     </div>
     <?php if (($abilities['crear'] ?? false) === true): ?>
@@ -45,7 +46,7 @@ $notice = is_string($notice ?? null) ? $notice : null;
     </div>
     <form class="product-filters" method="get" action="/productos">
         <div class="product-field product-field--search">
-            <label for="product-search">ID o descripción</label>
+            <label for="product-search">ID, descripción o identificador</label>
             <input
                 id="product-search"
                 name="search"
@@ -136,6 +137,7 @@ $notice = is_string($notice ?? null) ? $notice : null;
                     <tr>
                         <th scope="col">ID producto</th>
                         <th scope="col">Descripción</th>
+                        <th scope="col">Identificador</th>
                         <th scope="col">Tipo</th>
                         <th scope="col">Unidad</th>
                         <th scope="col">Línea</th>
@@ -154,6 +156,17 @@ $notice = is_string($notice ?? null) ? $notice : null;
                         <tr>
                             <td><strong><?= e($productId) ?></strong></td>
                             <td><?= e($product['descripcion'] ?? '') ?></td>
+                            <td>
+                                <?php
+                                $identifier = trim(implode(' · ', array_filter([
+                                    (string) ($product['sku'] ?? ''),
+                                    (string) ($product['upc'] ?? ''),
+                                    (string) ($product['ean'] ?? ''),
+                                    (string) ($product['gtin'] ?? ''),
+                                ])));
+                                ?>
+                                <?= e($identifier !== '' ? $identifier : '—') ?>
+                            </td>
                             <td><?= e($product['tipo_nombre'] ?? '') ?></td>
                             <td><?= e($product['unidad_codigo'] ?? '') ?></td>
                             <td><?= e($product['linea_nombre'] ?? '—') ?></td>

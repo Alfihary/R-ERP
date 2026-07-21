@@ -98,6 +98,13 @@ $satUnit = trim(
             'ID producto' => $productId,
             'Descripción corta' => $product['descripcion'] ?? '',
             'Descripción larga' => $product['descripcion_larga'] ?? '—',
+            'SKU' => $product['sku'] ?? '—',
+            'SKU alterno' => $product['sku_alterno'] ?? '—',
+            'UPC' => $product['upc'] ?? '—',
+            'EAN' => $product['ean'] ?? '—',
+            'GTIN' => $product['gtin'] ?? '—',
+            'Código fabricante' => $product['codigo_fabricante'] ?? '—',
+            'Modelo' => $product['modelo'] ?? '—',
             'Tipo' => $product['tipo_nombre'] ?? '—',
             'Unidad' => trim(
                 (string) ($product['unidad_codigo'] ?? '')
@@ -162,12 +169,15 @@ $satUnit = trim(
     <section class="product-related-section" aria-labelledby="product-barcode-title">
         <div class="product-section-heading">
             <div>
-                <h2 id="product-barcode-title">Códigos de barras</h2>
-                <p>Identificadores registrados; sin lector ni etiquetas.</p>
+                <h2 id="product-barcode-title">Códigos adicionales</h2>
+                <p>
+                    Códigos secundarios o de empaque; no sustituyen SKU, UPC,
+                    EAN ni GTIN principales.
+                </p>
             </div>
         </div>
         <?php if ($barcodes === []): ?>
-            <p class="product-related-empty">Sin códigos de barras.</p>
+            <p class="product-related-empty">Sin códigos adicionales.</p>
         <?php else: ?>
             <ul class="product-plain-list">
                 <?php foreach ($barcodes as $barcode): ?>

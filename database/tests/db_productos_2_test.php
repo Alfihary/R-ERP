@@ -25,15 +25,32 @@ return new class implements DatabaseTest {
             'migration' => 'db_productos_2_001_extend_product_master',
         ]);
         $migrationRows = (int) $migration->fetchColumn();
+        $identifierMigration = $pdo->prepare(
+            'SELECT COUNT(*) FROM schema_migrations
+             WHERE migration = :migration'
+        );
+        $identifierMigration->execute([
+            'migration' =>
+                'productos_identificadores_imagen_1_001_add_product_identifiers',
+        ]);
+        $identifierMigrationRows = (int) $identifierMigration->fetchColumn();
         $table = $this->tableEvidence($pdo, $database);
         $columns = $this->productColumns($pdo, $database);
         $identity = $this->identityEvidence($pdo, $database);
         $constraints = $this->constraintNames($pdo, $database);
+        $indexes = $this->indexNames($pdo, $database);
         $foreignKeys = $this->foreignKeys($pdo, $database);
         $seed = $this->seedEvidence($pdo);
         $before = $this->persistentCounts($pdo);
 
         $requiredColumns = [
+            'sku',
+            'sku_alterno',
+            'upc',
+            'ean',
+            'gtin',
+            'codigo_fabricante',
+            'modelo',
             'tipo_producto_id',
             'peso_kg',
             'largo_cm',
@@ -46,20 +63,37 @@ return new class implements DatabaseTest {
         $requiredConstraints = [
             'chk_productos_alto_cm',
             'chk_productos_ancho_cm',
+            'chk_productos_codigo_fabricante',
             'chk_productos_controla_lotes',
             'chk_productos_controla_pedimentos',
             'chk_productos_controla_series',
+            'chk_productos_ean',
+            'chk_productos_gtin',
             'chk_productos_largo_cm',
+            'chk_productos_modelo',
             'chk_productos_peso_kg',
+            'chk_productos_sku',
+            'chk_productos_sku_alterno',
+            'chk_productos_upc',
             'chk_tipos_producto_activo',
             'chk_tipos_producto_codigo',
             'chk_tipos_producto_nombre',
             'fk_productos_tipo_producto',
             'uq_tipos_producto_codigo',
         ];
+        $requiredIndexes = [
+            'idx_productos_codigo_fabricante',
+            'idx_productos_ean',
+            'idx_productos_gtin',
+            'idx_productos_modelo',
+            'idx_productos_sku_alterno',
+            'idx_productos_upc',
+            'uq_productos_sku',
+        ];
 
         if (
             $migrationRows !== 1
+            || $identifierMigrationRows !== 1
             || $table !== [
                 'engine' => 'InnoDB',
                 'table_collation' => 'utf8mb4_unicode_ci',
@@ -73,6 +107,7 @@ return new class implements DatabaseTest {
             || $identity['alternative_identity_columns'] !== []
             || $identity['id_check'] !== 1
             || array_diff($requiredConstraints, $constraints) !== []
+            || array_diff($requiredIndexes, $indexes) !== []
             || ($foreignKeys['fk_productos_tipo_producto'] ?? null)
                 !== 'productos.tipo_producto_id->tipos_producto.id'
             || count(array_filter(
@@ -122,10 +157,12 @@ return new class implements DatabaseTest {
                 'SELECT VERSION()'
             )->fetchColumn(),
             'migration_rows' => $migrationRows,
+            'identifier_migration_rows' => $identifierMigrationRows,
             'table' => $table,
             'product_columns' => $columns,
             'identity' => $identity,
             'constraints' => $constraints,
+            'indexes' => $indexes,
             'foreign_keys' => $foreignKeys,
             'seed' => $seed,
             'functional' => $functional,
@@ -170,6 +207,13 @@ return new class implements DatabaseTest {
              WHERE table_schema = :database
                AND table_name = 'productos'
                AND column_name IN (
+                   'sku',
+                   'sku_alterno',
+                   'upc',
+                   'ean',
+                   'gtin',
+                   'codigo_fabricante',
+                   'modelo',
                    'tipo_producto_id',
                    'peso_kg',
                    'largo_cm',
@@ -278,6 +322,23 @@ return new class implements DatabaseTest {
     }
 
     /**
+     * @return list<string>
+     */
+    private function indexNames(PDO $pdo, string $database): array
+    {
+        $statement = $pdo->prepare(
+            "SELECT DISTINCT INDEX_NAME AS index_name
+             FROM information_schema.statistics
+             WHERE table_schema = :database
+               AND table_name = 'productos'
+             ORDER BY index_name"
+        );
+        $statement->execute(['database' => $database]);
+
+        return array_column($statement->fetchAll(), 'index_name');
+    }
+
+    /**
      * @return array<string, string>
      */
     private function foreignKeys(PDO $pdo, string $database): array
@@ -376,6 +437,13 @@ return new class implements DatabaseTest {
             $this->insertProduct($pdo, [
                 'id_producto' => 'QAP2PRODUCT',
                 'descripcion' => 'Producto físico QA',
+                'sku' => 'SKU-P2/001',
+                'sku_alterno' => 'ALT_P2.001',
+                'upc' => '123456789012',
+                'ean' => '1234567890123',
+                'gtin' => '12345678901234',
+                'codigo_fabricante' => 'FAB-P2/001',
+                'modelo' => 'Modelo QA',
                 'unidad_medida_id' => $unitId,
                 'tipo_producto_id' => (int) $types['PRODUCTO'],
                 'peso_kg' => '12.5000',
@@ -389,6 +457,13 @@ return new class implements DatabaseTest {
             $this->insertProduct($pdo, [
                 'id_producto' => 'QAP2SERVICE',
                 'descripcion' => 'Servicio QA',
+                'sku' => null,
+                'sku_alterno' => null,
+                'upc' => null,
+                'ean' => null,
+                'gtin' => null,
+                'codigo_fabricante' => null,
+                'modelo' => null,
                 'unidad_medida_id' => $unitId,
                 'tipo_producto_id' => (int) $types['SERVICIO'],
                 'peso_kg' => null,
@@ -402,6 +477,13 @@ return new class implements DatabaseTest {
             $this->insertProduct($pdo, [
                 'id_producto' => 'QAP2KIT',
                 'descripcion' => 'Kit QA',
+                'sku' => 'KIT-P2/001',
+                'sku_alterno' => null,
+                'upc' => null,
+                'ean' => null,
+                'gtin' => null,
+                'codigo_fabricante' => 'KIT-FAB/001',
+                'modelo' => 'Kit QA',
                 'unidad_medida_id' => $unitId,
                 'tipo_producto_id' => (int) $types['KIT'],
                 'peso_kg' => '5.2500',
@@ -428,12 +510,30 @@ return new class implements DatabaseTest {
                 'invalid_lots_flag' => ['controla_lotes' => 2],
                 'invalid_customs_flag' => ['controla_pedimentos' => 2],
                 'trailing_space_id' => ['id_producto' => 'QAP2SPACE '],
+                'duplicate_sku' => ['sku' => 'SKU-P2/001'],
+                'invalid_lowercase_sku' => ['sku' => 'sku-bad'],
+                'invalid_sku_space' => ['sku' => 'SKU BAD'],
+                'invalid_upc_letters' => ['upc' => '12345678901A'],
+                'invalid_upc_length' => ['upc' => '12345678901'],
+                'invalid_ean_length' => ['ean' => '123456789012'],
+                'invalid_gtin_length' => ['gtin' => '123456789'],
+                'invalid_manufacturer_code' => [
+                    'codigo_fabricante' => 'FAB BAD',
+                ],
+                'invalid_model_length' => ['modelo' => str_repeat('M', 81)],
             ];
 
             foreach ($invalidCases as $label => $override) {
                 $data = array_replace([
                     'id_producto' => 'QAP2' . strtoupper(substr(md5($label), 0, 8)),
                     'descripcion' => 'Inválido QA',
+                    'sku' => null,
+                    'sku_alterno' => null,
+                    'upc' => null,
+                    'ean' => null,
+                    'gtin' => null,
+                    'codigo_fabricante' => null,
+                    'modelo' => null,
                     'unidad_medida_id' => $unitId,
                     'tipo_producto_id' => (int) $types['PRODUCTO'],
                     'peso_kg' => '1.0000',
@@ -494,6 +594,13 @@ return new class implements DatabaseTest {
             INSERT INTO productos (
                 id_producto,
                 descripcion,
+                sku,
+                sku_alterno,
+                upc,
+                ean,
+                gtin,
+                codigo_fabricante,
+                modelo,
                 unidad_medida_id,
                 tipo_producto_id,
                 peso_kg,
@@ -507,6 +614,13 @@ return new class implements DatabaseTest {
             VALUES (
                 :id_producto,
                 :descripcion,
+                :sku,
+                :sku_alterno,
+                :upc,
+                :ean,
+                :gtin,
+                :codigo_fabricante,
+                :modelo,
                 :unidad_medida_id,
                 :tipo_producto_id,
                 :peso_kg,

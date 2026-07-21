@@ -32,10 +32,31 @@ final class ProductRepository
         if (($filters['search'] ?? '') !== '') {
             $conditions[] =
                 '(p.id_producto LIKE :search_id '
-                . 'OR p.descripcion LIKE :search_description)';
+                . 'OR p.descripcion LIKE :search_description '
+                . 'OR p.sku LIKE :search_sku '
+                . 'OR p.upc LIKE :search_upc '
+                . 'OR p.ean LIKE :search_ean '
+                . 'OR p.gtin LIKE :search_gtin '
+                . 'OR p.codigo_fabricante LIKE :search_manufacturer '
+                . 'OR p.modelo LIKE :search_model '
+                . 'OR EXISTS (
+                    SELECT 1
+                    FROM producto_codigos_barras pcb
+                    WHERE pcb.id_producto = p.id_producto
+                      AND pcb.activo = 1
+                      AND pcb.eliminado_en IS NULL
+                      AND pcb.codigo_barras LIKE :search_barcode
+                ))';
             $term = '%' . $filters['search'] . '%';
             $parameters['search_id'] = $term;
             $parameters['search_description'] = $term;
+            $parameters['search_sku'] = $term;
+            $parameters['search_upc'] = $term;
+            $parameters['search_ean'] = $term;
+            $parameters['search_gtin'] = $term;
+            $parameters['search_manufacturer'] = $term;
+            $parameters['search_model'] = $term;
+            $parameters['search_barcode'] = $term;
         }
 
         if (($filters['status'] ?? '') === 'active') {
@@ -65,6 +86,10 @@ final class ProductRepository
             SELECT
                 p.id_producto,
                 p.descripcion,
+                p.sku,
+                p.upc,
+                p.ean,
+                p.gtin,
                 p.activo,
                 tp.codigo AS tipo_codigo,
                 tp.nombre AS tipo_nombre,
@@ -100,6 +125,13 @@ final class ProductRepository
                 p.id_producto,
                 p.descripcion,
                 p.descripcion_larga,
+                p.sku,
+                p.sku_alterno,
+                p.upc,
+                p.ean,
+                p.gtin,
+                p.codigo_fabricante,
+                p.modelo,
                 p.tipo_producto_id,
                 tp.codigo AS tipo_codigo,
                 tp.nombre AS tipo_nombre,
@@ -294,6 +326,23 @@ final class ProductRepository
         return (int) $statement->fetchColumn() > 0;
     }
 
+    public function skuOwnedByOther(string $sku, string $productId): bool
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM productos
+             WHERE sku = :sku
+               AND id_producto <> :id_producto
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'sku' => $sku,
+            'id_producto' => $productId,
+        ]);
+
+        return (int) $statement->fetchColumn() > 0;
+    }
+
     /**
      * @param array<string, int|string|null> $data
      */
@@ -305,6 +354,13 @@ final class ProductRepository
                 id_producto,
                 descripcion,
                 descripcion_larga,
+                sku,
+                sku_alterno,
+                upc,
+                ean,
+                gtin,
+                codigo_fabricante,
+                modelo,
                 tipo_producto_id,
                 unidad_medida_id,
                 moneda_id,
@@ -328,6 +384,13 @@ final class ProductRepository
                 :id_producto,
                 :descripcion,
                 :descripcion_larga,
+                :sku,
+                :sku_alterno,
+                :upc,
+                :ean,
+                :gtin,
+                :codigo_fabricante,
+                :modelo,
                 :tipo_producto_id,
                 :unidad_medida_id,
                 :moneda_id,
@@ -368,6 +431,13 @@ final class ProductRepository
             UPDATE productos
             SET descripcion = :descripcion,
                 descripcion_larga = :descripcion_larga,
+                sku = :sku,
+                sku_alterno = :sku_alterno,
+                upc = :upc,
+                ean = :ean,
+                gtin = :gtin,
+                codigo_fabricante = :codigo_fabricante,
+                modelo = :modelo,
                 tipo_producto_id = :tipo_producto_id,
                 unidad_medida_id = :unidad_medida_id,
                 moneda_id = :moneda_id,
