@@ -20,9 +20,9 @@ return new class implements DatabaseTest {
     private const PRODUCT_PREFIX = 'QASSTK';
     private const SERIES_PREFIX = 'QASSTK-SER-';
     private const REFERENCE_PREFIX = 'QA-SER-STOCK-';
-    private const WAREHOUSE_CODE = 'qasstk-other';
-    private const OTHER_COMPANY_CODE = 'qasstk-empresa';
-    private const OTHER_WAREHOUSE_CODE = 'qasstk-almacen';
+    private const WAREHOUSE_CODE = 'QASSTK-OTHER';
+    private const OTHER_COMPANY_CODE = 'QASSTK-EMPRESA';
+    private const OTHER_WAREHOUSE_CODE = 'QASSTK-ALMACEN';
 
     private PDO $pdo;
     /** @var array<string, int> */

@@ -180,12 +180,12 @@ final class CompanyService
         ];
         $errors = [];
 
-        if (preg_match('/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/', $data['codigo']) !== 1
+        if (preg_match('/^[A-Z0-9]+(?:[._-][A-Z0-9]+)*$/', $data['codigo']) !== 1
             || strlen($data['codigo']) < 2
             || strlen($data['codigo']) > 64
         ) {
             $errors['codigo'] =
-                'El código de empresa debe tener de 2 a 64 caracteres: letras minúsculas, números y separadores . _ -, sin espacios.';
+                'El código de empresa debe tener de 2 a 64 caracteres: letras mayúsculas, números y separadores . _ -, sin espacios.';
         }
 
         if ($data['nombre'] === '' || strlen($data['nombre']) > 150) {
@@ -283,7 +283,7 @@ final class CompanyService
      */
     private function code(array $input, string $key): string
     {
-        $value = strtolower($this->text($input, $key));
+        $value = strtoupper($this->text($input, $key));
 
         return (string) preg_replace('/\s+/', '-', $value);
     }

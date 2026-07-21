@@ -79,6 +79,8 @@ try {
             . '/database/migrations/config_operacion_1_001_extend_companies_warehouses.php',
         require BASE_PATH
             . '/database/migrations/config_operacion_codigos_min_2_001_update_company_warehouse_code_checks.php',
+        require BASE_PATH
+            . '/database/migrations/config_operacion_codigos_upper_1_001_uppercase_company_warehouse_codes.php',
     ];
     $seed = require BASE_PATH
         . '/database/seeds/config_operacion_empresas_almacenes_1_seed_permissions.php';

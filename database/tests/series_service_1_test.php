@@ -13,7 +13,7 @@ return new class implements DatabaseTest {
     private const PRODUCT_PREFIX = 'QASSV';
     private const SERIES_PREFIX = 'QASSV-SER-';
     private const REFERENCE_PREFIX = 'QA-SER-SVC-';
-    private const WAREHOUSE_CODE = 'qasvc-dest';
+    private const WAREHOUSE_CODE = 'QASVC-DEST';
 
     private PDO $pdo;
     /** @var array<string, int> */

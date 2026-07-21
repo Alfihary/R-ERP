@@ -179,7 +179,7 @@ return new class($initialAdminUsername, $initialAdminEmail) implements DatabaseT
             $this->expectConstraintFailure(
                 fn () => $this->insertCompany(
                     $pdo,
-                    'grupo-refrigerantes',
+                    'GRUPO-REFRIGERANTES',
                     'Duplicate Company',
                     $adminId
                 ),
@@ -273,7 +273,7 @@ return new class($initialAdminUsername, $initialAdminEmail) implements DatabaseT
                          VALUES (:codigo, :nombre, :activo, :creado_por)'
                     );
                     $statement->execute([
-                        'codigo' => 'db-scope-invalid-active',
+                        'codigo' => 'DB-SCOPE-INVALID-ACTIVE',
                         'nombre' => 'Invalid Active Company',
                         'activo' => 2,
                         'creado_por' => $adminId,
@@ -483,7 +483,7 @@ return new class($initialAdminUsername, $initialAdminEmail) implements DatabaseT
                AND activo = 1
                AND eliminado_en IS NULL'
         );
-        $company->execute(['codigo' => 'grupo-refrigerantes']);
+        $company->execute(['codigo' => 'GRUPO-REFRIGERANTES']);
         $companyId = $company->fetchColumn();
 
         if ($companyId === false) {
@@ -500,7 +500,7 @@ return new class($initialAdminUsername, $initialAdminEmail) implements DatabaseT
         );
         $warehouse->execute([
             'empresa_id' => $companyId,
-            'codigo' => 'principal',
+            'codigo' => 'PRINCIPAL',
         ]);
         $warehouseId = $warehouse->fetchColumn();
 

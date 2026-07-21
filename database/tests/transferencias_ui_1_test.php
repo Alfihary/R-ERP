@@ -190,7 +190,7 @@ return new class implements DatabaseTest {
         );
         $statement->execute([
             'empresa_id' => $ids['empresa_id'],
-            'codigo' => 'qatui-destino',
+            'codigo' => 'QATUI-DESTINO',
             'nombre' => 'QA Transfer UI Destino',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -208,7 +208,7 @@ return new class implements DatabaseTest {
              VALUES (:codigo, :nombre, 1, :creado_por)'
         );
         $company->execute([
-            'codigo' => 'qatui-other',
+            'codigo' => 'QATUI-OTHER',
             'nombre' => 'QA Transfer UI Otra Empresa',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -219,7 +219,7 @@ return new class implements DatabaseTest {
         );
         $warehouse->execute([
             'empresa_id' => $companyId,
-            'codigo' => 'qatui-ajeno',
+            'codigo' => 'QATUI-AJENO',
             'nombre' => 'QA Transfer UI Ajeno',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -532,8 +532,8 @@ return new class implements DatabaseTest {
             'productos_qa' => $this->countWhere($pdo, 'productos', "id_producto LIKE 'QATUI%'"),
             'existencias_qa' => $this->countWhere($pdo, 'existencias_producto', "id_producto LIKE 'QATUI%'"),
             'movimientos_qa' => $this->countWhere($pdo, 'movimientos_inventario', "referencia LIKE 'TRF-UIQA%'"),
-            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'qatui%'"),
-            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'qatui%'"),
+            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'QATUI%'"),
+            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'QATUI%'"),
         ];
     }
 
@@ -556,7 +556,7 @@ return new class implements DatabaseTest {
         $pdo->exec("DELETE FROM movimientos_inventario WHERE referencia LIKE 'TRF-UIQA%'");
         $pdo->exec("DELETE FROM existencias_producto WHERE id_producto LIKE 'QATUI%'");
         $pdo->exec("DELETE FROM productos WHERE id_producto LIKE 'QATUI%'");
-        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'qatui%'");
-        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'qatui%'");
+        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'QATUI%'");
+        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'QATUI%'");
     }
 };

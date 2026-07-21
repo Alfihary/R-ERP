@@ -12,8 +12,8 @@ if (!isset($initialAdminUsername, $initialAdminEmail)
 }
 
 return new class($initialAdminUsername, $initialAdminEmail) implements Seed {
-    private const COMPANY_CODE = 'grupo-refrigerantes';
-    private const WAREHOUSE_CODE = 'principal';
+    private const COMPANY_CODE = 'GRUPO-REFRIGERANTES';
+    private const WAREHOUSE_CODE = 'PRINCIPAL';
 
     public function __construct(
         private readonly string $adminUsername,

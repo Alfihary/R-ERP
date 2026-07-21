@@ -6,11 +6,11 @@ use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 
 return new class implements DatabaseTest {
-    private const COMPANY_A = 'qa-folios-empresa';
-    private const COMPANY_B = 'qa-folios-empresa-b';
-    private const WAREHOUSE_BO = 'qa-folios-bo';
-    private const WAREHOUSE_MTY = 'qa-folios-mty';
-    private const WAREHOUSE_BO_B = 'qa-folios-bo-b';
+    private const COMPANY_A = 'QA-FOLIOS-EMPRESA';
+    private const COMPANY_B = 'QA-FOLIOS-EMPRESA-B';
+    private const WAREHOUSE_BO = 'QA-FOLIOS-BO';
+    private const WAREHOUSE_MTY = 'QA-FOLIOS-MTY';
+    private const WAREHOUSE_BO_B = 'QA-FOLIOS-BO-B';
     private const FORMAT = '{PREFIJO}-{ALMACEN}{NUMERO}';
 
     private PDO $pdo;
@@ -1142,10 +1142,10 @@ return new class implements DatabaseTest {
                 )->fetchColumn()
                 : 0,
             'empresas_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'qa-folios-%'"
+                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'QA-FOLIOS-%'"
             )->fetchColumn(),
             'almacenes_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'qa-folios-%'"
+                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'QA-FOLIOS-%'"
             )->fetchColumn(),
             'usuarios_qa' => 0,
         ];
@@ -1179,10 +1179,10 @@ return new class implements DatabaseTest {
         }
 
         $this->pdo->exec(
-            "DELETE FROM almacenes WHERE codigo LIKE 'qa-folios-%'"
+            "DELETE FROM almacenes WHERE codigo LIKE 'QA-FOLIOS-%'"
         );
         $this->pdo->exec(
-            "DELETE FROM empresas WHERE codigo LIKE 'qa-folios-%'"
+            "DELETE FROM empresas WHERE codigo LIKE 'QA-FOLIOS-%'"
         );
     }
 };

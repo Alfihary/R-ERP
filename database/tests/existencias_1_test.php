@@ -317,7 +317,7 @@ return new class implements DatabaseTest {
              VALUES (:codigo, :nombre, 1, :creado_por)'
         );
         $company->execute([
-            'codigo' => 'qastockotra',
+            'codigo' => 'QASTOCKOTRA',
             'nombre' => 'QA Stock Otra Empresa',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -328,7 +328,7 @@ return new class implements DatabaseTest {
         );
         $warehouse->execute([
             'empresa_id' => $companyId,
-            'codigo' => 'qastockotro',
+            'codigo' => 'QASTOCKOTRO',
             'nombre' => 'QA Stock Otro Almacén',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -462,8 +462,8 @@ return new class implements DatabaseTest {
             )->fetchColumn(),
             'existencias_qa' => $this->countWhere($pdo, 'existencias_producto', "id_producto LIKE 'QASTOCK%'"),
             'usuarios_qa' => $this->countWhere($pdo, 'usuarios', "username LIKE 'qastock%'"),
-            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'qastock%'"),
-            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'qastock%'"),
+            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'QASTOCK%'"),
+            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'QASTOCK%'"),
         ];
     }
 
@@ -483,8 +483,8 @@ return new class implements DatabaseTest {
         $pdo->exec("DELETE FROM movimientos_inventario WHERE referencia LIKE 'QASTOCK%'");
         $pdo->exec("DELETE FROM existencias_producto WHERE id_producto LIKE 'QASTOCK%'");
         $pdo->exec("DELETE FROM productos WHERE id_producto LIKE 'QASTOCK%'");
-        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'qastock%'");
-        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'qastock%'");
+        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'QASTOCK%'");
+        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'QASTOCK%'");
     }
 
     private function hasColumn(PDO $pdo, string $table, string $column): bool

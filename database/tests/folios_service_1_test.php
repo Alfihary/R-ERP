@@ -9,11 +9,11 @@ use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Repositories\FolioRepository;
 
 return new class implements DatabaseTest {
-    private const COMPANY_A = 'qa-folios-service-a';
-    private const COMPANY_B = 'qa-folios-service-b';
-    private const WAREHOUSE_BO = 'qa-folios-service-bo';
-    private const WAREHOUSE_MTY = 'qa-folios-service-mty';
-    private const WAREHOUSE_BO_B = 'qa-folios-service-bo-b';
+    private const COMPANY_A = 'QA-FOLIOS-SERVICE-A';
+    private const COMPANY_B = 'QA-FOLIOS-SERVICE-B';
+    private const WAREHOUSE_BO = 'QA-FOLIOS-SERVICE-BO';
+    private const WAREHOUSE_MTY = 'QA-FOLIOS-SERVICE-MTY';
+    private const WAREHOUSE_BO_B = 'QA-FOLIOS-SERVICE-BO-B';
     private const FORMAT = '{PREFIJO}-{ALMACEN}{NUMERO}';
 
     private PDO $pdo;
@@ -614,7 +614,7 @@ return new class implements DatabaseTest {
         );
         $statement->execute([
             'id' => $warehouseId,
-            'codigo' => 'qa-folios-service-bo-edit',
+            'codigo' => 'QA-FOLIOS-SERVICE-BO-EDIT',
         ]);
 
         return true;
@@ -776,7 +776,7 @@ return new class implements DatabaseTest {
                     "SELECT COUNT(*)
                      FROM series_documentales sd
                      INNER JOIN empresas e ON e.id = sd.empresa_id
-                     WHERE e.codigo LIKE 'qa-folios-service-%'"
+                     WHERE e.codigo LIKE 'QA-FOLIOS-SERVICE-%'"
                 )->fetchColumn()
                 : 0,
             'documentos_folios_qa' => $this->tableExists('documentos_folios')
@@ -784,14 +784,14 @@ return new class implements DatabaseTest {
                     "SELECT COUNT(*)
                      FROM documentos_folios df
                      INNER JOIN empresas e ON e.id = df.empresa_id
-                     WHERE e.codigo LIKE 'qa-folios-service-%'"
+                     WHERE e.codigo LIKE 'QA-FOLIOS-SERVICE-%'"
                 )->fetchColumn()
                 : 0,
             'empresas_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'qa-folios-service-%'"
+                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'QA-FOLIOS-SERVICE-%'"
             )->fetchColumn(),
             'almacenes_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'qa-folios-service-%'"
+                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'QA-FOLIOS-SERVICE-%'"
             )->fetchColumn(),
             'usuarios_qa' => 0,
         ];
@@ -804,7 +804,7 @@ return new class implements DatabaseTest {
                 "DELETE df
                  FROM documentos_folios df
                  INNER JOIN empresas e ON e.id = df.empresa_id
-                 WHERE e.codigo LIKE 'qa-folios-service-%'"
+                 WHERE e.codigo LIKE 'QA-FOLIOS-SERVICE-%'"
             );
         }
 
@@ -813,15 +813,15 @@ return new class implements DatabaseTest {
                 "DELETE sd
                  FROM series_documentales sd
                  INNER JOIN empresas e ON e.id = sd.empresa_id
-                 WHERE e.codigo LIKE 'qa-folios-service-%'"
+                 WHERE e.codigo LIKE 'QA-FOLIOS-SERVICE-%'"
             );
         }
 
         $this->pdo->exec(
-            "DELETE FROM almacenes WHERE codigo LIKE 'qa-folios-service-%'"
+            "DELETE FROM almacenes WHERE codigo LIKE 'QA-FOLIOS-SERVICE-%'"
         );
         $this->pdo->exec(
-            "DELETE FROM empresas WHERE codigo LIKE 'qa-folios-service-%'"
+            "DELETE FROM empresas WHERE codigo LIKE 'QA-FOLIOS-SERVICE-%'"
         );
     }
 };

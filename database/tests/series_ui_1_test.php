@@ -17,7 +17,7 @@ return new class implements DatabaseTest {
     private const SERIES_PREFIX = 'QASUI-SER-';
     private const REFERENCE_PREFIX = 'QA-SER-UI-';
     private const TRANSFER_REFERENCE_PREFIX = 'TRF-QA-SER-UI-';
-    private const WAREHOUSE_CODE = 'qasui-dest';
+    private const WAREHOUSE_CODE = 'QASUI-DEST';
 
     private PDO $pdo;
     /** @var array{empresa_id: int, almacen_id: int} */

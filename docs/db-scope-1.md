@@ -64,8 +64,8 @@ sin que el usuario tenga previamente acceso a su empresa.
 
 El seed `db_scope_1_seed_initial_scope` crea de forma idempotente:
 
-- Empresa `grupo-refrigerantes` — Grupo Refrigerantes.
-- Almacén `principal` — Almacén Principal.
+- Empresa `GRUPO-REFRIGERANTES` — Grupo Refrigerantes.
+- Almacén `PRINCIPAL` — Almacén Principal.
 - Una asignación empresa al administrador inicial configurado.
 - Una asignación almacén al mismo administrador.
 

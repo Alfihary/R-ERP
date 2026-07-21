@@ -43,7 +43,7 @@ return new class implements DatabaseTest {
         $ids['destino_id'] = $this->createWarehouse(
             $pdo,
             $ids['empresa_id'],
-            'qatrf-destino',
+            'QATRF-DESTINO',
             'QA Transfer Destino',
             $ids['admin_id']
         );
@@ -630,14 +630,14 @@ return new class implements DatabaseTest {
     {
         $statement = $pdo->prepare(
             "INSERT INTO empresas (codigo, nombre, activo, creado_por)
-             VALUES ('qatrf-other', 'QA Transfer Otra Empresa', 1, :creado_por)"
+             VALUES ('QATRF-OTHER', 'QA Transfer Otra Empresa', 1, :creado_por)"
         );
         $statement->execute(['creado_por' => $ids['admin_id']]);
         $companyId = (int) $pdo->lastInsertId();
         $warehouseId = $this->createWarehouse(
             $pdo,
             $companyId,
-            'qatrf-other-wh',
+            'QATRF-OTHER-WH',
             'QA Transfer Otro Almacén',
             $ids['admin_id']
         );
@@ -872,22 +872,22 @@ return new class implements DatabaseTest {
         $pdo->exec(
             "DELETE FROM usuario_almacenes
              WHERE almacen_id IN (
-                SELECT id FROM almacenes WHERE codigo LIKE 'qatrf-%'
+                SELECT id FROM almacenes WHERE codigo LIKE 'QATRF-%'
              )"
         );
         $pdo->exec(
             "DELETE FROM almacenes
-             WHERE codigo LIKE 'qatrf-%'"
+             WHERE codigo LIKE 'QATRF-%'"
         );
         $pdo->exec(
             "DELETE FROM usuario_empresas
              WHERE empresa_id IN (
-                SELECT id FROM empresas WHERE codigo LIKE 'qatrf-%'
+                SELECT id FROM empresas WHERE codigo LIKE 'QATRF-%'
              )"
         );
         $pdo->exec(
             "DELETE FROM empresas
-             WHERE codigo LIKE 'qatrf-%'"
+             WHERE codigo LIKE 'QATRF-%'"
         );
     }
 };

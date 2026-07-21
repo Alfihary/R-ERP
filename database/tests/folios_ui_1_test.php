@@ -7,10 +7,10 @@ use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Repositories\FolioSeriesRepository;
 
 return new class implements DatabaseTest {
-    private const COMPANY_A = 'qa-folios-ui-a';
-    private const COMPANY_B = 'qa-folios-ui-b';
-    private const WAREHOUSE_A = 'qa-folios-ui-bo';
-    private const WAREHOUSE_B = 'qa-folios-ui-mty';
+    private const COMPANY_A = 'QA-FOLIOS-UI-A';
+    private const COMPANY_B = 'QA-FOLIOS-UI-B';
+    private const WAREHOUSE_A = 'QA-FOLIOS-UI-BO';
+    private const WAREHOUSE_B = 'QA-FOLIOS-UI-MTY';
     private const FORMAT = '{PREFIJO}-{ALMACEN}{NUMERO}';
 
     private PDO $pdo;
@@ -513,19 +513,19 @@ return new class implements DatabaseTest {
                 "SELECT COUNT(*)
                  FROM series_documentales sd
                  INNER JOIN empresas e ON e.id = sd.empresa_id
-                 WHERE e.codigo LIKE 'qa-folios-ui-%'"
+                 WHERE e.codigo LIKE 'QA-FOLIOS-UI-%'"
             )->fetchColumn(),
             'documentos_folios_qa' => (int) $this->pdo->query(
                 "SELECT COUNT(*)
                  FROM documentos_folios df
                  INNER JOIN empresas e ON e.id = df.empresa_id
-                 WHERE e.codigo LIKE 'qa-folios-ui-%'"
+                 WHERE e.codigo LIKE 'QA-FOLIOS-UI-%'"
             )->fetchColumn(),
             'empresas_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'qa-folios-ui-%'"
+                "SELECT COUNT(*) FROM empresas WHERE codigo LIKE 'QA-FOLIOS-UI-%'"
             )->fetchColumn(),
             'almacenes_qa' => (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'qa-folios-ui-%'"
+                "SELECT COUNT(*) FROM almacenes WHERE codigo LIKE 'QA-FOLIOS-UI-%'"
             )->fetchColumn(),
             'usuarios_qa' => 0,
             'permisos_qa' => 0,
@@ -538,21 +538,21 @@ return new class implements DatabaseTest {
             "DELETE df
              FROM documentos_folios df
              INNER JOIN empresas e ON e.id = df.empresa_id
-             WHERE e.codigo LIKE 'qa-folios-ui-%'"
+             WHERE e.codigo LIKE 'QA-FOLIOS-UI-%'"
         );
         $this->pdo->exec(
             "DELETE sd
              FROM series_documentales sd
              INNER JOIN empresas e ON e.id = sd.empresa_id
-             WHERE e.codigo LIKE 'qa-folios-ui-%'"
+             WHERE e.codigo LIKE 'QA-FOLIOS-UI-%'"
         );
         $this->pdo->exec(
             "DELETE FROM almacenes
-             WHERE codigo LIKE 'qa-folios-ui-%'"
+             WHERE codigo LIKE 'QA-FOLIOS-UI-%'"
         );
         $this->pdo->exec(
             "DELETE FROM empresas
-             WHERE codigo LIKE 'qa-folios-ui-%'"
+             WHERE codigo LIKE 'QA-FOLIOS-UI-%'"
         );
     }
 };

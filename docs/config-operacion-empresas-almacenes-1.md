@@ -44,16 +44,17 @@ La desactivación es lógica con `activo=0`. No hay hard delete.
 
 ### Regla de código de empresa
 
-CONFIG-OPERACION-CODIGOS-MIN-2 actualiza únicamente la restricción de código
-para permitir identificadores operativos cortos. La migración nueva
-`config_operacion_codigos_min_2_001_update_company_warehouse_code_checks`
-reemplaza `chk_empresas_codigo` sin modificar columnas ni datos.
+CONFIG-OPERACION-CODIGOS-UPPER-1 convierte formalmente los códigos operativos a
+mayúsculas. La migración nueva
+`config_operacion_codigos_upper_1_001_uppercase_company_warehouse_codes`
+reemplaza `chk_empresas_codigo` y convierte datos existentes con
+`UPDATE empresas SET codigo = UPPER(codigo)`.
 
 El `CHECK` real de base de datos permite:
 
 - longitud de 2 a 64 caracteres;
-- minúsculas;
-- letras `a-z`;
+- mayúsculas;
+- letras `A-Z`;
 - números `0-9`;
 - separadores `.`, `_` y `-` entre segmentos;
 - sin espacios;
@@ -62,25 +63,27 @@ El `CHECK` real de base de datos permite:
 Antes de guardar, el servicio aplica:
 
 - `trim`;
-- conversión a minúsculas;
+- conversión a mayúsculas;
 - conversión de espacios a guion medio.
 
 Ejemplos válidos:
 
-- `grupo-refrigerantes`
-- `gr`
-- `empresa-qa`
-- `sucursal-1`
-- `empresa.qa`
-- `empresa_qa`
+- `GRUPO-REFRIGERANTES`
+- `GR`
+- `MT`
+- `EMPRESA-QA`
+- `SUCURSAL-1`
+- `EMPRESA.QA`
+- `EMPRESA_QA`
 
 Ejemplos inválidos:
 
-- `g`
-- `empresa qa @`
+- `G`
+- `empresa qa @` en SQL directo;
+- `gr` en SQL directo;
 - `ñandu`
-- `empresa@`
-- `empresa--qa`
+- `EMPRESA@`
+- `EMPRESA--QA`
 
 `telefono` y `email` permanecen en `empresas`. Ambos siguen siendo opcionales;
 `email` se valida si se captura.
@@ -121,16 +124,17 @@ debe cambiarse libremente cuando existan movimientos o folios asociados.
 
 ### Regla de código de almacén
 
-CONFIG-OPERACION-CODIGOS-MIN-2 actualiza únicamente la restricción de código
-para permitir identificadores operativos cortos. La migración nueva
-`config_operacion_codigos_min_2_001_update_company_warehouse_code_checks`
-reemplaza `chk_almacenes_codigo` sin modificar columnas ni datos.
+CONFIG-OPERACION-CODIGOS-UPPER-1 convierte formalmente los códigos operativos a
+mayúsculas. La migración nueva
+`config_operacion_codigos_upper_1_001_uppercase_company_warehouse_codes`
+reemplaza `chk_almacenes_codigo` y convierte datos existentes con
+`UPDATE almacenes SET codigo = UPPER(codigo)`.
 
 El `CHECK` real de base de datos permite:
 
 - longitud de 2 a 64 caracteres;
-- minúsculas;
-- letras `a-z`;
+- mayúsculas;
+- letras `A-Z`;
 - números `0-9`;
 - separadores `.`, `_` y `-` entre segmentos;
 - sin espacios;
@@ -139,43 +143,49 @@ El `CHECK` real de base de datos permite:
 Antes de guardar, el servicio aplica:
 
 - `trim`;
-- conversión a minúsculas;
+- conversión a mayúsculas;
 - conversión de espacios a guion medio.
 
 Ejemplos válidos:
 
-- `bodega`
-- `bo`
-- `mt`
-- `bodega-1`
-- `almacen_qa`
-- `almacen.principal`
+- `BODEGA`
+- `BO`
+- `MT`
+- `SL`
+- `BODEGA-1`
+- `BODEGA-PRINCIPAL`
+- `ALMACEN_QA`
+- `ALMACEN.PRINCIPAL`
 
 Ejemplos inválidos:
 
-- `b`
-- `BODEGA` en SQL directo, aunque el servicio normaliza capturas de usuario a
-  minúsculas;
+- `B`
+- `bodega` en SQL directo, aunque el servicio normaliza capturas de usuario a
+  mayúsculas;
 - `bodega principal` en SQL directo, aunque el servicio normaliza espacios a
   guion;
-- `bodega@`
+- `BO@`
 - `ñandu`
-- `bodega--principal`
+- `BODEGA--PRINCIPAL`
 
 `telefono` y `email` permanecen en `almacenes`. Ambos siguen siendo opcionales;
 `email` se valida si se captura.
 
 Para folios por almacén, el código técnico de `almacenes.codigo` se mantiene en
-minúscula segura porque así lo exige el `CHECK` existente. La serie documental
-puede guardar un `codigo_almacen_snapshot` en mayúsculas cuando se configure
-desde la UI de folios, sin cambiar la tabla `almacenes`.
+mayúscula, alineado con snapshots documentales como `BO`, `MT` o `SL`.
 
-El rollback de la migración restaura el mínimo anterior de 3 caracteres. Si ya
-existen datos reales con códigos de 2 caracteres, el rollback no debe ejecutarse
-sin un plan de datos porque MySQL rechazará reinstalar el `CHECK` de mínimo 3.
+El rollback de CONFIG-OPERACION-CODIGOS-UPPER-1 restaura minúsculas y conserva
+el mínimo de 2 caracteres aprobado en CONFIG-OPERACION-CODIGOS-MIN-2.
 
-Esta fase no toca folios ni inventario; solo cambia las restricciones de código
-y la validación previa en servicios/formularios.
+Esta fase no toca folios ni inventario; solo cambia restricciones y datos de
+código, además de la validación previa en servicios/formularios.
+
+Los artefactos de prueba y fixtures QA que insertan directamente registros en
+`empresas.codigo` o `almacenes.codigo` fueron adaptados al contrato global en
+mayúsculas. Esto incluye patrones de limpieza por `codigo` y snapshots de
+almacén usados por regresiones de folios. No se modificó lógica funcional de
+folios, inventario, productos, series ni transferencias; únicamente datos de
+prueba, asserts y documentación relacionados con códigos operativos.
 
 ## Permisos
 

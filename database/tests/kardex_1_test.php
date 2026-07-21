@@ -336,7 +336,7 @@ return new class implements DatabaseTest {
              VALUES (:codigo, :nombre, 1, :creado_por)'
         );
         $company->execute([
-            'codigo' => 'qakardexotra',
+            'codigo' => 'QAKARDEXOTRA',
             'nombre' => 'QA Kardex Otra Empresa',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -347,7 +347,7 @@ return new class implements DatabaseTest {
         );
         $warehouse->execute([
             'empresa_id' => $companyId,
-            'codigo' => 'qakardexotro',
+            'codigo' => 'QAKARDEXOTRO',
             'nombre' => 'QA Kardex Otro Almacén',
             'creado_por' => $ids['admin_id'],
         ]);
@@ -460,8 +460,8 @@ return new class implements DatabaseTest {
             )->fetchColumn(),
             'existencias_qa' => $this->countWhere($pdo, 'existencias_producto', "id_producto LIKE 'QAKARD%'"),
             'usuarios_qa' => $this->countWhere($pdo, 'usuarios', "username LIKE 'qakardex%'"),
-            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'qakardex%'"),
-            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'qakardex%'"),
+            'empresas_qa' => $this->countWhere($pdo, 'empresas', "codigo LIKE 'QAKARDEX%'"),
+            'almacenes_qa' => $this->countWhere($pdo, 'almacenes', "codigo LIKE 'QAKARDEX%'"),
         ];
     }
 
@@ -498,8 +498,8 @@ return new class implements DatabaseTest {
         $pdo->exec("DELETE FROM movimientos_inventario WHERE referencia LIKE 'QAKARDEX%'");
         $pdo->exec("DELETE FROM existencias_producto WHERE id_producto LIKE 'QAKARD%'");
         $pdo->exec("DELETE FROM productos WHERE id_producto LIKE 'QAKARD%'");
-        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'qakardex%'");
-        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'qakardex%'");
+        $pdo->exec("DELETE FROM almacenes WHERE codigo LIKE 'QAKARDEX%'");
+        $pdo->exec("DELETE FROM empresas WHERE codigo LIKE 'QAKARDEX%'");
     }
 
     /**

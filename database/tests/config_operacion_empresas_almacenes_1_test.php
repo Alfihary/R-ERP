@@ -15,14 +15,14 @@ use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\WarehouseRepository;
 
 return new class implements DatabaseTest {
-    private const COMPANY_CODE = 'qa-config-empresa';
-    private const COMPANY_CODE_MIN = 'gr';
-    private const COMPANY_CODE_NORMALIZED = 'gr-empresa';
-    private const COMPANY_CODE_SECOND = 'qa-config-segunda';
-    private const WAREHOUSE_CODE = 'bo';
-    private const WAREHOUSE_CODE_NORMALIZED = 'bodega-principal';
-    private const WAREHOUSE_CODE_SECOND = 'qa-config-alm-2';
-    private const WAREHOUSE_CODE_SHARED = 'qa-config-shared';
+    private const COMPANY_CODE = 'QA-CONFIG-EMPRESA';
+    private const COMPANY_CODE_MIN = 'GR';
+    private const COMPANY_CODE_NORMALIZED = 'GRUPO-REFRIGERANTES-QA';
+    private const COMPANY_CODE_SECOND = 'QA-CONFIG-SEGUNDA';
+    private const WAREHOUSE_CODE = 'BO';
+    private const WAREHOUSE_CODE_NORMALIZED = 'BODEGA-PRINCIPAL';
+    private const WAREHOUSE_CODE_SECOND = 'QA-CONFIG-ALM-2';
+    private const WAREHOUSE_CODE_SHARED = 'QA-CONFIG-SHARED';
 
     private PDO $pdo;
     private int $adminId;
@@ -159,51 +159,65 @@ return new class implements DatabaseTest {
     private function codeCheckMigrationCases(): array
     {
         $migration = require BASE_PATH
-            . '/database/migrations/config_operacion_codigos_min_2_001_update_company_warehouse_code_checks.php';
+            . '/database/migrations/config_operacion_codigos_upper_1_001_uppercase_company_warehouse_codes.php';
 
         if (!$migration instanceof Migration) {
-            throw new RuntimeException('CONFIG-OPERACION-CODIGOS-MIN-2 migration is invalid.');
+            throw new RuntimeException('CONFIG-OPERACION-CODIGOS-UPPER-1 migration is invalid.');
         }
 
         $runner = new MigrationRunner($this->pdo);
-        $minTwoBeforeRollback = $this->checkUsesMinimum('chk_empresas_codigo', 2)
+        $uppercaseBeforeRollback = $this->checkUsesMinimum('chk_empresas_codigo', 2)
             && $this->checkUsesMinimum('chk_almacenes_codigo', 2)
-            && $this->dbAcceptsCompanyCode('zz')
-            && $this->dbAcceptsWarehouseCode('zz');
+            && $this->checkUsesCaseFunction('chk_empresas_codigo', 'upper')
+            && $this->checkUsesCaseFunction('chk_almacenes_codigo', 'upper')
+            && $this->dbAcceptsCompanyCode('ZZ')
+            && $this->dbAcceptsWarehouseCode('ZZ')
+            && !$this->dbAcceptsCompanyCode('zz')
+            && !$this->dbAcceptsWarehouseCode('zz')
+            && $this->codesStoredUppercase();
 
         $rollback = $runner->rollback($migration);
-        $rollbackRestoredMinThree = $this->checkUsesMinimum('chk_empresas_codigo', 3)
-            && $this->checkUsesMinimum('chk_almacenes_codigo', 3)
-            && !$this->dbAcceptsCompanyCode('zz')
-            && !$this->dbAcceptsWarehouseCode('zz');
+        $rollbackRestoredLowercaseMinTwo = $this->checkUsesMinimum('chk_empresas_codigo', 2)
+            && $this->checkUsesMinimum('chk_almacenes_codigo', 2)
+            && $this->checkUsesCaseFunction('chk_empresas_codigo', 'lower')
+            && $this->checkUsesCaseFunction('chk_almacenes_codigo', 'lower')
+            && $this->dbAcceptsCompanyCode('zz')
+            && $this->dbAcceptsWarehouseCode('zz')
+            && !$this->dbAcceptsCompanyCode('ZZ')
+            && !$this->dbAcceptsWarehouseCode('ZZ');
 
         $migrate = $runner->migrate($migration);
         $migrateSecondRun = $runner->migrate($migration);
-        $minTwoAfterMigrate = $this->checkUsesMinimum('chk_empresas_codigo', 2)
+        $uppercaseAfterMigrate = $this->checkUsesMinimum('chk_empresas_codigo', 2)
             && $this->checkUsesMinimum('chk_almacenes_codigo', 2)
-            && $this->dbAcceptsCompanyCode('zz')
-            && $this->dbAcceptsWarehouseCode('zz');
+            && $this->checkUsesCaseFunction('chk_empresas_codigo', 'upper')
+            && $this->checkUsesCaseFunction('chk_almacenes_codigo', 'upper')
+            && $this->dbAcceptsCompanyCode('ZZ')
+            && $this->dbAcceptsWarehouseCode('ZZ')
+            && !$this->dbAcceptsCompanyCode('zz')
+            && !$this->dbAcceptsWarehouseCode('zz')
+            && $this->codesStoredUppercase();
 
         if (
-            !$minTwoBeforeRollback
+            !$uppercaseBeforeRollback
             || $rollback !== 'rolled_back'
-            || !$rollbackRestoredMinThree
+            || !$rollbackRestoredLowercaseMinTwo
             || $migrate !== 'applied'
             || $migrateSecondRun !== 'already_applied'
-            || !$minTwoAfterMigrate
+            || !$uppercaseAfterMigrate
         ) {
             throw new RuntimeException(
-                'CONFIG-OPERACION-CODIGOS-MIN-2 migration verification failed.'
+                'CONFIG-OPERACION-CODIGOS-UPPER-1 migration verification failed.'
             );
         }
 
         return [
-            'min_two_before_rollback' => $minTwoBeforeRollback,
+            'uppercase_before_rollback' => $uppercaseBeforeRollback,
             'rollback' => $rollback,
-            'rollback_restored_min_three' => $rollbackRestoredMinThree,
+            'rollback_restored_lowercase_min_two' => $rollbackRestoredLowercaseMinTwo,
             'migrate' => $migrate,
             'migrate_second_run' => $migrateSecondRun,
-            'min_two_after_migrate' => $minTwoAfterMigrate,
+            'uppercase_after_migrate' => $uppercaseAfterMigrate,
         ];
     }
 
@@ -213,11 +227,11 @@ return new class implements DatabaseTest {
         $contextCompany = $this->activeContext()['company'];
         $fullId = $service->create($this->fullCompany(), $this->adminId);
         $minimalId = $service->create([
-            'codigo' => self::COMPANY_CODE_MIN,
+            'codigo' => 'gr',
             'nombre' => 'QA Empresa mínima',
         ], $this->adminId);
         $normalizedId = $service->create([
-            'codigo' => 'GR Empresa',
+            'codigo' => 'grupo refrigerantes qa',
             'nombre' => 'QA Empresa Normalizable',
         ], $this->adminId);
 
@@ -239,11 +253,11 @@ return new class implements DatabaseTest {
             'nombre' => 'QA sin código',
         ], $this->adminId))
             && $this->fails(fn () => $service->create([
-                'codigo' => 'g',
+                'codigo' => 'G',
                 'nombre' => 'QA código corto',
             ], $this->adminId))
             && $this->fails(fn () => $service->create([
-                'codigo' => 'empresa qa @',
+                'codigo' => 'GR@',
                 'nombre' => 'QA código inseguro',
             ], $this->adminId))
             && $this->fails(fn () => $service->create([
@@ -259,12 +273,12 @@ return new class implements DatabaseTest {
                 'nombre' => 'QA edición inválida',
             ]), $this->adminId))
             && $this->fails(fn () => $service->create([
-                'codigo' => 'qa-config-bad-email',
+                'codigo' => 'QA-CONFIG-BAD-EMAIL',
                 'nombre' => 'QA email inválido',
                 'email' => 'no-es-email',
             ], $this->adminId))
             && $this->fails(fn () => $service->create([
-                'codigo' => 'qa-config-bad-rfc',
+                'codigo' => 'QA-CONFIG-BAD-RFC',
                 'nombre' => 'QA RFC inválido',
                 'rfc' => 'INVALIDO',
             ], $this->adminId))
@@ -286,7 +300,7 @@ return new class implements DatabaseTest {
         $service = $this->warehouses();
         $contextWarehouse = $this->activeContext()['warehouse'];
 
-        $warehouseA = $service->create($this->warehouse($companyA, self::WAREHOUSE_CODE), $this->adminId);
+        $warehouseA = $service->create($this->warehouse($companyA, 'bo'), $this->adminId);
         $warehouseB = $service->create(
             array_replace(
                 $this->warehouse($companyA, self::WAREHOUSE_CODE_SECOND),
@@ -319,19 +333,19 @@ return new class implements DatabaseTest {
             && $updatedWarehouse['telefono'] === '5555555555'
             && $updatedWarehouse['email'] === 'qa-almacen-edicion@example.test'
             && $this->fails(fn () => $service->create(
-                $this->warehouse(99999999, 'qa-config-noempresa'),
-                $this->adminId
-            ))
+            $this->warehouse(99999999, 'qa-config-noempresa'),
+            $this->adminId
+        ))
             && $this->fails(fn () => $service->create(
                 $this->warehouse($companyA, self::WAREHOUSE_CODE),
                 $this->adminId
             ))
             && $this->fails(fn () => $service->create(
-                $this->warehouse($companyA, 'b'),
+                $this->warehouse($companyA, 'B'),
                 $this->adminId
             ))
             && $this->fails(fn () => $service->create(
-                $this->warehouse($companyA, 'almacen qa @'),
+                $this->warehouse($companyA, 'BO@'),
                 $this->adminId
             ))
             && $this->fails(fn () => $service->create(
@@ -340,16 +354,16 @@ return new class implements DatabaseTest {
             ))
             && $this->fails(fn () => $service->update($warehouseA, array_replace(
                 $this->warehouse($companyA, self::WAREHOUSE_CODE),
-                ['codigo' => 'b']
+                ['codigo' => 'B']
             ), $this->adminId))
             && $this->fails(fn () => $service->create(
-                array_replace($this->warehouse($companyA, 'qa-config-tipo-bad'), [
+                array_replace($this->warehouse($companyA, 'QA-CONFIG-TIPO-BAD'), [
                     'tipo_almacen' => 'NO_VALIDO',
                 ]),
                 $this->adminId
             ))
             && $this->fails(fn () => $service->create(
-                array_replace($this->warehouse($companyA, 'qa-config-mail-bad'), [
+                array_replace($this->warehouse($companyA, 'QA-CONFIG-MAIL-BAD'), [
                     'email' => 'no-es-email',
                 ]),
                 $this->adminId
@@ -366,7 +380,10 @@ return new class implements DatabaseTest {
     private function adminRelationsIdempotent(): bool
     {
         $companyId = $this->companyId(self::COMPANY_CODE);
-        $warehouseId = $this->warehouseId(self::WAREHOUSE_CODE);
+        $warehouseId = $this->warehouseIdForCompany(
+            self::WAREHOUSE_CODE,
+            $companyId
+        );
         $this->companyRepository()->assignUser($companyId, $this->adminId);
         $this->companyRepository()->assignUser($companyId, $this->adminId);
         $this->warehouseRepository()->assignUser(
@@ -390,9 +407,19 @@ return new class implements DatabaseTest {
             new ScopeRepository($this->provider())
         ))->resolveForUser($this->adminId);
 
-        return $resolved->hasScope()
-            && count($resolved->companies()) >= 1
-            && count($resolved->warehouses()) >= 1;
+        $companyIds = [];
+
+        foreach ($resolved->companies() as $company) {
+            $companyIds[(int) $company['id']] = true;
+        }
+
+        foreach ($resolved->warehouses() as $warehouse) {
+            if (isset($companyIds[(int) $warehouse['company_id']])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -512,8 +539,8 @@ return new class implements DatabaseTest {
             'SELECT e.id AS empresa_id, a.id AS almacen_id
              FROM empresas e
              INNER JOIN almacenes a ON a.empresa_id = e.id
-             WHERE e.codigo = "grupo-refrigerantes"
-               AND a.codigo = "principal"
+             WHERE e.codigo = "GRUPO-REFRIGERANTES"
+               AND a.codigo = "PRINCIPAL"
              LIMIT 1'
         )->fetch();
 
@@ -590,6 +617,40 @@ return new class implements DatabaseTest {
         );
     }
 
+    private function checkUsesCaseFunction(string $constraint, string $function): bool
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT CHECK_CLAUSE
+             FROM information_schema.CHECK_CONSTRAINTS
+             WHERE CONSTRAINT_SCHEMA = DATABASE()
+               AND CONSTRAINT_NAME = :constraint_name
+             LIMIT 1'
+        );
+        $statement->execute(['constraint_name' => $constraint]);
+        $clause = (string) $statement->fetchColumn();
+        $normalized = strtolower(str_replace(['`', ' '], '', $clause));
+
+        return str_contains($normalized, 'codigo=' . $function . '(codigo)');
+    }
+
+    private function codesStoredUppercase(): bool
+    {
+        $statement = $this->pdo->query(
+            'SELECT COUNT(*)
+             FROM empresas
+             WHERE codigo <> UPPER(codigo)'
+        );
+        $lowerCompanies = (int) $statement->fetchColumn();
+        $statement = $this->pdo->query(
+            'SELECT COUNT(*)
+             FROM almacenes
+             WHERE codigo <> UPPER(codigo)'
+        );
+        $lowerWarehouses = (int) $statement->fetchColumn();
+
+        return $lowerCompanies === 0 && $lowerWarehouses === 0;
+    }
+
     private function dbAcceptsCompanyCode(string $code): bool
     {
         try {
@@ -614,7 +675,9 @@ return new class implements DatabaseTest {
 
     private function dbAcceptsWarehouseCode(string $code): bool
     {
-        $companyCode = 'qa-config-check-parent';
+        $companyCode = strtolower($code) === $code
+            ? 'qa-config-check-parent'
+            : 'QA-CONFIG-CHECK-PARENT';
         $companyId = 0;
 
         try {
@@ -748,6 +811,28 @@ return new class implements DatabaseTest {
         return $id;
     }
 
+    private function warehouseIdForCompany(string $code, int $companyId): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT id
+             FROM almacenes
+             WHERE empresa_id = :empresa_id
+               AND codigo = :codigo
+             LIMIT 1'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'codigo' => $code,
+        ]);
+        $id = (int) $statement->fetchColumn();
+
+        if ($id < 1) {
+            throw new RuntimeException('QA warehouse was not found for company.');
+        }
+
+        return $id;
+    }
+
     private function principalCount(int $companyId): int
     {
         $statement = $this->pdo->prepare(
@@ -789,27 +874,47 @@ return new class implements DatabaseTest {
                 "SELECT COUNT(*)
                  FROM empresas
                  WHERE codigo LIKE 'qa-config-%'
-                    OR codigo IN ('gr', 'gr-empresa')"
+                    OR codigo LIKE 'QA-CONFIG-%'
+                    OR codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')"
             )->fetchColumn(),
             'almacenes_qa' => (int) $this->pdo->query(
                 "SELECT COUNT(*)
-                 FROM almacenes
-                 WHERE codigo LIKE 'qa-config-%'
-                    OR codigo IN ('bo', 'bodega-principal')"
+                 FROM almacenes a
+                 INNER JOIN empresas e ON e.id = a.empresa_id
+                 WHERE a.codigo LIKE 'qa-config-%'
+                    OR a.codigo LIKE 'QA-CONFIG-%'
+                    OR (
+                        a.codigo IN ('bo', 'bodega-principal', 'BO', 'BODEGA-PRINCIPAL')
+                        AND (
+                            e.codigo LIKE 'qa-config-%'
+                            OR e.codigo LIKE 'QA-CONFIG-%'
+                            OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')
+                        )
+                    )"
             )->fetchColumn(),
             'usuario_empresas_qa' => (int) $this->pdo->query(
                 "SELECT COUNT(*)
                  FROM usuario_empresas ue
                  INNER JOIN empresas e ON e.id = ue.empresa_id
                  WHERE e.codigo LIKE 'qa-config-%'
-                    OR e.codigo IN ('gr', 'gr-empresa')"
+                    OR e.codigo LIKE 'QA-CONFIG-%'
+                    OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')"
             )->fetchColumn(),
             'usuario_almacenes_qa' => (int) $this->pdo->query(
                 "SELECT COUNT(*)
                  FROM usuario_almacenes ua
                  INNER JOIN almacenes a ON a.id = ua.almacen_id
+                 INNER JOIN empresas e ON e.id = a.empresa_id
                  WHERE a.codigo LIKE 'qa-config-%'
-                    OR a.codigo IN ('bo', 'bodega-principal')"
+                    OR a.codigo LIKE 'QA-CONFIG-%'
+                    OR (
+                        a.codigo IN ('bo', 'bodega-principal', 'BO', 'BODEGA-PRINCIPAL')
+                        AND (
+                            e.codigo LIKE 'qa-config-%'
+                            OR e.codigo LIKE 'QA-CONFIG-%'
+                            OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')
+                        )
+                    )"
             )->fetchColumn(),
             'usuarios_qa' => 0,
         ];
@@ -820,18 +925,38 @@ return new class implements DatabaseTest {
         foreach ([
             "DELETE ua FROM usuario_almacenes ua
              INNER JOIN almacenes a ON a.id = ua.almacen_id
+             INNER JOIN empresas e ON e.id = a.empresa_id
              WHERE a.codigo LIKE 'qa-config-%'
-                OR a.codigo IN ('bo', 'bodega-principal')",
+                OR a.codigo LIKE 'QA-CONFIG-%'
+                OR (
+                    a.codigo IN ('bo', 'bodega-principal', 'BO', 'BODEGA-PRINCIPAL')
+                    AND (
+                        e.codigo LIKE 'qa-config-%'
+                        OR e.codigo LIKE 'QA-CONFIG-%'
+                        OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')
+                    )
+                )",
             "DELETE ue FROM usuario_empresas ue
              INNER JOIN empresas e ON e.id = ue.empresa_id
              WHERE e.codigo LIKE 'qa-config-%'
-                OR e.codigo IN ('gr', 'gr-empresa')",
-            "DELETE FROM almacenes
-             WHERE codigo LIKE 'qa-config-%'
-                OR codigo IN ('bo', 'bodega-principal')",
+                OR e.codigo LIKE 'QA-CONFIG-%'
+                OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')",
+            "DELETE a FROM almacenes a
+             INNER JOIN empresas e ON e.id = a.empresa_id
+             WHERE a.codigo LIKE 'qa-config-%'
+                OR a.codigo LIKE 'QA-CONFIG-%'
+                OR (
+                    a.codigo IN ('bo', 'bodega-principal', 'BO', 'BODEGA-PRINCIPAL')
+                    AND (
+                        e.codigo LIKE 'qa-config-%'
+                        OR e.codigo LIKE 'QA-CONFIG-%'
+                        OR e.codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')
+                    )
+                )",
             "DELETE FROM empresas
              WHERE codigo LIKE 'qa-config-%'
-                OR codigo IN ('gr', 'gr-empresa')",
+                OR codigo LIKE 'QA-CONFIG-%'
+                OR codigo IN ('gr', 'gr-empresa', 'GR', 'GRUPO-REFRIGERANTES-QA')",
         ] as $statement) {
             $this->pdo->exec($statement);
         }
