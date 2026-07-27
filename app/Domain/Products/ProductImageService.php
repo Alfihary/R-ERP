@@ -86,19 +86,17 @@ final class ProductImageService
     {
         $this->assertActor($actorId);
         $productId = $this->validatedProductId($productId);
-        $validated = $this->validatedUpload($upload);
+        $validated = $this->prepareImageUpload($upload);
         $relativePath = $this->relativePath($productId, $validated['extension']);
         $targetPath = $this->absolutePathForNewFile($relativePath);
         $oldPhoto = null;
 
         $this->ensureDirectory(dirname($targetPath));
 
-        if (!move_uploaded_file($validated['tmp_name'], $targetPath)) {
-            if (!rename($validated['tmp_name'], $targetPath)) {
-                throw new ProductValidationException([
-                    'imagen' => 'No fue posible almacenar la imagen.',
-                ]);
-            }
+        if (!$this->movePreparedUpload($validated['tmp_name'], $targetPath)) {
+            throw new ProductValidationException([
+                'imagen' => 'No fue posible almacenar la imagen.',
+            ]);
         }
 
         try {
@@ -138,6 +136,80 @@ final class ProductImageService
         if ($oldPhoto !== null) {
             $this->deleteRelativeFile((string) $oldPhoto['ruta_relativa']);
         }
+    }
+
+    /**
+     * @param array<string, mixed>|null $upload
+     * @return array{
+     *     tmp_name: string,
+     *     original_name: string,
+     *     mime_type: string,
+     *     extension: string,
+     *     size: int
+     * }
+     */
+    public function prepareImageUpload(?array $upload): array
+    {
+        return $this->validatedUpload($upload);
+    }
+
+    /**
+     * @param array{
+     *     tmp_name: string,
+     *     original_name: string,
+     *     mime_type: string,
+     *     extension: string,
+     *     size: int
+     * } $validated
+     */
+    public function attachPreparedMainPhotoToNewProduct(
+        string $productId,
+        array $validated,
+        int $actorId
+    ): string {
+        $this->assertActor($actorId);
+        $productId = $this->validatedProductId($productId);
+        $relativePath = $this->relativePath($productId, $validated['extension']);
+        $targetPath = $this->absolutePathForNewFile($relativePath);
+
+        $this->ensureDirectory(dirname($targetPath));
+
+        if (!$this->movePreparedUpload($validated['tmp_name'], $targetPath)) {
+            throw new ProductValidationException([
+                'imagen' => 'No fue posible almacenar la imagen.',
+            ]);
+        }
+
+        try {
+            if (!$this->documents->lockProduct($productId)) {
+                throw new ProductValidationException([
+                    'id_producto' => 'El producto solicitado no existe.',
+                ]);
+            }
+
+            $documentId = $this->documents->insertMainPhoto([
+                'id_producto' => $productId,
+                'nombre_original' => $validated['original_name'],
+                'ruta_relativa' => $relativePath,
+                'mime_type' => $validated['mime_type'],
+                'tamano_bytes' => $validated['size'],
+            ], $actorId);
+            $this->documents->deactivateActiveMainPhotosExcept(
+                $productId,
+                $documentId,
+                $actorId
+            );
+        } catch (\Throwable $exception) {
+            $this->deleteFileIfInsideRoot($targetPath);
+            throw $exception;
+        }
+
+        return $targetPath;
+    }
+
+    public function discardStoredFile(string $path): void
+    {
+        $this->deleteFileIfInsideRoot($path);
     }
 
     public function delete(string $productId, int $actorId): void
@@ -381,6 +453,15 @@ final class ProductImageService
     private function normalized(string $path): string
     {
         return rtrim(str_replace('\\', '/', $path), '/');
+    }
+
+    private function movePreparedUpload(string $tmpName, string $targetPath): bool
+    {
+        if (move_uploaded_file($tmpName, $targetPath)) {
+            return true;
+        }
+
+        return rename($tmpName, $targetPath);
     }
 
     private function assertActor(int $actorId): void

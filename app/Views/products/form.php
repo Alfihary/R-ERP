@@ -54,6 +54,7 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
 <form
     class="product-form"
     method="post"
+    enctype="multipart/form-data"
     action="<?= $editing ? '/productos/actualizar' : '/productos' ?>"
 >
     <?= csrf_field($csrf) ?>
@@ -128,18 +129,33 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
         <fieldset class="product-form-section product-image-section">
             <legend>Imagen principal</legend>
             <p class="product-form-section__help">
-                Primero guarda el producto. Después podrás subir la imagen
-                principal desde la edición.
+                Puedes seleccionar una imagen ahora y se guardará junto con el
+                producto.
             </p>
             <div class="product-image-create-note">
                 <div class="product-image-placeholder" role="img" aria-label="Producto sin imagen principal">
                     <span aria-hidden="true">▧</span>
-                    <strong>Imagen pendiente</strong>
+                    <strong>Imagen opcional</strong>
                 </div>
-                <p>
-                    La carga valida JPG, PNG o WEBP con MIME real, contenido
-                    decodificable y tamaño máximo de 5 MiB.
-                </p>
+                <div class="product-field">
+                    <label for="imagen">Seleccionar imagen principal</label>
+                    <input
+                        id="imagen"
+                        name="imagen"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        aria-describedby="imagen_create_help<?= isset($errors['imagen']) ? ' imagen_create_error' : '' ?>"
+                    >
+                    <small id="imagen_create_help">
+                        JPG, PNG o WEBP. Máximo 5 MiB. Se valida MIME real y
+                        contenido decodificable. SVG no está permitido.
+                    </small>
+                    <?php if (isset($errors['imagen'])): ?>
+                        <span class="product-field-error" id="imagen_create_error">
+                            <?= e($errors['imagen']) ?>
+                        </span>
+                    <?php endif; ?>
+                </div>
             </div>
         </fieldset>
     <?php else: ?>

@@ -86,6 +86,31 @@ final class ProductService
      */
     public function create(array $input, int $actorId): string
     {
+        return $this->createUsing($input, $actorId, null);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param callable(string): void $afterProductCreated
+     */
+    public function createWithHook(
+        array $input,
+        int $actorId,
+        callable $afterProductCreated
+    ): string {
+        return $this->createUsing($input, $actorId, $afterProductCreated);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param callable(string): void|null $afterProductCreated
+     */
+    private function createUsing(
+        array $input,
+        int $actorId,
+        ?callable $afterProductCreated
+    ): string
+    {
         $this->assertActor($actorId);
         $productId = strtoupper($this->text($input, 'id_producto'));
         $data = $this->validate($input, $productId, true);
@@ -100,7 +125,8 @@ final class ProductService
             $this->products->transactional(function () use (
                 $data,
                 $actorId,
-                $productId
+                $productId,
+                $afterProductCreated
             ): void {
                 $this->products->create($data['product'], $actorId);
                 $this->products->replaceTaxes(
@@ -113,6 +139,9 @@ final class ProductService
                     $data['barcodes'],
                     $actorId
                 );
+                if ($afterProductCreated !== null) {
+                    $afterProductCreated($productId);
+                }
             });
         } catch (PDOException $exception) {
             $this->convertDatabaseError($exception);

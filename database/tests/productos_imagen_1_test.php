@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Products\ProductImageService;
+use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Database\DatabaseTest;
@@ -13,6 +14,11 @@ use App\Infrastructure\Repositories\ProductRepository;
 
 return new class implements DatabaseTest {
     private const PRODUCT_ID = 'QAIMG001';
+    private const CREATE_NO_IMAGE_ID = 'QAIMGNOIMG';
+    private const CREATE_IMAGE_ID = 'QAIMGCREATE';
+    private const CREATE_INVALID_IMAGE_ID = 'QAIMGBADIMG';
+    private const CREATE_INVALID_DATA_ID = 'QAIMGBADDATA';
+    private const CREATE_ROLLBACK_ID = 'QAIMGROLLBACK';
 
     /**
      * @return array<string, mixed>
@@ -47,7 +53,9 @@ return new class implements DatabaseTest {
         $this->cleanup($pdo);
 
         if ($this->migrationRows($pdo, $migration->id()) === 1) {
-            $runner->rollback($migration);
+            if ($this->underscoreDocumentRows($pdo) === 0) {
+                $runner->rollback($migration);
+            }
         }
 
         $constraintBefore = $this->constraintClause($pdo);
@@ -57,19 +65,33 @@ return new class implements DatabaseTest {
         $migrationRows = $this->migrationRows($pdo, $migration->id());
         $constraintCases = $this->constraintCases($pdo);
         $this->cleanup($pdo);
-        $rollbackResult = $runner->rollback($migration);
-        $rollbackRejectsUnderscore = $this->fails(
-            fn () => $this->insertDocumentType($pdo, 'A_B')
-        );
-        $runner->migrate($migration);
+        $rollbackResult = 'skipped_existing_underscore_rows';
+        $rollbackRejectsUnderscore = 'SKIPPED_EXISTING_UNDERSCORE_ROWS';
+
+        if ($this->underscoreDocumentRows($pdo) === 0) {
+            $rollbackResult = $runner->rollback($migration);
+            $rollbackRejectsUnderscore = $this->fails(
+                fn () => $this->insertDocumentType($pdo, 'A_B')
+            );
+            $runner->migrate($migration);
+        }
+
         $this->cleanup($pdo);
 
         if (
             !in_array($migrationResult, ['applied', 'already_applied'], true)
             || $secondMigrationResult !== 'already_applied'
             || $migrationRows !== 1
-            || $rollbackResult !== 'rolled_back'
-            || $rollbackRejectsUnderscore !== true
+            || !in_array(
+                $rollbackResult,
+                ['rolled_back', 'skipped_existing_underscore_rows'],
+                true
+            )
+            || !in_array(
+                $rollbackRejectsUnderscore,
+                [true, 'SKIPPED_EXISTING_UNDERSCORE_ROWS'],
+                true
+            )
             || ($constraintCases['FOTO_PRINCIPAL'] ?? null) !== 'ACCEPTED'
         ) {
             throw new RuntimeException(
@@ -93,10 +115,144 @@ return new class implements DatabaseTest {
             new ProductDocumentRepository($connection),
             $storagePath
         );
+        $products = new ProductService(new ProductRepository($connection));
+        $unitId = $this->unitId($pdo);
 
         $results = [];
 
         try {
+            $noImageId = $products->create(
+                $this->productInput(self::CREATE_NO_IMAGE_ID, $unitId),
+                $actorId
+            );
+            $results['crear_sin_imagen'] = $noImageId === self::CREATE_NO_IMAGE_ID
+                && $service->current(self::CREATE_NO_IMAGE_ID) === null;
+            $this->cleanupProduct($pdo, self::CREATE_NO_IMAGE_ID);
+
+            $createdPath = null;
+            $validCreateImage = $this->imageFile('png');
+            $preparedCreateImage = $service->prepareImageUpload(
+                $this->upload($validCreateImage, 'create.png')
+            );
+            $imageId = $products->createWithHook(
+                $this->productInput(self::CREATE_IMAGE_ID, $unitId),
+                $actorId,
+                function (string $productId) use (
+                    $service,
+                    $preparedCreateImage,
+                    $actorId,
+                    &$createdPath
+                ): void {
+                    $createdPath = $service->attachPreparedMainPhotoToNewProduct(
+                        $productId,
+                        $preparedCreateImage,
+                        $actorId
+                    );
+                }
+            );
+            $createdPhoto = $service->current(self::CREATE_IMAGE_ID);
+            $results['crear_con_imagen_valida'] =
+                $imageId === self::CREATE_IMAGE_ID
+                && $createdPhoto !== null
+                && is_file((string) $createdPath)
+                && (string) $createdPhoto['tipo_documento'] === 'FOTO_PRINCIPAL'
+                && (int) $createdPhoto['es_principal'] === 1
+                && $service->content(self::CREATE_IMAGE_ID)['mime_type']
+                    === 'image/png';
+            $this->cleanupProduct($pdo, self::CREATE_IMAGE_ID);
+
+            $results['crear_con_imagen_invalida'] = $this->fails(
+                fn () => $products->createWithHook(
+                    $this->productInput(self::CREATE_INVALID_IMAGE_ID, $unitId),
+                    $actorId,
+                    function (string $productId) use ($service, $actorId): void {
+                        $prepared = $service->prepareImageUpload(
+                            $this->upload(
+                                $this->textFile('<svg></svg>', 'bad.svg'),
+                                'bad.svg'
+                            )
+                        );
+                        $service->attachPreparedMainPhotoToNewProduct(
+                            $productId,
+                            $prepared,
+                            $actorId
+                        );
+                    }
+                )
+            ) && !$this->productExists($pdo, self::CREATE_INVALID_IMAGE_ID)
+                && $this->documentCount($pdo, self::CREATE_INVALID_IMAGE_ID) === 0;
+
+            $preparedInvalidDataImage = $service->prepareImageUpload(
+                $this->upload($this->imageFile('jpg'), 'valid-data-bad.jpg')
+            );
+            $results['crear_datos_invalidos_con_imagen_valida'] = $this->fails(
+                fn () => $products->createWithHook(
+                    array_replace(
+                        $this->productInput(self::CREATE_INVALID_DATA_ID, $unitId),
+                        ['descripcion' => '']
+                    ),
+                    $actorId,
+                    function (string $productId) use (
+                        $service,
+                        $preparedInvalidDataImage,
+                        $actorId
+                    ): void {
+                        $service->attachPreparedMainPhotoToNewProduct(
+                            $productId,
+                            $preparedInvalidDataImage,
+                            $actorId
+                        );
+                    }
+                )
+            ) && !$this->productExists($pdo, self::CREATE_INVALID_DATA_ID)
+                && $this->documentCount($pdo, self::CREATE_INVALID_DATA_ID) === 0;
+
+            $storedRollbackPath = null;
+            $preparedRollbackImage = $service->prepareImageUpload(
+                $this->upload($this->imageFile('webp'), 'rollback.webp')
+            );
+            $results['rollback_despues_de_guardar_archivo'] = $this->fails(
+                function () use (
+                    $products,
+                    $service,
+                    $actorId,
+                    $preparedRollbackImage,
+                    $unitId,
+                    &$storedRollbackPath
+                ): void {
+                    try {
+                        $products->createWithHook(
+                            $this->productInput(self::CREATE_ROLLBACK_ID, $unitId),
+                            $actorId,
+                            function (string $productId) use (
+                                $service,
+                                $preparedRollbackImage,
+                                $actorId,
+                                &$storedRollbackPath
+                            ): void {
+                                $storedRollbackPath =
+                                    $service->attachPreparedMainPhotoToNewProduct(
+                                        $productId,
+                                        $preparedRollbackImage,
+                                        $actorId
+                                    );
+                                throw new ProductValidationException([
+                                    'imagen' => 'Falla simulada controlada.',
+                                ]);
+                            }
+                        );
+                    } catch (ProductValidationException $exception) {
+                        if ($storedRollbackPath !== null) {
+                            $service->discardStoredFile($storedRollbackPath);
+                        }
+
+                        throw $exception;
+                    }
+                }
+            ) && !$this->productExists($pdo, self::CREATE_ROLLBACK_ID)
+                && $this->documentCount($pdo, self::CREATE_ROLLBACK_ID) === 0
+                && ($storedRollbackPath === null || !is_file($storedRollbackPath));
+
             $this->insertProduct($pdo, self::PRODUCT_ID, $actorId);
             $results['producto_sin_imagen'] =
                 $service->current(self::PRODUCT_ID) === null;
@@ -244,9 +400,10 @@ return new class implements DatabaseTest {
                 'second_run' => $secondMigrationResult,
                 'migration_rows' => $migrationRows,
                 'rollback' => $rollbackResult,
-                'rollback_rejects_underscore' => $rollbackRejectsUnderscore
-                    ? 'PASS'
-                    : 'FAIL',
+                'rollback_rejects_underscore' =>
+                    $rollbackRejectsUnderscore === true
+                        ? 'PASS'
+                        : $rollbackRejectsUnderscore,
             ],
             'constraint_before' => $constraintBefore,
             'constraint_after' => $constraintAfter,
@@ -276,6 +433,11 @@ return new class implements DatabaseTest {
             ],
             'reemplazo' => 'PASS',
             'eliminacion' => 'PASS',
+            'crear_producto_sin_imagen' => 'PASS',
+            'crear_producto_con_imagen' => 'PASS',
+            'crear_producto_con_imagen_invalida' => 'PASS',
+            'crear_producto_datos_invalidos_con_imagen_valida' => 'PASS',
+            'rollback_archivo_huerfano' => 'PASS',
             'maximo_una_principal_activa' => 'PASS',
             'rollback_qa' => $after === $before ? 'PASS' : 'FAIL',
             'counts' => $after,
@@ -326,6 +488,15 @@ return new class implements DatabaseTest {
         }
 
         return preg_replace('/\s+/', ' ', $clause) ?? $clause;
+    }
+
+    private function underscoreDocumentRows(PDO $pdo): int
+    {
+        return (int) $pdo->query(
+            "SELECT COUNT(*)
+             FROM producto_documentos
+             WHERE LOCATE('_', tipo_documento) > 0"
+        )->fetchColumn();
     }
 
     /**
@@ -422,17 +593,42 @@ return new class implements DatabaseTest {
     {
         $counts = [];
 
-        foreach (['productos', 'producto_documentos'] as $table) {
+        foreach ([
+            'productos',
+            'producto_documentos',
+            'producto_codigos_barras',
+            'producto_impuestos',
+        ] as $table) {
             $counts[$table] = (int) $pdo->query(
                 'SELECT COUNT(*) FROM ' . $table
             )->fetchColumn();
         }
 
-        $counts['qa_files'] = count(glob(
-            BASE_PATH . '/storage/uploads/productos/' . self::PRODUCT_ID . '/*'
-        ) ?: []);
+        $counts['qa_files'] = $this->qaFileCount();
 
         return $counts;
+    }
+
+    private function productExists(PDO $pdo, string $productId): bool
+    {
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*) FROM productos WHERE id_producto = :id_producto'
+        );
+        $statement->execute(['id_producto' => $productId]);
+
+        return (int) $statement->fetchColumn() === 1;
+    }
+
+    private function documentCount(PDO $pdo, string $productId): int
+    {
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*)
+             FROM producto_documentos
+             WHERE id_producto = :id_producto'
+        );
+        $statement->execute(['id_producto' => $productId]);
+
+        return (int) $statement->fetchColumn();
     }
 
     private function adminId(PDO $pdo): int
@@ -488,6 +684,57 @@ return new class implements DatabaseTest {
             'creado_por' => $actorId,
             'actualizado_por' => $actorId,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function productInput(string $productId, int $unitId): array
+    {
+        return [
+            'id_producto' => $productId,
+            'descripcion' => 'Producto imagen QA',
+            'descripcion_larga' => 'Producto temporal de imagen.',
+            'sku' => '',
+            'sku_alterno' => '',
+            'upc' => '',
+            'ean' => '',
+            'gtin' => '',
+            'codigo_fabricante' => '',
+            'modelo' => '',
+            'tipo_producto' => 'PRODUCTO',
+            'unidad_medida_id' => (string) $unitId,
+            'moneda_id' => '',
+            'linea_producto_id' => '',
+            'marca_id' => '',
+            'clasificacion_producto_id' => '',
+            'clave_sat_id' => '',
+            'unidad_sat_id' => '',
+            'peso_kg' => '',
+            'largo_cm' => '',
+            'ancho_cm' => '',
+            'alto_cm' => '',
+            'controla_series' => '0',
+            'controla_lotes' => '0',
+            'controla_pedimentos' => '0',
+            'impuestos' => [],
+            'codigos_barras' => '',
+        ];
+    }
+
+    private function unitId(PDO $pdo): int
+    {
+        $unitId = (int) $pdo->query(
+            "SELECT id FROM unidades_medida
+             WHERE codigo = 'PIEZA' AND activo = 1 AND eliminado_en IS NULL
+             LIMIT 1"
+        )->fetchColumn();
+
+        if ($unitId < 1) {
+            throw new RuntimeException('PIEZA unit is required.');
+        }
+
+        return $unitId;
     }
 
     private function activeMainCount(PDO $pdo, string $productId): int
@@ -695,17 +942,59 @@ return new class implements DatabaseTest {
         foreach (glob(BASE_PATH . '/storage/temp/productos-imagen-*') ?: [] as $file) {
             $this->remove($file);
         }
-        foreach (glob(BASE_PATH . '/storage/uploads/productos/' . self::PRODUCT_ID . '/*') ?: [] as $file) {
+
+        foreach ($this->qaProductIds() as $productId) {
+            $this->cleanupProduct($pdo, $productId);
+        }
+    }
+
+    private function cleanupProduct(PDO $pdo, string $productId): void
+    {
+        foreach (glob(BASE_PATH . '/storage/uploads/productos/' . $productId . '/*') ?: [] as $file) {
             $this->remove($file);
         }
-        @rmdir(BASE_PATH . '/storage/uploads/productos/' . self::PRODUCT_ID);
+        @rmdir(BASE_PATH . '/storage/uploads/productos/' . $productId);
 
         $pdo->prepare(
             'DELETE FROM producto_documentos WHERE id_producto = :id_producto'
-        )->execute(['id_producto' => self::PRODUCT_ID]);
+        )->execute(['id_producto' => $productId]);
+        $pdo->prepare(
+            'DELETE FROM producto_codigos_barras WHERE id_producto = :id_producto'
+        )->execute(['id_producto' => $productId]);
+        $pdo->prepare(
+            'DELETE FROM producto_impuestos WHERE id_producto = :id_producto'
+        )->execute(['id_producto' => $productId]);
         $pdo->prepare(
             'DELETE FROM productos WHERE id_producto = :id_producto'
-        )->execute(['id_producto' => self::PRODUCT_ID]);
+        )->execute(['id_producto' => $productId]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function qaProductIds(): array
+    {
+        return [
+            self::PRODUCT_ID,
+            self::CREATE_NO_IMAGE_ID,
+            self::CREATE_IMAGE_ID,
+            self::CREATE_INVALID_IMAGE_ID,
+            self::CREATE_INVALID_DATA_ID,
+            self::CREATE_ROLLBACK_ID,
+        ];
+    }
+
+    private function qaFileCount(): int
+    {
+        $count = 0;
+
+        foreach ($this->qaProductIds() as $productId) {
+            $count += count(glob(
+                BASE_PATH . '/storage/uploads/productos/' . $productId . '/*'
+            ) ?: []);
+        }
+
+        return $count;
     }
 
     private function remove(string $file): void

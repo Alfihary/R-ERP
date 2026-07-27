@@ -50,19 +50,60 @@ final class ProductController
     public function create(Request $request): Response
     {
         $user = $this->user();
+        $preparedImage = null;
+        $storedImagePath = null;
 
         try {
-            $productId = $this->products->create(
-                $request->body(),
-                $user['user_id']
-            );
+            $upload = $request->file('imagen');
+
+            if (
+                $upload !== null
+                && ($upload['error'] ?? UPLOAD_ERR_NO_FILE)
+                    !== UPLOAD_ERR_NO_FILE
+            ) {
+                $preparedImage = $this->images->prepareImageUpload($upload);
+            }
+
+            if ($preparedImage === null) {
+                $productId = $this->products->create(
+                    $request->body(),
+                    $user['user_id']
+                );
+            } else {
+                $productId = $this->products->createWithHook(
+                    $request->body(),
+                    $user['user_id'],
+                    function (string $productId) use (
+                        $preparedImage,
+                        $user,
+                        &$storedImagePath
+                    ): void {
+                        $storedImagePath =
+                            $this->images->attachPreparedMainPhotoToNewProduct(
+                                $productId,
+                                $preparedImage,
+                                $user['user_id']
+                            );
+                    }
+                );
+            }
         } catch (ProductValidationException $exception) {
+            if ($storedImagePath !== null) {
+                $this->images->discardStoredFile($storedImagePath);
+            }
+
             return $this->renderForm(
                 $request->body(),
                 $exception->errors(),
                 false,
                 422
             );
+        } catch (\Throwable $exception) {
+            if ($storedImagePath !== null) {
+                $this->images->discardStoredFile($storedImagePath);
+            }
+
+            throw $exception;
         }
 
         return Response::redirect(
