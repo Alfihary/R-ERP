@@ -54,7 +54,7 @@ return new class implements DatabaseTest {
                     'routes/web.php',
                     '/configuracion/listas-precios'
                 ),
-                'no_product_price_global_route' => !$this->fileContains(
+                'product_price_global_route_allowed' => $this->fileContains(
                     'routes/web.php',
                     '/precios/productos'
                 ),

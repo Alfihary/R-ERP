@@ -20,6 +20,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\PriceListController;
+use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -41,6 +42,7 @@ return static function (
     FolioSeriesController $folioSeriesController,
     ProductController $productController,
     PriceListController $priceListController,
+    ProductPriceController $productPriceController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController
 ): void {
@@ -106,6 +108,10 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'productos.acceder'
         );
+        $canAccessProductPrices = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'precios.productos.acceder'
+        );
         $canAccessInventory = $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'inventario.movimientos.acceder'
@@ -133,6 +139,7 @@ return static function (
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $canAccessCatalogs,
             'canAccessProducts' => $canAccessProducts,
+            'canAccessProductPrices' => $canAccessProductPrices,
             'canAccessInventory' => $canAccessInventory,
             'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
             'canAccessConfiguration' => $canAccessConfiguration,
@@ -455,6 +462,75 @@ return static function (
         static fn (Request $request): Response =>
             $priceListController->setDefault($request),
         $priceListMiddleware('precios.listas.predeterminada')
+    );
+
+    $productPriceBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'precios.productos.acceder'),
+    ];
+    $productPriceMiddleware = static function (string $permission) use (
+        $productPriceBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($productPriceBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/precios/productos',
+        static fn (Request $request): Response =>
+            $productPriceController->index($request),
+        $productPriceBaseMiddleware
+    );
+    $router->get(
+        '/precios/productos/crear',
+        static fn (Request $request): Response =>
+            $productPriceController->createForm($request),
+        $productPriceMiddleware('precios.productos.crear')
+    );
+    $router->post(
+        '/precios/productos',
+        static fn (Request $request): Response =>
+            $productPriceController->create($request),
+        $productPriceMiddleware('precios.productos.crear')
+    );
+    $router->get(
+        '/precios/productos/ver',
+        static fn (Request $request): Response =>
+            $productPriceController->show($request),
+        $productPriceMiddleware('precios.productos.ver')
+    );
+    $router->get(
+        '/precios/productos/editar',
+        static fn (Request $request): Response =>
+            $productPriceController->editForm($request),
+        $productPriceMiddleware('precios.productos.editar')
+    );
+    $router->post(
+        '/precios/productos/actualizar',
+        static fn (Request $request): Response =>
+            $productPriceController->update($request),
+        $productPriceMiddleware('precios.productos.editar')
+    );
+    $router->post(
+        '/precios/productos/desactivar',
+        static fn (Request $request): Response =>
+            $productPriceController->deactivate($request),
+        $productPriceMiddleware('precios.productos.desactivar')
+    );
+    $router->post(
+        '/precios/productos/reactivar',
+        static fn (Request $request): Response =>
+            $productPriceController->reactivate($request),
+        $productPriceMiddleware('precios.productos.reactivar')
+    );
+    $router->get(
+        '/precios/productos/historial',
+        static fn (Request $request): Response =>
+            $productPriceController->history($request),
+        $productPriceMiddleware('precios.productos.historial')
     );
 
     $catalogAccessMiddleware = new PermissionMiddleware(

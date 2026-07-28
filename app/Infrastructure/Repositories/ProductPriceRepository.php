@@ -59,6 +59,30 @@ final class ProductPriceRepository
     /**
      * @return array<string, mixed>|null
      */
+    public function findDetailById(int $id): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT pp.*, p.descripcion AS producto_descripcion,
+                    p.sku AS producto_sku, p.upc AS producto_upc,
+                    p.ean AS producto_ean, p.gtin AS producto_gtin,
+                    lp.clave AS lista_clave, lp.nombre AS lista_nombre,
+                    m.codigo AS moneda_codigo
+             FROM producto_precios pp
+             INNER JOIN productos p ON p.id_producto = pp.id_producto
+             INNER JOIN listas_precios lp ON lp.id = pp.lista_precio_id
+             INNER JOIN monedas m ON m.id = pp.moneda_id
+             WHERE pp.id = :id
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $id]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
     public function findByIdForUpdate(int $id): ?array
     {
         $statement = $this->connection->pdo()->prepare(
@@ -330,6 +354,72 @@ final class ProductPriceRepository
         return (int) $statement->fetchColumn() === 1;
     }
 
+    /**
+     * @param array{q: string, lista_precio_id: int|null, activo: string, requiere_revision: string, moneda_id: int|null} $filters
+     * @return list<array<string, mixed>>
+     */
+    public function paginate(array $filters, int $page, int $perPage): array
+    {
+        $where = $this->priceWhere($filters);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT pp.*, p.descripcion AS producto_descripcion,
+                    p.sku AS producto_sku, p.upc AS producto_upc,
+                    p.ean AS producto_ean, p.gtin AS producto_gtin,
+                    lp.clave AS lista_clave, lp.nombre AS lista_nombre,
+                    m.codigo AS moneda_codigo
+             FROM producto_precios pp
+             INNER JOIN productos p ON p.id_producto = pp.id_producto
+             INNER JOIN listas_precios lp ON lp.id = pp.lista_precio_id
+             INNER JOIN monedas m ON m.id = pp.moneda_id
+             ' . $where['sql'] . '
+             ORDER BY pp.requiere_revision DESC, p.descripcion, lp.nombre, pp.id
+             LIMIT :limit OFFSET :offset'
+        );
+
+        foreach ($where['params'] as $name => $value) {
+            $statement->bindValue($name, $value);
+        }
+
+        $statement->bindValue('limit', $perPage, \PDO::PARAM_INT);
+        $statement->bindValue('offset', ($page - 1) * $perPage, \PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param array{q: string, lista_precio_id: int|null, activo: string, requiere_revision: string, moneda_id: int|null} $filters
+     */
+    public function count(array $filters): int
+    {
+        $where = $this->priceWhere($filters);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM producto_precios pp
+             INNER JOIN productos p ON p.id_producto = pp.id_producto
+             INNER JOIN listas_precios lp ON lp.id = pp.lista_precio_id
+             INNER JOIN monedas m ON m.id = pp.moneda_id
+             ' . $where['sql']
+        );
+        $statement->execute($where['params']);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nombre: string}>
+     */
+    public function activeCurrencies(): array
+    {
+        return $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre
+             FROM monedas
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY codigo'
+        )->fetchAll();
+    }
+
     public function updateProductCurrency(
         string $idProducto,
         int $currencyId,
@@ -396,5 +486,60 @@ final class ProductPriceRepository
         $statement->execute(['id_producto' => $idProducto]);
 
         return $statement->fetchAll();
+    }
+
+    /**
+     * @param array{q: string, lista_precio_id: int|null, activo: string, requiere_revision: string, moneda_id: int|null} $filters
+     * @return array{sql: string, params: array<string, int|string>}
+     */
+    private function priceWhere(array $filters): array
+    {
+        $conditions = ['pp.eliminado_en IS NULL'];
+        $params = [];
+
+        if ($filters['q'] !== '') {
+            $conditions[] = '(
+                pp.id_producto LIKE :q_producto
+                OR p.descripcion LIKE :q_descripcion
+                OR p.sku LIKE :q_sku
+                OR p.upc LIKE :q_upc
+                OR p.ean LIKE :q_ean
+                OR p.gtin LIKE :q_gtin
+            )';
+            $like = '%' . $filters['q'] . '%';
+            $params['q_producto'] = $like;
+            $params['q_descripcion'] = $like;
+            $params['q_sku'] = $like;
+            $params['q_upc'] = $like;
+            $params['q_ean'] = $like;
+            $params['q_gtin'] = $like;
+        }
+
+        if ($filters['lista_precio_id'] !== null) {
+            $conditions[] = 'pp.lista_precio_id = :lista_precio_id';
+            $params['lista_precio_id'] = $filters['lista_precio_id'];
+        }
+
+        if ($filters['moneda_id'] !== null) {
+            $conditions[] = 'pp.moneda_id = :moneda_id';
+            $params['moneda_id'] = $filters['moneda_id'];
+        }
+
+        if ($filters['activo'] === 'active') {
+            $conditions[] = 'pp.activo = 1';
+        } elseif ($filters['activo'] === 'inactive') {
+            $conditions[] = 'pp.activo = 0';
+        }
+
+        if ($filters['requiere_revision'] === 'yes') {
+            $conditions[] = 'pp.requiere_revision = 1';
+        } elseif ($filters['requiere_revision'] === 'no') {
+            $conditions[] = 'pp.requiere_revision = 0';
+        }
+
+        return [
+            'sql' => 'WHERE ' . implode(' AND ', $conditions),
+            'params' => $params,
+        ];
     }
 }

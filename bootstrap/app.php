@@ -36,6 +36,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\PriceListController;
+use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -229,6 +230,14 @@ $priceListController = new PriceListController(
     $csrf,
     $priceLists
 );
+$productPriceController = new ProductPriceController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productPrices
+);
 $inventoryController = new InventoryController(
     $config,
     $auth,
@@ -270,6 +279,7 @@ $registerRoutes(
     $folioSeriesController,
     $productController,
     $priceListController,
+    $productPriceController,
     $inventoryController,
     $inventoryTransferController
 );

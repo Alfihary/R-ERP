@@ -479,6 +479,48 @@ final class ProductPriceService
     }
 
     /**
+     * @param array<string, mixed> $query
+     * @return array{rows: list<array<string, mixed>>, total: int, page: int, per_page: int, filters: array<string, mixed>}
+     */
+    public function listPrices(array $query = [], int $page = 1, int $perPage = 20): array
+    {
+        $filters = $this->priceFilters($query);
+        $page = max(1, $page);
+        $perPage = max(1, min(100, $perPage));
+
+        return [
+            'rows' => array_map(
+                fn (array $price): array => $this->normalizePrice($price),
+                $this->prices->paginate($filters, $page, $perPage)
+            ),
+            'total' => $this->prices->count($filters),
+            'page' => $page,
+            'per_page' => $perPage,
+            'filters' => $filters,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getPriceDetail(int $productoPrecioId): ?array
+    {
+        $price = $this->prices->findDetailById(
+            $this->positiveIdValue($productoPrecioId, 'producto_precio_id')
+        );
+
+        return $price === null ? null : $this->normalizePrice($price);
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nombre: string}>
+     */
+    public function listarMonedasActivas(): array
+    {
+        return $this->prices->activeCurrencies();
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function listarHistorialProductoPrecio(int $productoPrecioId): array
@@ -835,7 +877,42 @@ final class ProductPriceService
                 'lista_clave' => $price['lista_clave'] ?? null,
                 'lista_nombre' => $price['lista_nombre'] ?? null,
                 'moneda_codigo' => $price['moneda_codigo'] ?? null,
+                'producto_descripcion' => $price['producto_descripcion'] ?? null,
+                'producto_sku' => $price['producto_sku'] ?? null,
+                'producto_upc' => $price['producto_upc'] ?? null,
+                'producto_ean' => $price['producto_ean'] ?? null,
+                'producto_gtin' => $price['producto_gtin'] ?? null,
+                'creado_en' => $price['creado_en'] ?? null,
+                'actualizado_en' => $price['actualizado_en'] ?? null,
             ], static fn (mixed $value): bool => $value !== null),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $query
+     * @return array{q: string, lista_precio_id: int|null, activo: string, requiere_revision: string, moneda_id: int|null}
+     */
+    private function priceFilters(array $query): array
+    {
+        $activo = (string) ($query['activo'] ?? 'active');
+        $revision = (string) ($query['requiere_revision'] ?? 'all');
+
+        if (!in_array($activo, ['all', 'active', 'inactive'], true)) {
+            $activo = 'active';
+        }
+
+        if (!in_array($revision, ['all', 'yes', 'no'], true)) {
+            $revision = 'all';
+        }
+
+        return [
+            'q' => trim((string) ($query['q'] ?? '')),
+            'lista_precio_id' => $this->optionalPositiveId(
+                $query['lista_precio_id'] ?? null
+            ),
+            'activo' => $activo,
+            'requiere_revision' => $revision,
+            'moneda_id' => $this->optionalPositiveId($query['moneda_id'] ?? null),
         ];
     }
 
@@ -875,6 +952,22 @@ final class ProductPriceService
         }
 
         return $value;
+    }
+
+    private function optionalPositiveId(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (
+            (!is_string($value) && !is_int($value))
+            || preg_match('/^[1-9]\d*$/', (string) $value) !== 1
+        ) {
+            return null;
+        }
+
+        return (int) $value;
     }
 
     private function money(mixed $value, string $field): string

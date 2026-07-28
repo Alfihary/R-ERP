@@ -90,10 +90,15 @@ final class ProductPriceHistoryRepository
     public function listByProductPrice(int $productoPrecioId): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT *
-             FROM producto_precios_historial
-             WHERE producto_precio_id = :producto_precio_id
-             ORDER BY cambiado_en DESC, id DESC'
+            'SELECT h.*, ma.codigo AS moneda_anterior_codigo,
+                    mn.codigo AS moneda_nueva_codigo,
+                    u.username AS cambiado_por_username
+             FROM producto_precios_historial h
+             LEFT JOIN monedas ma ON ma.id = h.moneda_id_anterior
+             INNER JOIN monedas mn ON mn.id = h.moneda_id_nueva
+             INNER JOIN usuarios u ON u.id = h.cambiado_por
+             WHERE h.producto_precio_id = :producto_precio_id
+             ORDER BY h.cambiado_en DESC, h.id DESC'
         );
         $statement->execute(['producto_precio_id' => $productoPrecioId]);
 

@@ -1,6 +1,6 @@
 .price-list-page {
     display: grid;
-    gap: 1.25rem;
+    gap: 1rem;
     max-width: 72rem;
 }
 
@@ -18,7 +18,9 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1.25rem;
+    padding: 1.5rem;
+    background:
+        linear-gradient(180deg, oklch(0.985 0.006 160), var(--color-bg));
 }
 
 .price-list-page__header h1,
@@ -27,7 +29,8 @@
 }
 
 .price-list-page__header p:last-child {
-    margin-top: 0.35rem;
+    max-width: 68ch;
+    margin-top: 0.5rem;
     color: var(--color-muted);
 }
 
@@ -41,12 +44,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: end;
-    gap: 0.875rem;
-    padding: 1rem;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--color-bg);
 }
 
 .price-list-toolbar .field {
     min-width: min(100%, 14rem);
+}
+
+.price-list-toolbar .field:first-child {
+    min-width: min(100%, 18rem);
 }
 
 .price-list-form {
@@ -80,6 +88,17 @@
 
 .price-list-table {
     min-width: 58rem;
+}
+
+.price-list-table td:first-child code {
+    display: inline-flex;
+    min-height: 1.75rem;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0.5rem;
+    color: var(--color-primary-strong);
+    background: var(--color-surface);
+    font-weight: 800;
 }
 
 .price-list-table small {

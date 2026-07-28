@@ -28,6 +28,7 @@ $activeNavigation = is_string($activeNavigation ?? null)
     : 'home';
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
+$canAccessProductPrices = ($canAccessProductPrices ?? false) === true;
 $canAccessInventory = ($canAccessInventory ?? false) === true;
 $canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
 $canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === true;
@@ -105,6 +106,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">▤</span>
                         Productos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProductPrices): ?>
+                    <span class="app-navigation__section">Precios</span>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'product-prices' ? ' is-active' : '' ?>"
+                        href="/precios/productos"
+                        <?= $activeNavigation === 'product-prices' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">$</span>
+                        Precios por producto
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessInventory): ?>
