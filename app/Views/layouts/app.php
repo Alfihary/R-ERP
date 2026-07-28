@@ -38,6 +38,7 @@ $canAccessConfiguration = ($canAccessConfiguration ?? false) === true;
 $canAccessConfigCompanies = ($canAccessConfigCompanies ?? false) === true;
 $canAccessConfigWarehouses = ($canAccessConfigWarehouses ?? false) === true;
 $canAccessConfigFolios = ($canAccessConfigFolios ?? false) === true;
+$canAccessPriceLists = ($canAccessPriceLists ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 $activeCompany = is_array($context['active_company'] ?? null)
@@ -197,6 +198,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">№</span>
                         Folios
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessPriceLists): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-price-lists' ? ' is-active' : '' ?>"
+                        href="/configuracion/listas-precios"
+                        <?= $activeNavigation === 'configuration-price-lists' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">$</span>
+                        Listas de precios
                     </a>
                 <?php endif; ?>
             </nav>

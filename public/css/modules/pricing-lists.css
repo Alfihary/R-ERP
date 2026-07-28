@@ -1,0 +1,134 @@
+.price-list-page {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 72rem;
+}
+
+.price-list-page__header,
+.price-list-toolbar,
+.price-list-form,
+.price-list-detail {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+}
+
+.price-list-page__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.price-list-page__header h1,
+.price-list-page__header p {
+    margin: 0;
+}
+
+.price-list-page__header p:last-child {
+    margin-top: 0.35rem;
+    color: var(--color-muted);
+}
+
+.price-list-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.price-list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.875rem;
+    padding: 1rem;
+}
+
+.price-list-toolbar .field {
+    min-width: min(100%, 14rem);
+}
+
+.price-list-form {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1.25rem;
+}
+
+.price-list-form fieldset {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+}
+
+.price-list-form legend {
+    padding: 0 0.35rem;
+    font-weight: 750;
+}
+
+.price-list-form .field--wide {
+    grid-column: 1 / -1;
+}
+
+.price-list-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.price-list-table {
+    min-width: 58rem;
+}
+
+.price-list-table small {
+    display: block;
+    color: var(--color-muted);
+}
+
+.price-list-detail {
+    padding: 1.25rem;
+}
+
+.price-list-detail dl {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+}
+
+.price-list-detail div {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.price-list-detail dt {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 750;
+    text-transform: uppercase;
+}
+
+.price-list-detail dd {
+    margin: 0;
+}
+
+.form-note {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-danger);
+}
+
+@media (max-width: 48rem) {
+    .price-list-page__header,
+    .price-list-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .price-list-form fieldset,
+    .price-list-detail dl {
+        grid-template-columns: 1fr;
+    }
+}

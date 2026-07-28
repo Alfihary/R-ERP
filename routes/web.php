@@ -19,6 +19,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -39,6 +40,7 @@ return static function (
     WarehouseController $warehouseController,
     FolioSeriesController $folioSeriesController,
     ProductController $productController,
+    PriceListController $priceListController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController
 ): void {
@@ -121,6 +123,9 @@ return static function (
         ) || $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'configuracion.folios.acceder'
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'precios.listas.acceder'
         );
 
         return Response::html(View::render('layouts/app', [
@@ -142,6 +147,10 @@ return static function (
             'canAccessConfigFolios' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
                 'configuracion.folios.acceder'
+            ),
+            'canAccessPriceLists' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                'precios.listas.acceder'
             ),
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
@@ -377,6 +386,75 @@ return static function (
         static fn (Request $request): Response =>
             $folioSeriesController->activate($request),
         $folioMiddleware('configuracion.folios.desactivar')
+    );
+
+    $priceListBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'precios.listas.acceder'),
+    ];
+    $priceListMiddleware = static function (string $permission) use (
+        $priceListBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($priceListBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/configuracion/listas-precios',
+        static fn (Request $request): Response =>
+            $priceListController->index($request),
+        $priceListBaseMiddleware
+    );
+    $router->get(
+        '/configuracion/listas-precios/crear',
+        static fn (Request $request): Response =>
+            $priceListController->createForm($request),
+        $priceListMiddleware('precios.listas.crear')
+    );
+    $router->post(
+        '/configuracion/listas-precios',
+        static fn (Request $request): Response =>
+            $priceListController->create($request),
+        $priceListMiddleware('precios.listas.crear')
+    );
+    $router->get(
+        '/configuracion/listas-precios/ver',
+        static fn (Request $request): Response =>
+            $priceListController->show($request),
+        $priceListMiddleware('precios.listas.ver')
+    );
+    $router->get(
+        '/configuracion/listas-precios/editar',
+        static fn (Request $request): Response =>
+            $priceListController->editForm($request),
+        $priceListMiddleware('precios.listas.editar')
+    );
+    $router->post(
+        '/configuracion/listas-precios/actualizar',
+        static fn (Request $request): Response =>
+            $priceListController->update($request),
+        $priceListMiddleware('precios.listas.editar')
+    );
+    $router->post(
+        '/configuracion/listas-precios/activar',
+        static fn (Request $request): Response =>
+            $priceListController->activate($request),
+        $priceListMiddleware('precios.listas.activar')
+    );
+    $router->post(
+        '/configuracion/listas-precios/desactivar',
+        static fn (Request $request): Response =>
+            $priceListController->deactivate($request),
+        $priceListMiddleware('precios.listas.activar')
+    );
+    $router->post(
+        '/configuracion/listas-precios/predeterminada',
+        static fn (Request $request): Response =>
+            $priceListController->setDefault($request),
+        $priceListMiddleware('precios.listas.predeterminada')
     );
 
     $catalogAccessMiddleware = new PermissionMiddleware(

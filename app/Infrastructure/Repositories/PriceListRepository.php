@@ -12,6 +12,33 @@ final class PriceListRepository
     {
     }
 
+    public function beginTransaction(): bool
+    {
+        $pdo = $this->connection->pdo();
+
+        if ($pdo->inTransaction()) {
+            return false;
+        }
+
+        $pdo->beginTransaction();
+
+        return true;
+    }
+
+    public function commit(bool $ownsTransaction = true): void
+    {
+        if ($ownsTransaction) {
+            $this->connection->pdo()->commit();
+        }
+    }
+
+    public function rollBack(bool $ownsTransaction = true): void
+    {
+        if ($ownsTransaction && $this->connection->pdo()->inTransaction()) {
+            $this->connection->pdo()->rollBack();
+        }
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -22,6 +49,43 @@ final class PriceListRepository
              FROM listas_precios
              WHERE id = :id
              LIMIT 1'
+        );
+        $statement->execute(['id' => $id]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findNotDeletedById(int $id): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT *
+             FROM listas_precios
+             WHERE id = :id
+               AND eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $id]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findNotDeletedByIdForUpdate(int $id): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT *
+             FROM listas_precios
+             WHERE id = :id
+               AND eliminado_en IS NULL
+             LIMIT 1
+             FOR UPDATE'
         );
         $statement->execute(['id' => $id]);
         $row = $statement->fetch();
@@ -98,6 +162,52 @@ final class PriceListRepository
     }
 
     /**
+     * @param array{search: string, status: string, page: int, per_page: int} $filters
+     * @return list<array<string, mixed>>
+     */
+    public function paginate(array $filters): array
+    {
+        $where = $this->where($filters);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, clave, nombre, observaciones, incluye_impuestos,
+                    es_predeterminada, activo, creado_en, actualizado_en,
+                    eliminado_en
+             FROM listas_precios
+             ' . $where['sql'] . '
+             ORDER BY es_predeterminada DESC, activo DESC, nombre, clave
+             LIMIT :limit OFFSET :offset'
+        );
+
+        foreach ($where['params'] as $name => $value) {
+            $statement->bindValue($name, $value);
+        }
+
+        $statement->bindValue('limit', $filters['per_page'], \PDO::PARAM_INT);
+        $statement->bindValue(
+            'offset',
+            ($filters['page'] - 1) * $filters['per_page'],
+            \PDO::PARAM_INT
+        );
+        $statement->execute();
+
+        return $statement->fetchAll();
+    }
+
+    /**
+     * @param array{search: string, status: string, page: int, per_page: int} $filters
+     */
+    public function count(array $filters): int
+    {
+        $where = $this->where($filters);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*) FROM listas_precios ' . $where['sql']
+        );
+        $statement->execute($where['params']);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    /**
      * @param array<string, int|string|null> $data
      */
     public function insert(array $data): int
@@ -167,6 +277,69 @@ final class PriceListRepository
         ]);
     }
 
+    public function activate(int $id, int $userId): void
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'UPDATE listas_precios
+             SET activo = 1,
+                 actualizado_en = CURRENT_TIMESTAMP,
+                 actualizado_por = :actualizado_por
+             WHERE id = :id
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'id' => $id,
+            'actualizado_por' => $userId,
+        ]);
+    }
+
+    public function deactivate(int $id, int $userId): void
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'UPDATE listas_precios
+             SET activo = 0,
+                 es_predeterminada = 0,
+                 actualizado_en = CURRENT_TIMESTAMP,
+                 actualizado_por = :actualizado_por
+             WHERE id = :id
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'id' => $id,
+            'actualizado_por' => $userId,
+        ]);
+    }
+
+    public function clearDefault(int $userId): void
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'UPDATE listas_precios
+             SET es_predeterminada = 0,
+                 actualizado_en = CURRENT_TIMESTAMP,
+                 actualizado_por = :actualizado_por
+             WHERE es_predeterminada = 1
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute(['actualizado_por' => $userId]);
+    }
+
+    public function setDefault(int $id, int $userId): void
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'UPDATE listas_precios
+             SET es_predeterminada = 1,
+                 actualizado_en = CURRENT_TIMESTAMP,
+                 actualizado_por = :actualizado_por
+             WHERE id = :id
+               AND activo = 1
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'id' => $id,
+            'actualizado_por' => $userId,
+        ]);
+    }
+
     public function softDelete(int $id, int $userId): void
     {
         $statement = $this->connection->pdo()->prepare(
@@ -184,5 +357,32 @@ final class PriceListRepository
             'actualizado_por' => $userId,
             'eliminado_por' => $userId,
         ]);
+    }
+
+    /**
+     * @param array{search: string, status: string, page: int, per_page: int} $filters
+     * @return array{sql: string, params: array<string, string>}
+     */
+    private function where(array $filters): array
+    {
+        $conditions = ['eliminado_en IS NULL'];
+        $params = [];
+
+        if ($filters['search'] !== '') {
+            $conditions[] = '(clave LIKE :search_clave OR nombre LIKE :search_nombre)';
+            $params['search_clave'] = '%' . $filters['search'] . '%';
+            $params['search_nombre'] = '%' . $filters['search'] . '%';
+        }
+
+        if ($filters['status'] === 'active') {
+            $conditions[] = 'activo = 1';
+        } elseif ($filters['status'] === 'inactive') {
+            $conditions[] = 'activo = 0';
+        }
+
+        return [
+            'sql' => 'WHERE ' . implode(' AND ', $conditions),
+            'params' => $params,
+        ];
     }
 }

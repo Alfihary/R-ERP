@@ -18,6 +18,7 @@ use App\Domain\Configuration\WarehouseService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
+use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
@@ -34,6 +35,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -137,6 +139,7 @@ $productPrices = new ProductPriceService(
     new PriceListRepository($connection),
     new ProductPriceHistoryRepository($connection)
 );
+$priceLists = new PriceListService(new PriceListRepository($connection));
 $products = new ProductService($productRepository, $productPrices);
 $productImages = new ProductImageService(
     $productRepository,
@@ -218,6 +221,14 @@ $productController = new ProductController(
     $products,
     $productImages
 );
+$priceListController = new PriceListController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $priceLists
+);
 $inventoryController = new InventoryController(
     $config,
     $auth,
@@ -258,6 +269,7 @@ $registerRoutes(
     $warehouseController,
     $folioSeriesController,
     $productController,
+    $priceListController,
     $inventoryController,
     $inventoryTransferController
 );
