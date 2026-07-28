@@ -34,6 +34,20 @@ $initialPriceRows = is_array($values['precios_iniciales'] ?? null)
 $currencyPriceRows = is_array($values['precios_cambio_moneda'] ?? null)
     ? $values['precios_cambio_moneda']
     : [];
+$pricedListIds = [];
+foreach ($prices as $price) {
+    if (is_array($price) && isset($price['lista_precio_id'])) {
+        $pricedListIds[(string) $price['lista_precio_id']] = true;
+    }
+}
+$availableInitialPriceLists = array_values(array_filter(
+    $priceLists,
+    static function (array $list) use ($pricedListIds): bool {
+        $listId = (string) ($list['id'] ?? '');
+
+        return $listId !== '' && !isset($pricedListIds[$listId]);
+    }
+));
 $priceRowValue = static function (
     array $rows,
     string $listId,
@@ -501,8 +515,8 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
         <fieldset class="product-form-section">
             <legend>Precios actuales</legend>
             <p class="product-form-section__help">
-                Consulta simple de precios vigentes del producto. Las acciones
-                de edición directa e historial quedan para una fase posterior.
+                Consulta de precios vigentes del producto. Para editar importes
+                ya registrados usa la pantalla global de precios.
             </p>
             <?php if ($prices === []): ?>
                 <p class="product-related-empty">El producto no tiene precios registrados.</p>
@@ -559,6 +573,81 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
                         </tbody>
                     </table>
                 </div>
+            <?php endif; ?>
+        </fieldset>
+    <?php endif; ?>
+
+    <?php if (
+        $editing
+        && ($pricePermissions['create'] ?? false) === true
+        && $availableInitialPriceLists !== []
+    ): ?>
+        <fieldset class="product-form-section">
+            <legend>Agregar precios faltantes</legend>
+            <p class="product-form-section__help">
+                Captura precios para listas activas que todavía no están
+                registradas en este producto. Las filas totalmente vacías se
+                ignoran.
+            </p>
+            <div class="product-table-wrap">
+                <table class="product-table product-table--prices">
+                    <thead>
+                        <tr>
+                            <th>Lista</th>
+                            <th>Precio lista</th>
+                            <th>Precio mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($availableInitialPriceLists as $index => $list): ?>
+                            <?php $listId = (string) ($list['id'] ?? ''); ?>
+                            <tr>
+                                <td>
+                                    <strong><?= e($list['clave'] ?? '') ?></strong>
+                                    <span><?= e($list['nombre'] ?? '') ?></span>
+                                    <input
+                                        type="hidden"
+                                        name="precios_iniciales[<?= e((string) $index) ?>][lista_precio_id]"
+                                        value="<?= e($listId) ?>"
+                                    >
+                                </td>
+                                <td>
+                                    <label class="sr-only" for="precio_faltante_lista_<?= e((string) $index) ?>">
+                                        Precio lista <?= e($list['clave'] ?? '') ?>
+                                    </label>
+                                    <input
+                                        id="precio_faltante_lista_<?= e((string) $index) ?>"
+                                        name="precios_iniciales[<?= e((string) $index) ?>][precio_lista]"
+                                        type="number"
+                                        inputmode="decimal"
+                                        min="0"
+                                        step="0.0001"
+                                        value="<?= e($priceRowValue($initialPriceRows, $listId, 'precio_lista')) ?>"
+                                    >
+                                </td>
+                                <td>
+                                    <label class="sr-only" for="precio_faltante_minimo_<?= e((string) $index) ?>">
+                                        Precio mínimo <?= e($list['clave'] ?? '') ?>
+                                    </label>
+                                    <input
+                                        id="precio_faltante_minimo_<?= e((string) $index) ?>"
+                                        name="precios_iniciales[<?= e((string) $index) ?>][precio_minimo]"
+                                        type="number"
+                                        inputmode="decimal"
+                                        min="0"
+                                        step="0.0001"
+                                        value="<?= e($priceRowValue($initialPriceRows, $listId, 'precio_minimo')) ?>"
+                                    >
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php if (isset($errors['precios_iniciales'])): ?>
+                <span class="product-field-error">
+                    <?= e($errors['precios_iniciales']) ?>
+                </span>
             <?php endif; ?>
         </fieldset>
     <?php endif; ?>

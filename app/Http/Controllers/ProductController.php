@@ -170,6 +170,10 @@ final class ProductController
                 $this->permissions->allows(
                     $user['user_id'],
                     'precios.productos.editar'
+                ),
+                $this->permissions->allows(
+                    $user['user_id'],
+                    'precios.productos.crear'
                 )
             );
             $this->products->update(
@@ -306,9 +310,11 @@ final class ProductController
         }
 
         $image = null;
+        $prices = [];
 
         if ($editing && is_string($values['id_producto'] ?? null)) {
             $image = $this->safeImage((string) $values['id_producto']);
+            $prices = $this->safePrices((string) $values['id_producto']);
         }
 
         return $this->render('products/form', [
@@ -317,9 +323,7 @@ final class ProductController
             'errors' => $errors,
             'image' => $image,
             'priceLists' => $this->safePriceLists(),
-            'prices' => $editing && is_string($values['id_producto'] ?? null)
-                ? $this->safePrices((string) $values['id_producto'])
-                : [],
+            'prices' => $prices,
             'pricePermissions' => [
                 'create' => $this->permissions->allows(
                     $this->user()['user_id'],
@@ -418,27 +422,35 @@ final class ProductController
     private function withPriceInput(
         array $input,
         bool $editing,
-        bool $allowed
+        bool $allowed,
+        ?bool $createAllowed = null
     ): array {
-        if (!$allowed) {
+        $createAllowed ??= $allowed;
+
+        if (!$allowed && !$createAllowed) {
             $input['precios_iniciales'] = [];
             $input['precios_cambio_moneda'] = [];
             return $input;
         }
 
-        $createRows = $this->normalizePriceRows(
-            $input['precios_iniciales'] ?? [],
-            'precios_iniciales'
-        );
-        $changeRows = $this->normalizePriceRows(
-            $input['precios_cambio_moneda'] ?? [],
-            'precios_cambio_moneda'
-        );
+        $createRows = $createAllowed
+            ? $this->normalizePriceRows(
+                $input['precios_iniciales'] ?? [],
+                'precios_iniciales'
+            )
+            : [];
+        $changeRows = $allowed
+            ? $this->normalizePriceRows(
+                $input['precios_cambio_moneda'] ?? [],
+                'precios_cambio_moneda'
+            )
+            : [];
 
         $input['precios_iniciales'] = [];
         $input['precios_cambio_moneda'] = [];
 
         if ($editing) {
+            $input['precios_iniciales'] = $createRows;
             $input['precios_cambio_moneda'] = $changeRows;
             return $input;
         }

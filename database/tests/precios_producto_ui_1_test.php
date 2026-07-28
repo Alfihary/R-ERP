@@ -21,6 +21,7 @@ return new class implements DatabaseTest {
     private const PRODUCT_DUPLICATE = 'QAPRCUI006';
     private const PRODUCT_NO_CHANGE = 'QAPRCUI007';
     private const PRODUCT_CURRENCY = 'QAPRCUI008';
+    private const PRODUCT_EDIT_ADD = 'QAPRCUI009';
 
     public function run(PDO $pdo, string $expectedDatabase): array
     {
@@ -172,6 +173,47 @@ return new class implements DatabaseTest {
             );
             $results['fila_vacia_ignorada'] =
                 $this->priceCount($pdo, self::PRODUCT_EMPTY) === 0;
+
+            $products->create(
+                $this->productInput(self::PRODUCT_EDIT_ADD, $unitId, $mxnId),
+                $actorId
+            );
+            $editAddRows = $this->normalizedInput([
+                'precios_iniciales' => [
+                    [
+                        'lista_precio_id' => $publicListId,
+                        'precio_lista' => '125.0000',
+                        'precio_minimo' => '100.0000',
+                    ],
+                ],
+            ], true, true, true)['precios_iniciales'];
+            $products->update(
+                self::PRODUCT_EDIT_ADD,
+                $this->productInput(
+                    self::PRODUCT_EDIT_ADD,
+                    $unitId,
+                    $mxnId,
+                    $editAddRows
+                ),
+                $actorId
+            );
+            $addedFromEdit = $this->priceByProductAndList(
+                $pdo,
+                self::PRODUCT_EDIT_ADD,
+                $publicListId
+            );
+            $results['editar_agrega_precio_faltante'] = [
+                'price_created_from_edit' =>
+                    $addedFromEdit !== null
+                    && $addedFromEdit['precio_lista'] === '125.0000'
+                    && $addedFromEdit['precio_minimo'] === '100.0000',
+                'history_creacion_from_edit' =>
+                    $this->historyCountByType(
+                        $pdo,
+                        self::PRODUCT_EDIT_ADD,
+                        'CREACION'
+                    ) === 1,
+            ];
 
             $results['rechazos_creacion'] = [
                 'precio_sin_moneda' => $this->fails(
@@ -364,6 +406,11 @@ return new class implements DatabaseTest {
                         'app/Views/products/form.php',
                         'Precios actuales'
                     ),
+                'form_declares_missing_prices' =>
+                    $this->fileContains(
+                        'app/Views/products/form.php',
+                        'Agregar precios faltantes'
+                    ),
                 'detail_declares_prices' =>
                     $this->fileContains(
                         'app/Views/products/detail.php',
@@ -437,16 +484,35 @@ return new class implements DatabaseTest {
         bool $editing,
         bool $allowed
     ): array {
+        $input = $editing
+            ? ['precios_cambio_moneda' => $rows]
+            : ['precios_iniciales' => $rows];
+
+        return $this->normalizedInput($input, $editing, $allowed);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+    private function normalizedInput(
+        array $input,
+        bool $editing,
+        bool $allowed,
+        ?bool $createAllowed = null
+    ): array {
         $controller = (new ReflectionClass(ProductController::class))
             ->newInstanceWithoutConstructor();
         $method = new ReflectionMethod(ProductController::class, 'withPriceInput');
         $method->setAccessible(true);
 
-        $input = $editing
-            ? ['precios_cambio_moneda' => $rows]
-            : ['precios_iniciales' => $rows];
-
-        return $method->invoke($controller, $input, $editing, $allowed);
+        return $method->invoke(
+            $controller,
+            $input,
+            $editing,
+            $allowed,
+            $createAllowed
+        );
     }
 
     /**

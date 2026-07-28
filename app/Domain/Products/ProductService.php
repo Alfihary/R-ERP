@@ -224,6 +224,14 @@ final class ProductService
                 ? 'precios_cambio_moneda'
                 : 'precios_actualizados'
         );
+        $newPrices = $this->priceRows($input, 'precios_iniciales');
+
+        if ($newPrices !== [] && $newCurrencyId === null) {
+            throw new ProductValidationException([
+                'moneda_id' =>
+                    'Selecciona una moneda para capturar precios del producto.',
+            ]);
+        }
 
         try {
             $this->products->transactional(function () use (
@@ -232,7 +240,8 @@ final class ProductService
                 $productId,
                 $currencyChanged,
                 $currencyPrices,
-                $newCurrencyId
+                $newCurrencyId,
+                $newPrices
             ): void {
                 if ($currencyChanged) {
                     $existingPrices = $this->prices === null
@@ -273,6 +282,13 @@ final class ProductService
                     $data['barcodes'],
                     $actorId
                 );
+                if ($newPrices !== []) {
+                    $this->priceService()->crearPreciosInicialesProducto(
+                        $productId,
+                        $newPrices,
+                        $actorId
+                    );
+                }
             });
         } catch (PricingValidationException $exception) {
             throw new ProductValidationException($exception->errors());
