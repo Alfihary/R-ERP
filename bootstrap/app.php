@@ -18,6 +18,7 @@ use App\Domain\Configuration\WarehouseService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
+use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
@@ -47,8 +48,11 @@ use App\Infrastructure\Repositories\FolioRepository;
 use App\Infrastructure\Repositories\FolioSeriesRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
+use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
+use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
+use App\Infrastructure\Repositories\ProductPriceRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
@@ -128,7 +132,12 @@ $companies = new CompanyService($companyRepository);
 $warehouses = new WarehouseService($warehouseRepository);
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
-$products = new ProductService($productRepository);
+$productPrices = new ProductPriceService(
+    new ProductPriceRepository($connection),
+    new PriceListRepository($connection),
+    new ProductPriceHistoryRepository($connection)
+);
+$products = new ProductService($productRepository, $productPrices);
 $productImages = new ProductImageService(
     $productRepository,
     $productDocuments,

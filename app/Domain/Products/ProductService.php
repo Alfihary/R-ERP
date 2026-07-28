@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domain\Products;
 
+use App\Domain\Pricing\PricingValidationException;
+use App\Domain\Pricing\ProductPriceService;
 use App\Infrastructure\Repositories\ProductRepository;
 use PDOException;
 
 final class ProductService
 {
-    public function __construct(private readonly ProductRepository $products)
+    public function __construct(
+        private readonly ProductRepository $products,
+        private readonly ?ProductPriceService $prices = null
+    )
     {
     }
 
@@ -114,6 +119,14 @@ final class ProductService
         $this->assertActor($actorId);
         $productId = strtoupper($this->text($input, 'id_producto'));
         $data = $this->validate($input, $productId, true);
+        $initialPrices = $this->priceRows($input, 'precios_iniciales');
+
+        if ($initialPrices !== [] && $data['product']['moneda_id'] === null) {
+            throw new ProductValidationException([
+                'moneda_id' =>
+                    'Selecciona una moneda para capturar precios iniciales.',
+            ]);
+        }
 
         if ($this->products->exists($productId)) {
             throw new ProductValidationException([
@@ -126,7 +139,8 @@ final class ProductService
                 $data,
                 $actorId,
                 $productId,
-                $afterProductCreated
+                $afterProductCreated,
+                $initialPrices
             ): void {
                 $this->products->create($data['product'], $actorId);
                 $this->products->replaceTaxes(
@@ -142,7 +156,16 @@ final class ProductService
                 if ($afterProductCreated !== null) {
                     $afterProductCreated($productId);
                 }
+                if ($initialPrices !== []) {
+                    $this->priceService()->crearPreciosInicialesProducto(
+                        $productId,
+                        $initialPrices,
+                        $actorId
+                    );
+                }
             });
+        } catch (PricingValidationException $exception) {
+            throw new ProductValidationException($exception->errors());
         } catch (PDOException $exception) {
             $this->convertDatabaseError($exception);
             throw $exception;
@@ -161,7 +184,7 @@ final class ProductService
     ): void {
         $this->assertActor($actorId);
         $productId = $this->validatedStoredId($productId);
-        $this->get($productId);
+        $current = $this->get($productId);
         $submittedId = $this->text($input, 'id_producto');
 
         if ($submittedId !== $productId) {
@@ -172,13 +195,51 @@ final class ProductService
         }
 
         $data = $this->validate($input, $productId, false);
+        $newCurrencyId = $data['product']['moneda_id'];
+        $currentCurrencyId = $current['moneda_id'] === null
+            ? null
+            : (int) $current['moneda_id'];
+        $currencyChanged = $currentCurrencyId !== $newCurrencyId;
+        $currencyPrices = $this->priceRows(
+            $input,
+            array_key_exists('precios_cambio_moneda', $input)
+                ? 'precios_cambio_moneda'
+                : 'precios_actualizados'
+        );
 
         try {
             $this->products->transactional(function () use (
                 $data,
                 $actorId,
-                $productId
+                $productId,
+                $currencyChanged,
+                $currencyPrices,
+                $newCurrencyId
             ): void {
+                if ($currencyChanged) {
+                    $existingPrices = $this->prices === null
+                        ? []
+                        : $this->prices->listarPreciosProducto($productId);
+
+                    if ($existingPrices !== [] || $currencyPrices !== []) {
+                        if ($newCurrencyId === null) {
+                            throw new ProductValidationException([
+                                'moneda_id' =>
+                                    'Selecciona la nueva moneda del producto.',
+                            ]);
+                        }
+
+                        $this->priceService()->cambiarMonedaProductoConPrecios([
+                            'id_producto' => $productId,
+                            'moneda_id_nueva' => $newCurrencyId,
+                            'precios_actualizados' => $currencyPrices,
+                            'usuario_id' => $actorId,
+                            'motivo_cambio' =>
+                                'Cambio de moneda desde producto.',
+                        ]);
+                    }
+                }
+
                 $this->products->update(
                     $productId,
                     $data['product'],
@@ -195,6 +256,8 @@ final class ProductService
                     $actorId
                 );
             });
+        } catch (PricingValidationException $exception) {
+            throw new ProductValidationException($exception->errors());
         } catch (PDOException $exception) {
             $this->convertDatabaseError($exception);
             throw $exception;
@@ -741,6 +804,68 @@ final class ProductService
         }
 
         return ['value' => 0, 'error' => true];
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return list<array<string, mixed>>
+     */
+    private function priceRows(array $input, string $key): array
+    {
+        $raw = $input[$key] ?? [];
+
+        if ($raw === '' || $raw === null) {
+            return [];
+        }
+
+        if (!is_array($raw)) {
+            throw new ProductValidationException([
+                $key => 'Los precios deben enviarse como una lista.',
+            ]);
+        }
+
+        $rows = [];
+
+        foreach (array_values($raw) as $index => $row) {
+            if (!is_array($row)) {
+                throw new ProductValidationException([
+                    $key . '.' . $index =>
+                        'Cada precio debe enviarse como un arreglo.',
+                ]);
+            }
+
+            $listId = $row['lista_precio_id'] ?? null;
+            $listPrice = $row['precio_lista'] ?? null;
+            $minimumPrice = $row['precio_minimo'] ?? null;
+
+            if (
+                ($listId === null || $listId === '')
+                && ($listPrice === null || $listPrice === '')
+                && ($minimumPrice === null || $minimumPrice === '')
+            ) {
+                continue;
+            }
+
+            $rows[] = [
+                'lista_precio_id' => $listId,
+                'precio_lista' => $listPrice,
+                'precio_minimo' => $minimumPrice,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function priceService(): ProductPriceService
+    {
+        if ($this->prices === null) {
+            throw new ProductValidationException([
+                'precios' =>
+                    'El servicio de precios no está disponible para productos.',
+            ]);
+        }
+
+        return $this->prices;
     }
 
     private function assertActor(int $actorId): void
