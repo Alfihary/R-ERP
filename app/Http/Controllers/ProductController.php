@@ -50,10 +50,19 @@ final class ProductController
     public function create(Request $request): Response
     {
         $user = $this->user();
+        $input = $request->body();
         $preparedImage = null;
         $storedImagePath = null;
 
         try {
+            $input = $this->withPriceInput(
+                $input,
+                false,
+                $this->permissions->allows(
+                    $user['user_id'],
+                    'precios.productos.crear'
+                )
+            );
             $upload = $request->file('imagen');
 
             if (
@@ -66,12 +75,12 @@ final class ProductController
 
             if ($preparedImage === null) {
                 $productId = $this->products->create(
-                    $request->body(),
+                    $input,
                     $user['user_id']
                 );
             } else {
                 $productId = $this->products->createWithHook(
-                    $request->body(),
+                    $input,
                     $user['user_id'],
                     function (string $productId) use (
                         $preparedImage,
@@ -93,7 +102,7 @@ final class ProductController
             }
 
             return $this->renderForm(
-                $request->body(),
+                $input,
                 $exception->errors(),
                 false,
                 422
@@ -126,6 +135,7 @@ final class ProductController
             'abilities' => $this->abilities($this->user()['user_id']),
             'image' => $this->safeImage($productId),
             'notice' => $this->resultMessage($request),
+            'prices' => $this->safePrices($productId),
             'product' => $product,
         ], 'Detalle de producto');
     }
@@ -151,16 +161,25 @@ final class ProductController
         $user = $this->user();
         $originalId = $request->input('original_id_producto');
         $originalId = is_string($originalId) ? $originalId : '';
+        $input = $request->body();
 
         try {
+            $input = $this->withPriceInput(
+                $input,
+                true,
+                $this->permissions->allows(
+                    $user['user_id'],
+                    'precios.productos.editar'
+                )
+            );
             $this->products->update(
                 $originalId,
-                $request->body(),
+                $input,
                 $user['user_id']
             );
         } catch (ProductValidationException $exception) {
             return $this->renderForm(
-                $request->body(),
+                $input,
                 $exception->errors(),
                 true,
                 422,
@@ -297,6 +316,24 @@ final class ProductController
             'editing' => $editing,
             'errors' => $errors,
             'image' => $image,
+            'priceLists' => $this->safePriceLists(),
+            'prices' => $editing && is_string($values['id_producto'] ?? null)
+                ? $this->safePrices((string) $values['id_producto'])
+                : [],
+            'pricePermissions' => [
+                'create' => $this->permissions->allows(
+                    $this->user()['user_id'],
+                    'precios.productos.crear'
+                ),
+                'edit' => $this->permissions->allows(
+                    $this->user()['user_id'],
+                    'precios.productos.editar'
+                ),
+                'view' => $this->permissions->allows(
+                    $this->user()['user_id'],
+                    'precios.productos.ver'
+                ),
+            ],
             'values' => $values,
         ], $editing ? 'Editar producto' : 'Crear producto', $status);
     }
@@ -364,8 +401,128 @@ final class ProductController
                 'productos.' . $action
             );
         }
+        foreach (['ver', 'crear', 'editar'] as $action) {
+            $abilities['precios_' . $action] = $this->permissions->allows(
+                $userId,
+                'precios.productos.' . $action
+            );
+        }
 
         return $abilities;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string, mixed>
+     */
+    private function withPriceInput(
+        array $input,
+        bool $editing,
+        bool $allowed
+    ): array {
+        if (!$allowed) {
+            $input['precios_iniciales'] = [];
+            $input['precios_cambio_moneda'] = [];
+            return $input;
+        }
+
+        $createRows = $this->normalizePriceRows(
+            $input['precios_iniciales'] ?? [],
+            'precios_iniciales'
+        );
+        $changeRows = $this->normalizePriceRows(
+            $input['precios_cambio_moneda'] ?? [],
+            'precios_cambio_moneda'
+        );
+
+        $input['precios_iniciales'] = [];
+        $input['precios_cambio_moneda'] = [];
+
+        if ($editing) {
+            $input['precios_cambio_moneda'] = $changeRows;
+            return $input;
+        }
+
+        $input['precios_iniciales'] = $createRows;
+        return $input;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function normalizePriceRows(mixed $raw, string $field): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (!is_array($raw)) {
+            throw new ProductValidationException([
+                $field => 'Los precios deben enviarse como una lista.',
+            ]);
+        }
+
+        $rows = [];
+        $seenLists = [];
+
+        foreach (array_values($raw) as $index => $row) {
+            if (!is_array($row)) {
+                throw new ProductValidationException([
+                    $field . '.' . $index =>
+                        'Cada precio debe enviarse como una fila válida.',
+                ]);
+            }
+
+            $listId = $this->trimmed($row['lista_precio_id'] ?? '');
+            $listPrice = $this->trimmed($row['precio_lista'] ?? '');
+            $minimumPrice = $this->trimmed($row['precio_minimo'] ?? '');
+
+            if ($listId === '' && $listPrice === '' && $minimumPrice === '') {
+                continue;
+            }
+
+            if ($listId === '') {
+                throw new ProductValidationException([
+                    $field => 'Selecciona una lista de precios.',
+                ]);
+            }
+
+            if ($listPrice === '') {
+                throw new ProductValidationException([
+                    $field => 'El precio de lista es obligatorio.',
+                ]);
+            }
+
+            if ($minimumPrice === '') {
+                throw new ProductValidationException([
+                    $field => 'El precio mínimo es obligatorio.',
+                ]);
+            }
+
+            if (isset($seenLists[$listId])) {
+                throw new ProductValidationException([
+                    $field => 'No repitas listas de precios.',
+                ]);
+            }
+
+            $seenLists[$listId] = true;
+            $rows[] = [
+                'lista_precio_id' => $listId,
+                'precio_lista' => $listPrice,
+                'precio_minimo' => $minimumPrice,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function trimmed(mixed $value): string
+    {
+        if (!is_string($value) && !is_int($value) && !is_float($value)) {
+            return '';
+        }
+
+        return trim((string) $value);
     }
 
     /**
@@ -480,6 +637,30 @@ final class ProductController
             return $this->images->current($productId);
         } catch (ProductValidationException) {
             return null;
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function safePriceLists(): array
+    {
+        try {
+            return $this->products->activePriceLists();
+        } catch (ProductValidationException) {
+            return [];
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function safePrices(string $productId): array
+    {
+        try {
+            return $this->products->prices($productId);
+        } catch (ProductValidationException) {
+            return [];
         }
     }
 

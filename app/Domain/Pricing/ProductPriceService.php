@@ -473,6 +473,14 @@ final class ProductPriceService
     /**
      * @return list<array<string, mixed>>
      */
+    public function listarListasActivas(): array
+    {
+        return $this->lists->listActive();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
     public function listarHistorialProductoPrecio(int $productoPrecioId): array
     {
         return $this->history->listByProductPrice(

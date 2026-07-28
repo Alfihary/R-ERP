@@ -14,6 +14,7 @@ if (
 
 $image = is_array($image ?? null) ? $image : null;
 $notice = is_string($notice ?? null) ? $notice : null;
+$prices = is_array($prices ?? null) ? $prices : [];
 $productId = (string) ($product['id_producto'] ?? '');
 $active = (int) ($product['activo'] ?? 0) === 1;
 $taxes = is_array($product['taxes'] ?? null) ? $product['taxes'] : [];
@@ -143,6 +144,72 @@ $satUnit = trim(
         <?php endforeach; ?>
     </dl>
 </section>
+
+<?php if (($abilities['precios_ver'] ?? false) === true): ?>
+    <section class="product-detail" aria-labelledby="product-prices-title">
+        <div class="product-section-heading">
+            <div>
+                <h2 id="product-prices-title">Precios del producto</h2>
+                <p>Consulta simple; edición directa e historial quedan fuera de esta fase.</p>
+            </div>
+        </div>
+        <?php if ($prices === []): ?>
+            <p class="product-related-empty">El producto no tiene precios registrados.</p>
+        <?php else: ?>
+            <div class="product-table-wrap">
+                <table class="product-table product-table--prices">
+                    <thead>
+                        <tr>
+                            <th>Lista</th>
+                            <th>Precio lista</th>
+                            <th>Precio mínimo</th>
+                            <th>Moneda</th>
+                            <th>Impuestos</th>
+                            <th>Revisión</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($prices as $price): ?>
+                            <?php
+                            $requiresReview = (int) (
+                                $price['requiere_revision'] ?? 0
+                            ) === 1;
+                            $priceActive = (int) ($price['activo'] ?? 0) === 1;
+                            ?>
+                            <tr>
+                                <td>
+                                    <strong><?= e($price['lista_clave'] ?? '') ?></strong>
+                                    <span><?= e($price['lista_nombre'] ?? '') ?></span>
+                                </td>
+                                <td><?= e($price['precio_lista'] ?? '') ?></td>
+                                <td><?= e($price['precio_minimo'] ?? '') ?></td>
+                                <td><?= e($price['moneda_codigo'] ?? '') ?></td>
+                                <td>
+                                    <?= (int) ($price['incluye_impuestos'] ?? 0) === 1
+                                        ? 'Incluye'
+                                        : 'No incluye' ?>
+                                </td>
+                                <td>
+                                    <span class="product-status<?= $requiresReview ? '' : ' is-active' ?>">
+                                        <?= $requiresReview
+                                            ? 'Requiere revisión'
+                                            : 'Vigente' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="product-status<?= $priceActive ? ' is-active' : '' ?>">
+                                        <?= $priceActive ? 'Activo' : 'Inactivo' ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
 
 <div class="product-related">
     <section class="product-related-section" aria-labelledby="product-tax-title">

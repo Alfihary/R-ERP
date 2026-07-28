@@ -15,6 +15,11 @@ if (
 }
 
 $image = is_array($image ?? null) ? $image : null;
+$priceLists = is_array($priceLists ?? null) ? $priceLists : [];
+$prices = is_array($prices ?? null) ? $prices : [];
+$pricePermissions = is_array($pricePermissions ?? null)
+    ? $pricePermissions
+    : [];
 $selectedTaxes = is_array($values['impuestos'] ?? null)
     ? array_map('strval', $values['impuestos'])
     : [];
@@ -23,6 +28,28 @@ $originalId = (string) (
     $values['original_id_producto']
     ?? $productId
 );
+$initialPriceRows = is_array($values['precios_iniciales'] ?? null)
+    ? $values['precios_iniciales']
+    : [];
+$currencyPriceRows = is_array($values['precios_cambio_moneda'] ?? null)
+    ? $values['precios_cambio_moneda']
+    : [];
+$priceRowValue = static function (
+    array $rows,
+    string $listId,
+    string $field
+): string {
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+        if ((string) ($row['lista_precio_id'] ?? '') === $listId) {
+            return (string) ($row[$field] ?? '');
+        }
+    }
+
+    return '';
+};
 $selectedSatKeyId = (string) ($values['clave_sat_id'] ?? '');
 $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
 ?>
@@ -395,6 +422,228 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
             <?php endforeach; ?>
         </div>
     </fieldset>
+
+    <?php if (!$editing && ($pricePermissions['create'] ?? false) === true): ?>
+        <fieldset class="product-form-section">
+            <legend>Precios iniciales</legend>
+            <p class="product-form-section__help">
+                Opcional. Si capturas al menos un precio, el producto debe
+                tener moneda asignada. Las filas totalmente vacías se ignoran.
+            </p>
+            <?php if ($priceLists === []): ?>
+                <p class="product-related-empty">No hay listas de precios activas.</p>
+            <?php else: ?>
+                <div class="product-table-wrap">
+                    <table class="product-table product-table--prices">
+                        <thead>
+                            <tr>
+                                <th>Lista</th>
+                                <th>Precio lista</th>
+                                <th>Precio mínimo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach (array_values($priceLists) as $index => $list): ?>
+                                <?php $listId = (string) ($list['id'] ?? ''); ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= e($list['clave'] ?? '') ?></strong>
+                                        <span><?= e($list['nombre'] ?? '') ?></span>
+                                        <input
+                                            type="hidden"
+                                            name="precios_iniciales[<?= e((string) $index) ?>][lista_precio_id]"
+                                            value="<?= e($listId) ?>"
+                                        >
+                                    </td>
+                                    <td>
+                                        <label class="sr-only" for="precio_inicial_lista_<?= e((string) $index) ?>">
+                                            Precio lista <?= e($list['clave'] ?? '') ?>
+                                        </label>
+                                        <input
+                                            id="precio_inicial_lista_<?= e((string) $index) ?>"
+                                            name="precios_iniciales[<?= e((string) $index) ?>][precio_lista]"
+                                            type="number"
+                                            inputmode="decimal"
+                                            min="0"
+                                            step="0.0001"
+                                            value="<?= e($priceRowValue($initialPriceRows, $listId, 'precio_lista')) ?>"
+                                        >
+                                    </td>
+                                    <td>
+                                        <label class="sr-only" for="precio_inicial_minimo_<?= e((string) $index) ?>">
+                                            Precio mínimo <?= e($list['clave'] ?? '') ?>
+                                        </label>
+                                        <input
+                                            id="precio_inicial_minimo_<?= e((string) $index) ?>"
+                                            name="precios_iniciales[<?= e((string) $index) ?>][precio_minimo]"
+                                            type="number"
+                                            inputmode="decimal"
+                                            min="0"
+                                            step="0.0001"
+                                            value="<?= e($priceRowValue($initialPriceRows, $listId, 'precio_minimo')) ?>"
+                                        >
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+            <?php if (isset($errors['precios_iniciales'])): ?>
+                <span class="product-field-error">
+                    <?= e($errors['precios_iniciales']) ?>
+                </span>
+            <?php endif; ?>
+        </fieldset>
+    <?php endif; ?>
+
+    <?php if ($editing && ($pricePermissions['view'] ?? false) === true): ?>
+        <fieldset class="product-form-section">
+            <legend>Precios actuales</legend>
+            <p class="product-form-section__help">
+                Consulta simple de precios vigentes del producto. Las acciones
+                de edición directa e historial quedan para una fase posterior.
+            </p>
+            <?php if ($prices === []): ?>
+                <p class="product-related-empty">El producto no tiene precios registrados.</p>
+            <?php else: ?>
+                <div class="product-table-wrap">
+                    <table class="product-table product-table--prices">
+                        <thead>
+                            <tr>
+                                <th>Lista</th>
+                                <th>Precio lista</th>
+                                <th>Precio mínimo</th>
+                                <th>Moneda</th>
+                                <th>Impuestos</th>
+                                <th>Revisión</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($prices as $price): ?>
+                                <?php
+                                $requiresReview = (int) (
+                                    $price['requiere_revision'] ?? 0
+                                ) === 1;
+                                $priceActive = (int) ($price['activo'] ?? 0)
+                                    === 1;
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= e($price['lista_clave'] ?? '') ?></strong>
+                                        <span><?= e($price['lista_nombre'] ?? '') ?></span>
+                                    </td>
+                                    <td><?= e($price['precio_lista'] ?? '') ?></td>
+                                    <td><?= e($price['precio_minimo'] ?? '') ?></td>
+                                    <td><?= e($price['moneda_codigo'] ?? '') ?></td>
+                                    <td>
+                                        <?= (int) ($price['incluye_impuestos'] ?? 0) === 1
+                                            ? 'Incluye'
+                                            : 'No incluye' ?>
+                                    </td>
+                                    <td>
+                                        <span class="product-status<?= $requiresReview ? '' : ' is-active' ?>">
+                                            <?= $requiresReview
+                                                ? 'Requiere revisión'
+                                                : 'Vigente' ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="product-status<?= $priceActive ? ' is-active' : '' ?>">
+                                            <?= $priceActive ? 'Activo' : 'Inactivo' ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </fieldset>
+    <?php endif; ?>
+
+    <?php if (
+        $editing
+        && $prices !== []
+        && ($pricePermissions['edit'] ?? false) === true
+    ): ?>
+        <fieldset class="product-form-section">
+            <legend>Actualizar precios por cambio de moneda</legend>
+            <p class="product-form-section__help">
+                Si cambias la moneda del producto, captura los importes de las
+                listas que ya puedas actualizar. Las listas que dejes vacías
+                quedarán en 0.00 y pendientes de revisión.
+            </p>
+            <div class="product-table-wrap">
+                <table class="product-table product-table--prices">
+                    <thead>
+                        <tr>
+                            <th>Lista</th>
+                            <th>Precio actual</th>
+                            <th>Nuevo precio lista</th>
+                            <th>Nuevo precio mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach (array_values($prices) as $index => $price): ?>
+                            <?php $listId = (string) ($price['lista_precio_id'] ?? ''); ?>
+                            <tr>
+                                <td>
+                                    <strong><?= e($price['lista_clave'] ?? '') ?></strong>
+                                    <span><?= e($price['lista_nombre'] ?? '') ?></span>
+                                    <input
+                                        type="hidden"
+                                        name="precios_cambio_moneda[<?= e((string) $index) ?>][lista_precio_id]"
+                                        value="<?= e($listId) ?>"
+                                    >
+                                </td>
+                                <td>
+                                    <?= e($price['precio_lista'] ?? '') ?>
+                                    /
+                                    <?= e($price['precio_minimo'] ?? '') ?>
+                                    <?= e($price['moneda_codigo'] ?? '') ?>
+                                </td>
+                                <td>
+                                    <label class="sr-only" for="precio_cambio_lista_<?= e((string) $index) ?>">
+                                        Nuevo precio lista <?= e($price['lista_clave'] ?? '') ?>
+                                    </label>
+                                    <input
+                                        id="precio_cambio_lista_<?= e((string) $index) ?>"
+                                        name="precios_cambio_moneda[<?= e((string) $index) ?>][precio_lista]"
+                                        type="number"
+                                        inputmode="decimal"
+                                        min="0"
+                                        step="0.0001"
+                                        value="<?= e($priceRowValue($currencyPriceRows, $listId, 'precio_lista')) ?>"
+                                    >
+                                </td>
+                                <td>
+                                    <label class="sr-only" for="precio_cambio_minimo_<?= e((string) $index) ?>">
+                                        Nuevo precio mínimo <?= e($price['lista_clave'] ?? '') ?>
+                                    </label>
+                                    <input
+                                        id="precio_cambio_minimo_<?= e((string) $index) ?>"
+                                        name="precios_cambio_moneda[<?= e((string) $index) ?>][precio_minimo]"
+                                        type="number"
+                                        inputmode="decimal"
+                                        min="0"
+                                        step="0.0001"
+                                        value="<?= e($priceRowValue($currencyPriceRows, $listId, 'precio_minimo')) ?>"
+                                    >
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php if (isset($errors['precios_cambio_moneda'])): ?>
+                <span class="product-field-error">
+                    <?= e($errors['precios_cambio_moneda']) ?>
+                </span>
+            <?php endif; ?>
+        </fieldset>
+    <?php endif; ?>
 
     <fieldset class="product-form-section">
         <legend>Clasificación SAT</legend>

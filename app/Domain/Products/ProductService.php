@@ -70,6 +70,24 @@ final class ProductService
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function activePriceLists(): array
+    {
+        return $this->priceService()->listarListasActivas();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function prices(string $productId): array
+    {
+        return $this->priceService()->listarPreciosProducto(
+            $this->validatedStoredId($productId)
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function get(string $productId): array
