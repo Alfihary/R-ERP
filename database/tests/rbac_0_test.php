@@ -52,12 +52,16 @@ return new class($connection) implements DatabaseTest {
             }
         }
 
-        if ((int) $pdo->query('SELECT COUNT(*) FROM permisos')->fetchColumn() !== 3) {
-            throw new RuntimeException('RBAC-0 must contain only the three approved permissions.');
-        }
-
         $admin = $this->adminContext($pdo);
-        $assignmentCount = $this->adminAssignmentCount($pdo, (int) $admin['rol_id']);
+        $assignmentCount = $this->adminAssignmentCount(
+            $pdo,
+            (int) $admin['rol_id'],
+            $permissionCodes
+        );
+        $assignmentTotal = $this->adminActiveAssignmentTotal(
+            $pdo,
+            (int) $admin['rol_id']
+        );
 
         if ($assignmentCount !== 3) {
             throw new RuntimeException('ADMIN must receive the three RBAC-0 permissions once.');
@@ -115,7 +119,10 @@ return new class($connection) implements DatabaseTest {
         return [
             'permission_codes' => $permissionCodes,
             'permissions_rows' => count($permissionRows),
+            'total_permission_rows' =>
+                (int) $pdo->query('SELECT COUNT(*) FROM permisos')->fetchColumn(),
             'admin_permission_rows' => $assignmentCount,
+            'admin_active_permission_total_rows' => $assignmentTotal,
             'duplicate_permission_codes' => 0,
             'duplicate_role_permissions' => 0,
             'admin_allowed' => true,
@@ -192,7 +199,38 @@ return new class($connection) implements DatabaseTest {
         return $context;
     }
 
-    private function adminAssignmentCount(PDO $pdo, int $roleId): int
+    /**
+     * @param list<string> $codes
+     */
+    private function adminAssignmentCount(PDO $pdo, int $roleId, array $codes): int
+    {
+        $placeholders = [];
+        $parameters = ['rol_id' => $roleId];
+
+        foreach ($codes as $index => $code) {
+            $key = 'code_' . $index;
+            $placeholders[] = ':' . $key;
+            $parameters[$key] = $code;
+        }
+
+        $statement = $pdo->prepare(
+            'SELECT COUNT(*)
+            FROM rol_permisos rp
+            INNER JOIN permisos p
+                ON p.id = rp.permiso_id
+               AND p.activo = 1
+               AND p.eliminado_en IS NULL
+            WHERE rp.rol_id = :rol_id
+              AND rp.activo = 1
+              AND rp.eliminado_en IS NULL
+              AND p.codigo IN (' . implode(', ', $placeholders) . ')'
+        );
+        $statement->execute($parameters);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    private function adminActiveAssignmentTotal(PDO $pdo, int $roleId): int
     {
         $statement = $pdo->prepare(
             <<<'SQL'

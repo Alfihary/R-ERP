@@ -313,7 +313,6 @@ return new class implements DatabaseTest {
     private function filesystemEvidence(): array
     {
         $paths = [
-            'services' => BASE_PATH . '/app/Domain/Profile',
             'vcard_services' => BASE_PATH . '/app/Domain/Vcards',
             'credential_services' => BASE_PATH . '/app/Domain/Credentials',
             'profile_controller' => BASE_PATH . '/app/Http/Controllers/ProfileController.php',
@@ -333,6 +332,8 @@ return new class implements DatabaseTest {
 
         return [
             'checked' => array_keys($paths),
+            'phase_compatibility' =>
+                'PERFIL-VCARD-DB-1 validates DB contract only; app/Domain/Profile may exist after PERFIL-SERVICE-1.',
             'exists' => $exists,
             'all_absent' => !in_array(true, $exists, true),
         ];
