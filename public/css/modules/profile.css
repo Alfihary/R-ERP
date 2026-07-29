@@ -117,6 +117,23 @@
     margin: 1rem 0 0;
 }
 
+.profile-photo-form {
+    display: grid;
+    gap: 0.875rem;
+    margin: 1rem 0 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-line);
+}
+
+.profile-photo-form input[type="file"] {
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+}
+
 .profile-form {
     display: grid;
     gap: 1.25rem;

@@ -19,6 +19,7 @@ use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserPhotoRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Storage\UserPhotoStorage;
 use App\Support\Security\CsrfTokenService;
 
 return new class implements DatabaseTest {
@@ -77,6 +78,7 @@ return new class implements DatabaseTest {
                 'get_profile_declared' => $this->fileContains('routes/web.php', "'/perfil'"),
                 'post_profile_update_declared' => $this->fileContains('routes/web.php', "'/perfil/actualizar'"),
                 'password_declared' => $this->fileContains('routes/web.php', "'/perfil/password'"),
+                'upload_photo_declared' => $this->fileContains('routes/web.php', "'/perfil/foto'"),
                 'delete_photo_declared' => $this->fileContains('routes/web.php', "'/perfil/foto/eliminar'"),
                 'no_upload_route' => !$this->fileContains('routes/web.php', "'/perfil/foto/subir'"),
                 'no_public_vcard_routes' =>
@@ -243,7 +245,7 @@ return new class implements DatabaseTest {
             'transient_counts_during' => $during,
             'persistent_counts_after' => $after,
             'cleanup' => 'transaction_rolled_back',
-            'photo_upload_route' => false,
+            'photo_upload_route' => true,
         ];
     }
 
@@ -266,6 +268,10 @@ return new class implements DatabaseTest {
             new ProfileService(
                 new ProfileRepository($GLOBALS['perfil_ui_connection']),
                 new UserPhotoRepository($GLOBALS['perfil_ui_connection'])
+            ),
+            new UserPhotoStorage(
+                (string) $GLOBALS['perfil_ui_config']->get('paths.STORAGE_PATH', STORAGE_PATH),
+                true
             )
         );
 

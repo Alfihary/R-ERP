@@ -12,6 +12,7 @@ La fase usa el servicio cerrado en `PERFIL-SERVICE-1`; la vista no escribe direc
 - `POST /perfil/actualizar`: actualiza únicamente campos permitidos del perfil.
 - `GET /perfil/password`: muestra el formulario de cambio de contraseña.
 - `POST /perfil/password`: cambia la contraseña propia con validación de contraseña actual.
+- `POST /perfil/foto`: carga una foto privada de perfil desde `PERFIL-FOTO-UPLOAD-1`.
 - `POST /perfil/foto/eliminar`: elimina lógicamente la foto activa.
 
 Todas las rutas pasan por autenticación. Las rutas sensibles pasan por permisos específicos y CSRF en métodos `POST`.
@@ -30,15 +31,15 @@ Los botones de edición, contraseña y eliminación de foto se muestran según p
 
 ## Foto activa
 
-Decisión de alcance de esta fase:
+Estado posterior a `PERFIL-FOTO-UPLOAD-1`:
 
 - Se muestran metadatos seguros de la foto activa.
+- Se permite carga física privada de JPEG, PNG o WebP con `perfil.foto.actualizar`.
 - Se permite eliminar lógicamente la foto activa si existe permiso.
-- No se implementa carga física de archivos.
 - No se expone `ruta_relativa`.
 - No se coloca ningún archivo privado en `public/`.
 
-La carga de foto requiere una fase posterior específica de storage/upload seguro.
+El serving público de foto sigue fuera de alcance hasta una fase posterior.
 
 ## Seguridad
 
@@ -71,6 +72,7 @@ Cobertura principal:
 - validación de URL inválida;
 - cambio de contraseña;
 - metadatos de foto visibles sin ruta privada;
+- formulario de carga de foto visible con permiso;
 - eliminación de foto activa;
 - rollback de datos QA transitorios.
 
@@ -99,6 +101,6 @@ PERFIL-UI-1 no implementa:
 - productos de vCard;
 - administración de usuarios;
 - revocación de sesiones;
-- carga física de foto;
+- serving público de foto;
 - rutas públicas de perfil;
 - cambios en productos, precios o inventario.

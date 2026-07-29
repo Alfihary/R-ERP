@@ -232,6 +232,12 @@ return static function (
         $profileMiddleware('perfil.password.cambiar')
     );
     $router->post(
+        '/perfil/foto',
+        static fn (Request $request): Response =>
+            $profileController->uploadPhoto($request),
+        $profileMiddleware('perfil.foto.actualizar')
+    );
+    $router->post(
         '/perfil/foto/eliminar',
         static fn (Request $request): Response =>
             $profileController->deletePhoto($request),

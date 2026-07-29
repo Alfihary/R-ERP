@@ -13,6 +13,7 @@ use App\Domain\Profile\ProfileService;
 use App\Domain\Profile\ProfileValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
+use App\Infrastructure\Storage\UserPhotoStorage;
 use App\Support\Security\CsrfTokenService;
 
 final class ProfileController
@@ -23,7 +24,8 @@ final class ProfileController
         private readonly PermissionService $permissions,
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
-        private readonly ProfileService $profiles
+        private readonly ProfileService $profiles,
+        private readonly UserPhotoStorage $photoStorage
     ) {
     }
 
@@ -112,6 +114,52 @@ final class ProfileController
         $this->profiles->eliminarFoto($user['user_id'], $user['user_id']);
 
         return Response::redirect('/perfil?result=photo_deleted');
+    }
+
+    public function uploadPhoto(Request $request): Response
+    {
+        if (!$this->allowed('perfil.foto.actualizar')) {
+            return $this->forbidden();
+        }
+
+        $user = $this->user();
+        $stored = null;
+
+        try {
+            $stored = $this->photoStorage->store(
+                $user['user_id'],
+                $request->file('foto')
+            );
+            $this->profiles->registrarFoto(
+                $user['user_id'],
+                $stored,
+                $user['user_id']
+            );
+        } catch (ProfileValidationException $exception) {
+            if (is_array($stored) && isset($stored['ruta_relativa'])) {
+                $this->photoStorage->deleteRelativeFile(
+                    (string) $stored['ruta_relativa']
+                );
+            }
+
+            return $this->render('profile/index', [
+                'abilities' => $this->abilities($user['user_id']),
+                'errors' => $exception->errors(),
+                'notice' => null,
+                'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
+                'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+            ], 'Mi perfil', $exception->statusCode());
+        } catch (\Throwable $exception) {
+            if (is_array($stored) && isset($stored['ruta_relativa'])) {
+                $this->photoStorage->deleteRelativeFile(
+                    (string) $stored['ruta_relativa']
+                );
+            }
+
+            throw $exception;
+        }
+
+        return Response::redirect('/perfil?result=photo_uploaded');
     }
 
     /**
@@ -298,6 +346,7 @@ final class ProfileController
         return match ($request->query()['result'] ?? null) {
             'updated' => 'Perfil actualizado correctamente.',
             'password_updated' => 'Contraseña actualizada correctamente.',
+            'photo_uploaded' => 'Foto actualizada correctamente.',
             'photo_deleted' => 'Foto activa eliminada correctamente.',
             default => null,
         };

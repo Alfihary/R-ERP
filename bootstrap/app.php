@@ -69,6 +69,7 @@ use App\Infrastructure\Repositories\UserRepository;
 use App\Infrastructure\Repositories\UserVcardRepository;
 use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Infrastructure\Repositories\WarehouseRepository;
+use App\Infrastructure\Storage\UserPhotoStorage;
 
 if (!defined('BASE_PATH')) {
     throw new RuntimeException('BASE_PATH must be defined before bootstrapping the application.');
@@ -147,6 +148,9 @@ $productDocuments = new ProductDocumentRepository($connection);
 $profiles = new ProfileService(
     new ProfileRepository($connection),
     new UserPhotoRepository($connection)
+);
+$userPhotoStorage = new UserPhotoStorage(
+    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
 );
 $vcardPrivacyRepository = new VcardPrivacyRepository($connection);
 $vcardPrivacy = new VcardPrivacyService($vcardPrivacyRepository);
@@ -239,7 +243,8 @@ $profileController = new ProfileController(
     $permissions,
     $scopeContext,
     $csrf,
-    $profiles
+    $profiles,
+    $userPhotoStorage
 );
 $publicVcardController = new PublicVcardController($config, $vcards);
 $productController = new ProductController(

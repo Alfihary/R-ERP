@@ -12,6 +12,7 @@ $error = static fn (string $key): string => (string) ($errors[$key] ?? '');
 $canEdit = ($abilities['editar'] ?? false) === true;
 $canChangePassword = ($abilities['password'] ?? false) === true;
 $canDeletePhoto = ($abilities['foto_eliminar'] ?? false) === true;
+$canUpdatePhoto = ($abilities['foto_actualizar'] ?? false) === true;
 ?>
 <section class="profile-page">
     <header class="profile-page__header">
@@ -76,7 +77,7 @@ $canDeletePhoto = ($abilities['foto_eliminar'] ?? false) === true;
             <?php if ($photo === null): ?>
                 <div class="profile-empty">
                     <strong>Sin foto activa</strong>
-                    <p>El upload físico queda reservado para una fase posterior.</p>
+                    <p>Sube una imagen JPEG, PNG o WebP. El archivo se guarda en almacenamiento privado.</p>
                 </div>
             <?php else: ?>
                 <dl class="profile-readonly-list">
@@ -106,6 +107,24 @@ $canDeletePhoto = ($abilities['foto_eliminar'] ?? false) === true;
                         </button>
                     </form>
                 <?php endif; ?>
+            <?php endif; ?>
+
+            <?php if ($canUpdatePhoto): ?>
+                <form class="profile-photo-form" method="post" action="/perfil/foto" enctype="multipart/form-data">
+                    <?= csrf_field($csrf) ?>
+                    <label class="field">
+                        <span>Actualizar foto</span>
+                        <input
+                            type="file"
+                            name="foto"
+                            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                            required
+                        >
+                        <small>Máximo 5 MiB. No se expone la ruta privada del archivo.</small>
+                        <?php if ($error('foto') !== ''): ?><small><?= e($error('foto')) ?></small><?php endif; ?>
+                    </label>
+                    <button class="button" type="submit">Guardar foto</button>
+                </form>
             <?php endif; ?>
         </aside>
     </div>
