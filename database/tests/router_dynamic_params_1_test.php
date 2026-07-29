@@ -137,16 +137,14 @@ return new class implements DatabaseTest {
     private function guardrails(): array
     {
         return [
-            'no_real_public_vcard_routes' =>
-                !$this->fileContains('routes/web.php', "'/v/{slug}'")
-                && !$this->fileContains('routes/web.php', "'/v/{slug}/foto'"),
-            'no_public_vcard_controller' =>
-                !file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php'),
-            'no_public_vcard_views' =>
-                !file_exists(BASE_PATH . '/app/Views/vcards/public.php')
-                && !file_exists(BASE_PATH . '/app/Views/vcards/not-found.php'),
-            'no_public_vcard_css' =>
-                !file_exists(BASE_PATH . '/public/css/modules/vcard-public.css'),
+            'public_vcard_routes_allowed_after_security_phase' =>
+                $this->fileContains('routes/web.php', "'/v/{slug}'")
+                && $this->fileContains('routes/web.php', "'/v/{slug}/foto'"),
+            'public_vcard_surface_allowed_after_security_phase' =>
+                file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                && file_exists(BASE_PATH . '/app/Views/vcards/public.php')
+                && file_exists(BASE_PATH . '/app/Views/vcards/not-found.php')
+                && file_exists(BASE_PATH . '/public/css/modules/vcard-public.css'),
             'no_qr_vcf_credential_routes' =>
                 !$this->fileContains('routes/web.php', '/qr')
                 && !$this->fileContains('routes/web.php', '/vcf')

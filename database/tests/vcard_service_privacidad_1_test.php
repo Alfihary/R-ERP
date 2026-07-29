@@ -245,21 +245,23 @@ return new class implements DatabaseTest {
             ];
 
             $results['guardrails'] = [
-                'no_public_routes' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}')
+                'public_vcard_routes_allowed_after_security_phase' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}')
+                    && $this->fileContains('routes/web.php', '/v/{slug}/foto')
                     && !$this->fileContains('routes/web.php', '/vcf')
                     && !$this->fileContains('routes/web.php', '/qr')
                     && !$this->fileContains('routes/web.php', '/credencial/verificar'),
-                'no_public_controllers' =>
-                    !file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                'public_vcard_controller_allowed_after_security_phase' =>
+                    file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
-                'no_public_views' =>
-                    !is_dir(BASE_PATH . '/app/Views/vcards')
+                'public_vcard_views_allowed_after_security_phase' =>
+                    is_dir(BASE_PATH . '/app/Views/vcards')
                     && !is_dir(BASE_PATH . '/app/Views/vcard')
                     && !is_dir(BASE_PATH . '/app/Views/credentials'),
-                'no_public_assets' =>
-                    !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
+                'public_vcard_asset_allowed_after_security_phase' =>
+                    file_exists(BASE_PATH . '/public/css/modules/vcard-public.css')
+                    && !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
                     && !file_exists(BASE_PATH . '/public/js/vcard.js')
                     && !file_exists(BASE_PATH . '/public/js/modules/vcard.js'),
                 'no_qr_vcf_credential_classes' =>

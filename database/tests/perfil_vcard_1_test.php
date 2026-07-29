@@ -316,7 +316,6 @@ return new class implements DatabaseTest {
     {
         $paths = [
             'credential_services' => BASE_PATH . '/app/Domain/Credentials',
-            'public_vcard_controller' => BASE_PATH . '/app/Http/Controllers/PublicVcardController.php',
             'credential_controller' => BASE_PATH . '/app/Http/Controllers/CredentialController.php',
             'vcard_views' => BASE_PATH . '/app/Views/vcards',
             'credential_views' => BASE_PATH . '/app/Views/credentials',
@@ -334,9 +333,16 @@ return new class implements DatabaseTest {
         return [
             'checked' => array_keys($paths),
             'phase_compatibility' =>
-                'PERFIL-VCARD-DB-1 validates DB contract only; private profile UI and private vCard service may exist after later approved phases.',
+                'PERFIL-VCARD-DB-1 validates DB contract only; private profile UI, private vCard service and public vCard security surface may exist after later approved phases.',
             'exists' => $exists,
-            'forbidden_absent' => !in_array(true, $exists, true),
+            'forbidden_absent' =>
+                ($exists['credential_services'] ?? false) === false
+                && ($exists['credential_controller'] ?? false) === false
+                && ($exists['credential_views'] ?? false) === false
+                && ($exists['vcard_css'] ?? false) === false
+                && ($exists['credential_css'] ?? false) === false
+                && ($exists['vcard_js'] ?? false) === false
+                && ($exists['credential_js'] ?? false) === false,
         ];
     }
 

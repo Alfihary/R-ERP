@@ -23,6 +23,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
@@ -42,6 +43,7 @@ return static function (
     WarehouseController $warehouseController,
     FolioSeriesController $folioSeriesController,
     ProfileController $profileController,
+    PublicVcardController $publicVcardController,
     ProductController $productController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
@@ -57,6 +59,17 @@ return static function (
     $router->get('/health', static function (Request $request): Response {
         return Response::json(['status' => 'ok']);
     });
+
+    $router->get(
+        '/v/{slug}',
+        static fn (Request $request, array $params): Response =>
+            $publicVcardController->show($request, $params)
+    );
+    $router->get(
+        '/v/{slug}/foto',
+        static fn (Request $request, array $params): Response =>
+            $publicVcardController->photo($request, $params)
+    );
 
     $router->get('/login', static function (Request $request) use ($auth, $csrf): Response {
         if ($auth->check()) {

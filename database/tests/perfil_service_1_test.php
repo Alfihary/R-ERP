@@ -267,21 +267,22 @@ return new class implements DatabaseTest {
             $results['guardrails'] = [
                 'no_public_routes_file_created' =>
                     !file_exists(BASE_PATH . '/routes/profile.php'),
-                'no_public_vcard_controllers_created' =>
-                    !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                'public_vcard_controller_allowed_after_security_phase' =>
+                    file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                    && !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
-                'no_public_vcard_views_created' =>
+                'public_vcard_views_allowed_after_security_phase' =>
                     !is_dir(BASE_PATH . '/app/Views/vcard')
-                    && !is_dir(BASE_PATH . '/app/Views/vcards')
+                    && is_dir(BASE_PATH . '/app/Views/vcards')
                     && !is_dir(BASE_PATH . '/app/Views/credential')
                     && !is_dir(BASE_PATH . '/app/Views/credentials'),
-                'no_public_vcard_assets_created' =>
-                    !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
+                'public_vcard_asset_allowed_after_security_phase' =>
+                    file_exists(BASE_PATH . '/public/css/modules/vcard-public.css')
+                    && !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
                     && !file_exists(BASE_PATH . '/public/css/modules/credential.css')
                     && !file_exists(BASE_PATH . '/public/js/modules/vcard.js')
                     && !file_exists(BASE_PATH . '/public/js/modules/credential.js'),
-                'no_public_vcard_implementation' =>
+                'no_legacy_public_vcard_service_implementation' =>
                     !file_exists(BASE_PATH . '/app/Domain/Profile/VCardService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Profile/VcardPublicService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcardPublicService.php'),

@@ -26,6 +26,8 @@ use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
@@ -40,6 +42,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
@@ -63,6 +66,8 @@ use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserPhotoRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\UserVcardRepository;
+use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Infrastructure\Repositories\WarehouseRepository;
 
 if (!defined('BASE_PATH')) {
@@ -142,6 +147,13 @@ $productDocuments = new ProductDocumentRepository($connection);
 $profiles = new ProfileService(
     new ProfileRepository($connection),
     new UserPhotoRepository($connection)
+);
+$vcardPrivacyRepository = new VcardPrivacyRepository($connection);
+$vcardPrivacy = new VcardPrivacyService($vcardPrivacyRepository);
+$vcards = new VcardService(
+    new UserVcardRepository($connection),
+    $vcardPrivacyRepository,
+    $vcardPrivacy
 );
 $productPrices = new ProductPriceService(
     new ProductPriceRepository($connection),
@@ -229,6 +241,7 @@ $profileController = new ProfileController(
     $csrf,
     $profiles
 );
+$publicVcardController = new PublicVcardController($config, $vcards);
 $productController = new ProductController(
     $config,
     $auth,
@@ -294,6 +307,7 @@ $registerRoutes(
     $warehouseController,
     $folioSeriesController,
     $profileController,
+    $publicVcardController,
     $productController,
     $priceListController,
     $productPriceController,

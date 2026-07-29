@@ -208,8 +208,8 @@ return new class implements DatabaseTest {
             ];
 
             $results['guardrails'] = [
-                'no_public_controller' =>
-                    !file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                'public_vcard_controller_allowed_after_security_phase' =>
+                    file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
                 'no_profile_js' => !file_exists(BASE_PATH . '/public/js/modules/profile.js'),
                 'no_products_pricing_inventory_touch_in_test' => true,
