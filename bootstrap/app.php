@@ -20,6 +20,7 @@ use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
 use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
+use App\Domain\Profile\ProfileService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
@@ -36,6 +37,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\PriceListController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
@@ -56,8 +58,10 @@ use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
+use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
+use App\Infrastructure\Repositories\UserPhotoRepository;
 use App\Infrastructure\Repositories\UserRepository;
 use App\Infrastructure\Repositories\WarehouseRepository;
 
@@ -135,6 +139,10 @@ $companies = new CompanyService($companyRepository);
 $warehouses = new WarehouseService($warehouseRepository);
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
+$profiles = new ProfileService(
+    new ProfileRepository($connection),
+    new UserPhotoRepository($connection)
+);
 $productPrices = new ProductPriceService(
     new ProductPriceRepository($connection),
     new PriceListRepository($connection),
@@ -213,6 +221,14 @@ $folioSeriesController = new FolioSeriesController(
     $csrf,
     $folioSeriesRepository
 );
+$profileController = new ProfileController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $profiles
+);
 $productController = new ProductController(
     $config,
     $auth,
@@ -277,6 +293,7 @@ $registerRoutes(
     $companyController,
     $warehouseController,
     $folioSeriesController,
+    $profileController,
     $productController,
     $priceListController,
     $productPriceController,

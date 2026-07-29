@@ -20,6 +20,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\PriceListController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SatCatalogController;
@@ -40,6 +41,7 @@ return static function (
     CompanyController $companyController,
     WarehouseController $warehouseController,
     FolioSeriesController $folioSeriesController,
+    ProfileController $profileController,
     ProductController $productController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
@@ -112,6 +114,10 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'precios.productos.acceder'
         );
+        $canAccessProfile = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'perfil.ver'
+        );
         $canAccessInventory = $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'inventario.movimientos.acceder'
@@ -138,6 +144,7 @@ return static function (
             'activeNavigation' => 'home',
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $canAccessCatalogs,
+            'canAccessProfile' => $canAccessProfile,
             'canAccessProducts' => $canAccessProducts,
             'canAccessProductPrices' => $canAccessProductPrices,
             'canAccessInventory' => $canAccessInventory,
@@ -172,6 +179,51 @@ return static function (
             'user' => $user,
         ]));
     }, [$authMiddleware, $appPermissionMiddleware]);
+
+    $profileBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'perfil.ver'),
+    ];
+    $profileMiddleware = static function (string $permission) use (
+        $profileBaseMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return array_merge($profileBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ]);
+    };
+
+    $router->get(
+        '/perfil',
+        static fn (Request $request): Response =>
+            $profileController->index($request),
+        $profileBaseMiddleware
+    );
+    $router->post(
+        '/perfil/actualizar',
+        static fn (Request $request): Response =>
+            $profileController->update($request),
+        $profileMiddleware('perfil.editar')
+    );
+    $router->get(
+        '/perfil/password',
+        static fn (Request $request): Response =>
+            $profileController->passwordForm($request),
+        $profileMiddleware('perfil.password.cambiar')
+    );
+    $router->post(
+        '/perfil/password',
+        static fn (Request $request): Response =>
+            $profileController->updatePassword($request),
+        $profileMiddleware('perfil.password.cambiar')
+    );
+    $router->post(
+        '/perfil/foto/eliminar',
+        static fn (Request $request): Response =>
+            $profileController->deletePhoto($request),
+        $profileMiddleware('perfil.foto.eliminar')
+    );
 
     $router->post('/app/contexto', static function (Request $request) use (
         $auth,

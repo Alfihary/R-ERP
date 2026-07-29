@@ -9,6 +9,8 @@ use App\Infrastructure\Database\Seed;
 
 return new class implements DatabaseTest {
     private const MIGRATION = 'perfil_vcard_1_001_create_profile_vcard_tables';
+    private const QA_USERNAME = 'qa_perfil_vcard_db_1';
+    private const QA_EMAIL = 'qa.perfil.vcard.db.1@example.test';
     private const TABLES = [
         'perfiles_usuario',
         'usuarios_fotos',
@@ -114,7 +116,7 @@ return new class implements DatabaseTest {
             || $seed['duplicate_role_permissions'] !== 0
             || $guardrails['all_passed'] !== true
             || $forbiddenColumns['all_absent'] !== true
-            || $filesystem['all_absent'] !== true
+            || $filesystem['forbidden_absent'] !== true
             || $events['total'] !== 0
             || $cases['all_passed'] !== true
             || $before !== $after
@@ -315,14 +317,14 @@ return new class implements DatabaseTest {
         $paths = [
             'vcard_services' => BASE_PATH . '/app/Domain/Vcards',
             'credential_services' => BASE_PATH . '/app/Domain/Credentials',
-            'profile_controller' => BASE_PATH . '/app/Http/Controllers/ProfileController.php',
             'public_vcard_controller' => BASE_PATH . '/app/Http/Controllers/PublicVcardController.php',
-            'profile_views' => BASE_PATH . '/app/Views/profile',
+            'credential_controller' => BASE_PATH . '/app/Http/Controllers/CredentialController.php',
             'vcard_views' => BASE_PATH . '/app/Views/vcards',
-            'profile_css' => BASE_PATH . '/public/css/modules/profile.css',
+            'credential_views' => BASE_PATH . '/app/Views/credentials',
             'vcard_css' => BASE_PATH . '/public/css/modules/vcard.css',
-            'profile_js' => BASE_PATH . '/public/js/profile.js',
+            'credential_css' => BASE_PATH . '/public/css/modules/credential.css',
             'vcard_js' => BASE_PATH . '/public/js/vcard.js',
+            'credential_js' => BASE_PATH . '/public/js/credential.js',
         ];
         $exists = [];
 
@@ -333,9 +335,9 @@ return new class implements DatabaseTest {
         return [
             'checked' => array_keys($paths),
             'phase_compatibility' =>
-                'PERFIL-VCARD-DB-1 validates DB contract only; app/Domain/Profile may exist after PERFIL-SERVICE-1.',
+                'PERFIL-VCARD-DB-1 validates DB contract only; private profile service/UI may exist after later approved phases.',
             'exists' => $exists,
-            'all_absent' => !in_array(true, $exists, true),
+            'forbidden_absent' => !in_array(true, $exists, true),
         ];
     }
 
@@ -404,21 +406,22 @@ return new class implements DatabaseTest {
      */
     private function functionalCases(PDO $pdo): array
     {
-        $adminId = $this->adminId($pdo);
+        $this->adminId($pdo);
         $productId = $this->existingProductId($pdo);
         $results = [];
 
         $pdo->beginTransaction();
 
         try {
-            $profileId = $this->insertProfile($pdo, $adminId);
-            $photoId = $this->insertPhoto($pdo, $adminId);
-            $vcardId = $this->insertVcard($pdo, $adminId, 'qa-perfil-vcard');
+            $userId = $this->insertUser($pdo);
+            $profileId = $this->insertProfile($pdo, $userId);
+            $photoId = $this->insertPhoto($pdo, $userId);
+            $vcardId = $this->insertVcard($pdo, $userId, 'qa-perfil-vcard');
             foreach (self::PRIVACY_FIELDS as $field) {
                 $this->insertPrivacy($pdo, $vcardId, $field, $field === 'productos');
             }
-            $vcardProductId = $this->insertVcardProduct($pdo, $vcardId, $productId, $adminId);
-            $credentialId = $this->insertCredential($pdo, $adminId);
+            $vcardProductId = $this->insertVcardProduct($pdo, $vcardId, $productId, $userId);
+            $credentialId = $this->insertCredential($pdo, $userId);
             $tokenId = $this->insertCredentialToken($pdo, $credentialId);
 
             $results['valid_profile_accepted'] = $profileId > 0;
@@ -430,16 +433,16 @@ return new class implements DatabaseTest {
             $results['valid_credential_accepted'] = $credentialId > 0;
             $results['valid_token_hash_accepted'] = $tokenId > 0;
             $results['duplicate_profile_rejected'] = $this->fails(
-                fn () => $this->insertProfile($pdo, $adminId)
+                fn () => $this->insertProfile($pdo, $userId)
             );
             $results['duplicate_vcard_user_rejected'] = $this->fails(
-                fn () => $this->insertVcard($pdo, $adminId, 'qa-otra-vcard')
+                fn () => $this->insertVcard($pdo, $userId, 'qa-otra-vcard')
             );
             $results['duplicate_slug_rejected'] = $this->fails(
-                fn () => $this->insertVcard($pdo, $adminId + 999999, 'qa-perfil-vcard')
+                fn () => $this->insertVcard($pdo, $userId + 999999, 'qa-perfil-vcard')
             );
             $results['invalid_slug_uppercase_rejected'] = $this->fails(
-                fn () => $this->insertVcardRawUser($pdo, $adminId + 999998, 'QA-PERFIL')
+                fn () => $this->insertVcardRawUser($pdo, $userId + 999998, 'QA-PERFIL')
             );
             $results['invalid_privacy_field_rejected'] = $this->fails(
                 fn () => $this->insertPrivacy($pdo, $vcardId, 'precio', true)
@@ -448,13 +451,13 @@ return new class implements DatabaseTest {
                 fn () => $this->insertPrivacy($pdo, $vcardId, 'foto', false)
             );
             $results['duplicate_vcard_product_rejected'] = $this->fails(
-                fn () => $this->insertVcardProduct($pdo, $vcardId, $productId, $adminId)
+                fn () => $this->insertVcardProduct($pdo, $vcardId, $productId, $userId)
             );
             $results['vcard_product_unknown_product_rejected'] = $this->fails(
-                fn () => $this->insertVcardProduct($pdo, $vcardId, 'QAMISSING000001', $adminId)
+                fn () => $this->insertVcardProduct($pdo, $vcardId, 'QAMISSING000001', $userId)
             );
             $results['duplicate_credential_user_rejected'] = $this->fails(
-                fn () => $this->insertCredential($pdo, $adminId)
+                fn () => $this->insertCredential($pdo, $userId)
             );
             $results['duplicate_token_hash_rejected'] = $this->fails(
                 fn () => $this->insertCredentialToken($pdo, $credentialId)
@@ -508,6 +511,30 @@ return new class implements DatabaseTest {
         return (int) $pdo->lastInsertId();
     }
 
+    private function insertUser(PDO $pdo): int
+    {
+        $statement = $pdo->prepare(
+            'INSERT INTO usuarios (
+                username,
+                email,
+                password_hash,
+                activo
+             ) VALUES (
+                :username,
+                :email,
+                :password_hash,
+                1
+             )'
+        );
+        $statement->execute([
+            'username' => self::QA_USERNAME,
+            'email' => self::QA_EMAIL,
+            'password_hash' => password_hash('PerfilVcardQa123!', PASSWORD_DEFAULT),
+        ]);
+
+        return (int) $pdo->lastInsertId();
+    }
+
     private function insertPhoto(PDO $pdo, int $userId): int
     {
         $statement = $pdo->prepare(
@@ -545,7 +572,7 @@ return new class implements DatabaseTest {
             'mime' => 'image/webp',
             'extension' => 'webp',
             'tamano_bytes' => 1234,
-            'sha256' => str_repeat('a', 64),
+            'sha256' => hash('sha256', 'perfil-vcard-db-1-photo-' . $userId),
             'ancho' => 100,
             'alto' => 100,
             'creado_por' => $userId,
@@ -674,7 +701,7 @@ return new class implements DatabaseTest {
         );
         $statement->execute([
             'credencial_id' => $credentialId,
-            'token_hash' => str_repeat('b', 64),
+            'token_hash' => hash('sha256', 'perfil-vcard-db-1-token-' . $credentialId),
             'token_prefix' => 'QATOKEN00001',
         ]);
 

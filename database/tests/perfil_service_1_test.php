@@ -265,18 +265,26 @@ return new class implements DatabaseTest {
             ];
 
             $results['guardrails'] = [
-                'no_routes_created' => !file_exists(BASE_PATH . '/routes/profile.php'),
-                'no_controllers_created' =>
-                    !file_exists(BASE_PATH . '/app/Http/Controllers/ProfileController.php')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php'),
-                'no_views_created' =>
-                    !is_dir(BASE_PATH . '/app/Views/profile')
-                    && !is_dir(BASE_PATH . '/app/Views/vcard'),
-                'no_css_js_created' =>
-                    !file_exists(BASE_PATH . '/public/css/modules/profile.css')
-                    && !file_exists(BASE_PATH . '/public/js/modules/profile.js'),
+                'no_public_routes_file_created' =>
+                    !file_exists(BASE_PATH . '/routes/profile.php'),
+                'no_public_vcard_controllers_created' =>
+                    !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php')
+                    && !file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
+                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                'no_public_vcard_views_created' =>
+                    !is_dir(BASE_PATH . '/app/Views/vcard')
+                    && !is_dir(BASE_PATH . '/app/Views/vcards')
+                    && !is_dir(BASE_PATH . '/app/Views/credential')
+                    && !is_dir(BASE_PATH . '/app/Views/credentials'),
+                'no_public_vcard_assets_created' =>
+                    !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
+                    && !file_exists(BASE_PATH . '/public/css/modules/credential.css')
+                    && !file_exists(BASE_PATH . '/public/js/modules/vcard.js')
+                    && !file_exists(BASE_PATH . '/public/js/modules/credential.js'),
                 'no_public_vcard_implementation' =>
-                    !file_exists(BASE_PATH . '/app/Domain/Profile/VCardService.php'),
+                    !file_exists(BASE_PATH . '/app/Domain/Profile/VCardService.php')
+                    && !file_exists(BASE_PATH . '/app/Domain/Profile/VcardPublicService.php')
+                    && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcardPublicService.php'),
             ];
 
             $during = $this->counts($pdo);

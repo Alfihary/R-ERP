@@ -26,6 +26,7 @@ $appName = trim($appName, " \t\n\r\0\x0B\"'");
 $activeNavigation = is_string($activeNavigation ?? null)
     ? $activeNavigation
     : 'home';
+$canAccessProfile = ($canAccessProfile ?? false) === true;
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $canAccessProductPrices = ($canAccessProductPrices ?? false) === true;
@@ -88,6 +89,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     <span aria-hidden="true">⌂</span>
                     Inicio
                 </a>
+                <?php if ($canAccessProfile): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'profile' ? ' is-active' : '' ?>"
+                        href="/perfil"
+                        <?= $activeNavigation === 'profile' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">◌</span>
+                        Mi perfil
+                    </a>
+                <?php endif; ?>
                 <?php if ($canAccessCatalogs): ?>
                     <a
                         class="app-navigation__item<?= $activeNavigation === 'catalogs' ? ' is-active' : '' ?>"
