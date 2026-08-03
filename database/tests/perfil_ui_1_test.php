@@ -84,8 +84,7 @@ return new class implements DatabaseTest {
                 'no_public_vcard_or_public_credential_routes' =>
                     !$this->fileContains('routes/web.php', '/vcf')
                     && !$this->fileContains('routes/web.php', '/qr')
-                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar'),
             ];
 
             $profileResponse = $controller->index(new Request('GET', '/perfil'));
@@ -213,8 +212,7 @@ return new class implements DatabaseTest {
             $results['guardrails'] = [
                 'public_vcard_controller_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
-                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar'),
                 'no_profile_js' => !file_exists(BASE_PATH . '/public/js/modules/profile.js'),
                 'no_products_pricing_inventory_touch_in_test' => true,
                 'layout_uses_permission_flag' =>

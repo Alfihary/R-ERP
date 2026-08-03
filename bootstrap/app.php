@@ -15,7 +15,9 @@ use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
 use App\Domain\Configuration\CompanyService;
 use App\Domain\Configuration\WarehouseService;
+use App\Domain\Credentials\CredentialQrService;
 use App\Domain\Credentials\CredentialService;
+use App\Domain\Credentials\CredentialTokenService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
@@ -71,6 +73,7 @@ use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserPhotoRepository;
 use App\Infrastructure\Repositories\UserCredentialRepository;
+use App\Infrastructure\Repositories\CredentialTokenRepository;
 use App\Infrastructure\Repositories\UserRepository;
 use App\Infrastructure\Repositories\UserVcardRepository;
 use App\Infrastructure\Repositories\VcardPrivacyRepository;
@@ -153,6 +156,11 @@ $warehouses = new WarehouseService($warehouseRepository);
 $credentials = new CredentialService(
     new UserCredentialRepository($connection)
 );
+$credentialTokens = new CredentialTokenService(
+    $credentials,
+    new CredentialTokenRepository($connection)
+);
+$credentialQr = new CredentialQrService();
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
 $profiles = new ProfileService(
@@ -268,7 +276,10 @@ $credentialController = new CredentialController(
     $permissions,
     $scopeContext,
     $csrf,
-    $credentials
+    $credentials,
+    $credentialTokens,
+    $credentialQr,
+    $session
 );
 $publicVcardController = new PublicVcardController(
     $config,

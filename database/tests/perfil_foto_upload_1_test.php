@@ -93,8 +93,6 @@ return new class implements DatabaseTest {
                     && $this->fileContains('app/Http/Controllers/PublicVcardController.php', 'return $this->notFound();'),
                 'no_credential_token_or_qr' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr/descargar')
                     && !file_exists(BASE_PATH . '/public/js/modules/credential.js'),
             ];
 

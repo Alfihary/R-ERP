@@ -205,16 +205,14 @@ return new class implements DatabaseTest {
                 'no_legacy_qr_vcf_or_public_credential_controllers' =>
                     !file_exists(BASE_PATH . '/app/Http/Controllers/QrController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcfController.php')
-                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar'),
                 'no_products_vcard_functional' =>
                     !$this->fileContains('routes/web.php', '/v/{slug}/productos')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),
                 'no_legacy_qr_vcf_or_public_credential_services' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialTokenService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialQrService.php'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialVerificationService.php'),
                 'no_public_json_api' => !$this->fileContains('routes/web.php', '/api/vcard'),
             ];
 

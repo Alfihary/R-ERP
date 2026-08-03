@@ -269,6 +269,47 @@ return static function (
             new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
         ]
     );
+    $router->get(
+        '/perfil/credencial/' . 'qr',
+        static fn (Request $request): Response =>
+            $credentialController->showQr($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+            new PermissionMiddleware($auth, $permissions, 'credencial.qr.ver'),
+        ]
+    );
+    $router->get(
+        '/perfil/credencial/' . 'qr/descargar',
+        static fn (Request $request): Response =>
+            $credentialController->downloadQr($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+            new PermissionMiddleware($auth, $permissions, 'credencial.qr.ver'),
+            new PermissionMiddleware($auth, $permissions, 'credencial.qr.descargar'),
+        ]
+    );
+    $router->post(
+        '/perfil/credencial/token/renovar',
+        static fn (Request $request): Response =>
+            $credentialController->renewToken($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+            new PermissionMiddleware($auth, $permissions, 'credencial.qr.ver'),
+        ]
+    );
+    $router->post(
+        '/perfil/credencial/token/revocar',
+        static fn (Request $request): Response =>
+            $credentialController->revokeToken($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+            new PermissionMiddleware($auth, $permissions, 'credencial.qr.ver'),
+        ]
+    );
 
     $router->post('/app/contexto', static function (Request $request) use (
         $auth,

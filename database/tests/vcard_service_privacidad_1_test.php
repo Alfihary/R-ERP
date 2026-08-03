@@ -254,8 +254,7 @@ return new class implements DatabaseTest {
                 'public_vcard_controller_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardController.php')
-                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar'),
                 'public_vcard_views_allowed_after_security_phase' =>
                     is_dir(BASE_PATH . '/app/Views/vcards')
                     && !is_dir(BASE_PATH . '/app/Views/vcard')
@@ -268,8 +267,7 @@ return new class implements DatabaseTest {
                 'no_qr_vcf_or_public_credential_classes' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialTokenService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialQrService.php'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialVerificationService.php'),
             ];
 
             $during = $this->counts($pdo);

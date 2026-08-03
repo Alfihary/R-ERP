@@ -19,8 +19,6 @@ Responsabilidades:
 - asegurar una fila base en `credenciales_usuario`;
 - validar usuario existente, activo y no eliminado;
 - obtener datos seguros para la credencial visual;
-- no generar tokens;
-- no generar QR;
 - no exponer hashes ni rutas privadas.
 
 ## Repositorio creado
@@ -63,7 +61,7 @@ Usa CSS modular, tokens globales disponibles, reglas responsivas y soporte bási
 No se muestran:
 
 - `password_hash`;
-- tokens;
+- token plano;
 - `token_hash`;
 - datos de `credencial_tokens`;
 - roles;
@@ -86,8 +84,6 @@ El permiso ya pertenece al contrato de PERFIL-VCARD-DB-1 y se valida con `Permis
 CREDENCIAL-VISUAL-1 no implementa:
 
 - `/credencial/verificar/{token}`;
-- QR de credencial;
-- descarga de QR;
 - token público;
 - firma criptográfica;
 - vCard pública;
@@ -122,8 +118,10 @@ php database/credencial-visual.php functional:test --database=r_erp_db_core_0_te
 - `asegurarCredencial()` es idempotente.
 - Usuario inactivo o inexistente es rechazado.
 - HTML no expone secretos, tokens, rutas privadas ni roles/permisos.
-- No existen rutas públicas de verificación ni QR de credencial.
+- No existen rutas públicas de verificación de credencial.
 - Datos QA revertidos por transacción.
+
+Después de `CREDENCIAL-TOKEN-QR-1`, puede existir QR privado autenticado y token hash en base de datos. La verificación pública sigue fuera de alcance.
 
 ## Siguiente fase sugerida
 

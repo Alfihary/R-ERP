@@ -270,8 +270,7 @@ return new class implements DatabaseTest {
                 'public_vcard_controller_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php')
-                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar'),
                 'public_vcard_views_allowed_after_security_phase' =>
                     !is_dir(BASE_PATH . '/app/Views/vcard')
                     && is_dir(BASE_PATH . '/app/Views/vcards')

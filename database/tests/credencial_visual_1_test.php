@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Core\Request;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
+use App\Domain\Credentials\CredentialQrService;
 use App\Domain\Credentials\CredentialService;
+use App\Domain\Credentials\CredentialTokenService;
 use App\Domain\Credentials\CredentialValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
@@ -15,6 +17,7 @@ use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Repositories\PermissionRepository;
+use App\Infrastructure\Repositories\CredentialTokenRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserCredentialRepository;
 use App\Infrastructure\Repositories\UserRepository;
@@ -157,8 +160,10 @@ return new class implements DatabaseTest {
             $results['guardrails'] = [
                 'no_public_verification_route' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar'),
-                'no_credential_qr_routes' =>
-                    !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
+                'credential_qr_routes_private_after_token_qr_phase' =>
+                    $this->fileContains('routes/web.php', "'/perfil/credencial/' . 'qr'")
+                    && $this->fileContains('routes/web.php', "'/perfil/credencial/token/renovar'")
+                    && $this->fileContains('routes/web.php', "'/perfil/credencial/token/revocar'"),
                 'vcard_public_routes_still_declared' =>
                     $this->fileContains('routes/web.php', "'/v/{slug}'")
                     && $this->fileContains('routes/web.php', "'/v/{slug}/' . 'qr'")
@@ -209,7 +214,7 @@ return new class implements DatabaseTest {
                 'permisos',
                 'ruta_relativa',
                 'storage/uploads',
-                'qr',
+                'qr publico',
                 'verificacion_publica',
             ],
             'persistent_counts_before' => $before,
@@ -232,7 +237,15 @@ return new class implements DatabaseTest {
             new CsrfTokenService($this->session(), 7200),
             new CredentialService(
                 new UserCredentialRepository($GLOBALS['credencial_visual_connection'])
-            )
+            ),
+            new CredentialTokenService(
+                new CredentialService(
+                    new UserCredentialRepository($GLOBALS['credencial_visual_connection'])
+                ),
+                new CredentialTokenRepository($GLOBALS['credencial_visual_connection'])
+            ),
+            new CredentialQrService(),
+            $this->session()
         );
     }
 
