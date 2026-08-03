@@ -91,6 +91,11 @@ return new class implements DatabaseTest {
                         'app/Http/Controllers/PublicVcardController.php',
                         'function vcf('
                     ),
+                'public_qr_available_after_vcard_qr_1' =>
+                    $this->fileContains(
+                        'app/Http/Controllers/PublicVcardController.php',
+                        'function qr('
+                    ),
                 'no_qr_route' => !$this->fileContains('routes/web.php', '/v/{slug}/qr'),
                 'no_products_route' => !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
                 'no_credential_verify_route' => !$this->fileContains('routes/web.php', '/credencial/verificar'),

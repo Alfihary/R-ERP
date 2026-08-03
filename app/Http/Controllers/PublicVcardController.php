@@ -8,19 +8,23 @@ use App\Core\Config;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
+use App\Domain\Vcards\VcardQrService;
 use App\Domain\Vcards\VcardService;
 use App\Domain\Vcards\VcardVcfService;
 
 final class PublicVcardController
 {
+    private readonly VcardQrService $qr;
     private readonly VcardVcfService $vcf;
 
     public function __construct(
         private readonly Config $config,
         private readonly VcardService $vcards,
-        ?VcardVcfService $vcf = null
+        ?VcardVcfService $vcf = null,
+        ?VcardQrService $qr = null
     ) {
         $this->vcf = $vcf ?? new VcardVcfService();
+        $this->qr = $qr ?? new VcardQrService();
     }
 
     /**
@@ -46,6 +50,7 @@ final class PublicVcardController
             'contactAction' => $this->contactAction($vcard['canal_contacto'] ?? null),
             'metaDescription' => $this->metaDescription($vcard),
             'pageTitle' => $this->pageTitle($vcard),
+            'qrUrl' => $slug !== '' ? '/v/' . rawurlencode($slug) . '/' . 'qr' : null,
             'vcfUrl' => $this->vcf->hasMinimumData($vcard) && $slug !== ''
                 ? '/v/' . rawurlencode($slug) . '/vcf'
                 : null,
@@ -71,6 +76,33 @@ final class PublicVcardController
         }
 
         return $this->servePhoto($photo);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function qr(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->qrNotFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null) {
+            return $this->qrNotFound();
+        }
+
+        $payload = $this->publicVcardUrl($request, (string) ($vcard['slug'] ?? $slug));
+        $qr = $this->qr->generate($payload);
+
+        return $this->withPublicHeaders(Response::binary(
+            $qr['png'],
+            'image/png',
+            ['Cache-Control' => 'public, max-age=3600']
+        ));
     }
 
     /**
@@ -124,6 +156,14 @@ final class PublicVcardController
     }
 
     private function vcfNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function qrNotFound(): Response
     {
         return $this->withPublicHeaders(new Response('', 404, [
             'Content-Type' => 'text/plain; charset=UTF-8',
@@ -382,5 +422,26 @@ final class PublicVcardController
         $safe = is_string($safe) ? trim($safe, '-') : '';
 
         return $safe !== '' ? $safe : 'contacto';
+    }
+
+    private function publicVcardUrl(Request $request, string $slug): string
+    {
+        $path = '/v/' . rawurlencode($slug);
+        $host = trim((string) ($request->header('host') ?? ''));
+
+        if ($host !== '' && preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/', $host) === 1) {
+            $proto = strtolower(trim((string) ($request->header('x-forwarded-proto') ?? '')));
+            $scheme = in_array($proto, ['http', 'https'], true) ? $proto : 'http';
+
+            return $scheme . '://' . $host . $path;
+        }
+
+        $baseUrl = rtrim((string) $this->config->get('app.url', ''), '/');
+
+        if ($baseUrl !== '' && preg_match('/^https?:\/\/[^\/\s]+$/', $baseUrl) === 1) {
+            return $baseUrl . $path;
+        }
+
+        return $path;
     }
 }

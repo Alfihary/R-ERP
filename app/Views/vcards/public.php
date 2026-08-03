@@ -13,6 +13,7 @@ if (
 }
 
 $contactAction = is_array($contactAction ?? null) ? $contactAction : null;
+$qrUrl = is_string($qrUrl ?? null) && $qrUrl !== '' ? $qrUrl : null;
 $vcfUrl = is_string($vcfUrl ?? null) && $vcfUrl !== '' ? $vcfUrl : null;
 $slug = (string) ($vcard['slug'] ?? '');
 $name = trim((string) ($vcard['nombre'] ?? ''));
@@ -156,6 +157,22 @@ $initial = function_exists('mb_substr')
                     <p class="vcard-public__empty">No hay enlaces públicos disponibles.</p>
                 <?php endif; ?>
             </section>
+
+            <?php if ($qrUrl !== null): ?>
+                <section class="vcard-public__section" aria-labelledby="vcard-public-qr">
+                    <h2 id="vcard-public-qr">QR público</h2>
+                    <img
+                        class="vcard-public__qr"
+                        src="<?= e($qrUrl) ?>"
+                        alt="Código QR para abrir esta vCard pública"
+                        width="270"
+                        height="270"
+                    >
+                    <p class="vcard-public__empty">
+                        El QR apunta únicamente a esta página pública.
+                    </p>
+                </section>
+            <?php endif; ?>
         </article>
     </main>
 </body>
