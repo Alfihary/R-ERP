@@ -202,17 +202,19 @@ return new class implements DatabaseTest {
             ];
 
             $results['guardrails'] = [
-                'no_qr_vcf_credential_controllers' =>
+                'no_legacy_qr_vcf_or_public_credential_controllers' =>
                     !file_exists(BASE_PATH . '/app/Http/Controllers/QrController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcfController.php')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
                 'no_products_vcard_functional' =>
                     !$this->fileContains('routes/web.php', '/v/{slug}/productos')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),
-                'no_qr_vcf_credential_services' =>
+                'no_legacy_qr_vcf_or_public_credential_services' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !is_dir(BASE_PATH . '/app/Domain/Credentials'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialTokenService.php')
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialQrService.php'),
                 'no_public_json_api' => !$this->fileContains('routes/web.php', '/api/vcard'),
             ];
 

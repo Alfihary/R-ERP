@@ -91,10 +91,11 @@ return new class implements DatabaseTest {
                 'public_photo_safe_route_remains' =>
                     $this->fileContains('routes/web.php', "'/v/{slug}/foto'")
                     && $this->fileContains('app/Http/Controllers/PublicVcardController.php', 'return $this->notFound();'),
-                'no_qr_vcf_credential' =>
-                    !$this->fileContains('routes/web.php', '/qr')
-                    && !$this->fileContains('routes/web.php', '/vcf')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                'no_credential_token_or_qr' =>
+                    !$this->fileContains('routes/web.php', '/credencial/verificar')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr/descargar')
+                    && !file_exists(BASE_PATH . '/public/js/modules/credential.js'),
             ];
 
             $page = $controller->index(new Request('GET', '/perfil'));

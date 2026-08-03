@@ -158,9 +158,10 @@ return new class implements DatabaseTest {
                 'no_vcf' =>
                     !$this->fileContains('routes/web.php', '/v/{slug}/vcf')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcfController.php'),
-                'no_credential' =>
+                'no_public_credential_verification' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr/descargar'),
                 'no_vcard_products' =>
                     !$this->fileContains('routes/web.php', '/v/{slug}/productos')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),

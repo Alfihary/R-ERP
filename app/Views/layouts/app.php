@@ -27,6 +27,7 @@ $activeNavigation = is_string($activeNavigation ?? null)
     ? $activeNavigation
     : 'home';
 $canAccessProfile = ($canAccessProfile ?? false) === true;
+$canAccessCredential = ($canAccessCredential ?? false) === true;
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $canAccessProductPrices = ($canAccessProductPrices ?? false) === true;
@@ -97,6 +98,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">◌</span>
                         Mi perfil
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessCredential): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'credential' ? ' is-active' : '' ?>"
+                        href="/perfil/credencial"
+                        <?= $activeNavigation === 'credential' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▣</span>
+                        Mi credencial
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessCatalogs): ?>

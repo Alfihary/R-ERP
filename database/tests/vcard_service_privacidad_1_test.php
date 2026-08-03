@@ -254,20 +254,22 @@ return new class implements DatabaseTest {
                 'public_vcard_controller_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardController.php')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
                 'public_vcard_views_allowed_after_security_phase' =>
                     is_dir(BASE_PATH . '/app/Views/vcards')
                     && !is_dir(BASE_PATH . '/app/Views/vcard')
-                    && !is_dir(BASE_PATH . '/app/Views/credentials'),
+                    && !is_dir(BASE_PATH . '/app/Views/credential-public'),
                 'public_vcard_asset_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/public/css/modules/vcard-public.css')
                     && !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
                     && !file_exists(BASE_PATH . '/public/js/vcard.js')
                     && !file_exists(BASE_PATH . '/public/js/modules/vcard.js'),
-                'no_qr_vcf_credential_classes' =>
+                'no_qr_vcf_or_public_credential_classes' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
                     && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !is_dir(BASE_PATH . '/app/Domain/Credentials'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialTokenService.php')
+                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialQrService.php'),
             ];
 
             $during = $this->counts($pdo);

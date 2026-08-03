@@ -15,6 +15,7 @@ use App\Domain\Catalogs\ExchangeRateService;
 use App\Domain\Catalogs\SatCatalogService;
 use App\Domain\Configuration\CompanyService;
 use App\Domain\Configuration\WarehouseService;
+use App\Domain\Credentials\CredentialService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
@@ -37,6 +38,7 @@ use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
@@ -68,6 +70,7 @@ use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserPhotoRepository;
+use App\Infrastructure\Repositories\UserCredentialRepository;
 use App\Infrastructure\Repositories\UserRepository;
 use App\Infrastructure\Repositories\UserVcardRepository;
 use App\Infrastructure\Repositories\VcardPrivacyRepository;
@@ -147,6 +150,9 @@ $folioSeriesRepository = new FolioSeriesRepository($connection);
 $folioService = new FolioService(new FolioRepository($connection));
 $companies = new CompanyService($companyRepository);
 $warehouses = new WarehouseService($warehouseRepository);
+$credentials = new CredentialService(
+    new UserCredentialRepository($connection)
+);
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
 $profiles = new ProfileService(
@@ -256,6 +262,14 @@ $profileController = new ProfileController(
     $profiles,
     $userPhotoStorage
 );
+$credentialController = new CredentialController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $credentials
+);
 $publicVcardController = new PublicVcardController(
     $config,
     $vcards,
@@ -328,6 +342,7 @@ $registerRoutes(
     $warehouseController,
     $folioSeriesController,
     $profileController,
+    $credentialController,
     $publicVcardController,
     $productController,
     $priceListController,

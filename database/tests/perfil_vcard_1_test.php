@@ -333,14 +333,13 @@ return new class implements DatabaseTest {
         return [
             'checked' => array_keys($paths),
             'phase_compatibility' =>
-                'PERFIL-VCARD-DB-1 validates DB contract only; private profile UI, private vCard service and public vCard security surface may exist after later approved phases.',
+                'PERFIL-VCARD-DB-1 validates DB contract only; private profile UI, private vCard service, public vCard security surface and private visual credential may exist after later approved phases.',
             'exists' => $exists,
             'forbidden_absent' =>
-                ($exists['credential_services'] ?? false) === false
-                && ($exists['credential_controller'] ?? false) === false
-                && ($exists['credential_views'] ?? false) === false
+                !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialTokenService.php')
+                && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialQrService.php')
+                && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialVerificationController.php')
                 && ($exists['vcard_css'] ?? false) === false
-                && ($exists['credential_css'] ?? false) === false
                 && ($exists['vcard_js'] ?? false) === false
                 && ($exists['credential_js'] ?? false) === false,
         ];

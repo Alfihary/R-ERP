@@ -15,6 +15,7 @@ use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CredentialController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
@@ -43,6 +44,7 @@ return static function (
     WarehouseController $warehouseController,
     FolioSeriesController $folioSeriesController,
     ProfileController $profileController,
+    CredentialController $credentialController,
     PublicVcardController $publicVcardController,
     ProductController $productController,
     PriceListController $priceListController,
@@ -141,6 +143,10 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'perfil.ver'
         );
+        $canAccessCredential = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'credencial.ver'
+        );
         $canAccessInventory = $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'inventario.movimientos.acceder'
@@ -168,6 +174,7 @@ return static function (
             'appName' => (string) $config->get('app.name', 'SoporteGR ERP'),
             'canAccessCatalogs' => $canAccessCatalogs,
             'canAccessProfile' => $canAccessProfile,
+            'canAccessCredential' => $canAccessCredential,
             'canAccessProducts' => $canAccessProducts,
             'canAccessProductPrices' => $canAccessProductPrices,
             'canAccessInventory' => $canAccessInventory,
@@ -252,6 +259,15 @@ return static function (
         static fn (Request $request): Response =>
             $profileController->deletePhoto($request),
         $profileMiddleware('perfil.foto.eliminar')
+    );
+    $router->get(
+        '/perfil/credencial',
+        static fn (Request $request): Response =>
+            $credentialController->show($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+        ]
     );
 
     $router->post('/app/contexto', static function (Request $request) use (

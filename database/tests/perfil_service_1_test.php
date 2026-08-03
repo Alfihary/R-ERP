@@ -270,16 +270,15 @@ return new class implements DatabaseTest {
                 'public_vcard_controller_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/app/Http/Controllers/PublicVcardController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VCardController.php')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialController.php'),
+                    && !$this->fileContains('routes/web.php', '/credencial/verificar')
+                    && !$this->fileContains('routes/web.php', '/perfil/credencial/qr'),
                 'public_vcard_views_allowed_after_security_phase' =>
                     !is_dir(BASE_PATH . '/app/Views/vcard')
                     && is_dir(BASE_PATH . '/app/Views/vcards')
-                    && !is_dir(BASE_PATH . '/app/Views/credential')
-                    && !is_dir(BASE_PATH . '/app/Views/credentials'),
+                    && !is_dir(BASE_PATH . '/app/Views/credential-public'),
                 'public_vcard_asset_allowed_after_security_phase' =>
                     file_exists(BASE_PATH . '/public/css/modules/vcard-public.css')
                     && !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
-                    && !file_exists(BASE_PATH . '/public/css/modules/credential.css')
                     && !file_exists(BASE_PATH . '/public/js/modules/vcard.js')
                     && !file_exists(BASE_PATH . '/public/js/modules/credential.js'),
                 'no_legacy_public_vcard_service_implementation' =>
@@ -437,6 +436,13 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    private function fileContains(string $relativePath, string $needle): bool
+    {
+        $path = BASE_PATH . '/' . ltrim($relativePath, '/');
+
+        return is_file($path) && str_contains((string) file_get_contents($path), $needle);
     }
 
     private function allTrue(mixed $value): bool
