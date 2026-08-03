@@ -57,16 +57,14 @@ visible y respeta `prefers-reduced-motion`.
 
 ## Reglas de foto pública
 
-`GET /v/{slug}/foto` está registrado, pero en esta fase responde 404 seguro.
+Estado posterior a `VCARD-FOTO-PUBLICA-1`:
 
-Motivo:
-
-- `VcardService` solo expone `foto_publica_disponible`;
-- no expone metadata de archivo ni ruta física;
-- servir archivos privados desde controlador requeriría ampliar una capa segura
-  de almacenamiento/metadata.
-
-La foto pública real queda diferida a `VCARD-FOTO-PUBLICA-1`.
+- `GET /v/{slug}/foto` sirve una imagen real solo cuando la vCard está publicada,
+  el usuario está activo, la privacidad `foto` está visible y existe foto activa
+  con archivo físico seguro.
+- Si la privacidad `foto` está desactivada, no hay foto, el archivo no existe o
+  el path no es seguro, responde 404 seguro.
+- No se expone `ruta_relativa` ni path físico en la vista pública.
 
 ## Reglas de contacto público
 
@@ -120,18 +118,12 @@ El test funcional valida:
 - campos privados no aparecen;
 - metadatos no incluyen campos privados;
 - no se exponen IDs, hashes, roles, permisos, tokens ni rutas privadas;
-- foto privada y foto inexistente = 404;
+- foto con privacidad desactivada y foto inexistente = 404;
 - enlaces externos usan `rel="noopener noreferrer"`;
 - no existen rutas QR/VCF/productos/credencial;
 - rollback de datos QA.
 
-## Riesgos conocidos
-
-La foto pública queda desactivada de forma segura en esta fase. Para activarla
-se requiere una fase dedicada con metadata controlada y lectura segura desde
-storage protegido.
-
 ## Siguiente fase sugerida
 
-Revisión/cierre de `VCARD-PUBLICO-SEGURIDAD-1` o fase específica
-`VCARD-FOTO-PUBLICA-1` si se decide servir imágenes públicas.
+Revisión/cierre de `VCARD-FOTO-PUBLICA-1` y, posteriormente, una fase explícita
+para QR o VCF si se autoriza.

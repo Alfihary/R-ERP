@@ -181,7 +181,7 @@ return new class implements DatabaseTest {
             );
 
             $results['photo_endpoint'] = [
-                'private_photo_404' => $privatePhoto->status() === 404,
+                'privacy_disabled_photo_404' => $privatePhoto->status() === 404,
                 'no_photo_404' => $noPhoto->status() === 404,
                 'no_private_path_leak' =>
                     !str_contains($privatePhoto->body(), 'profile/users/')
@@ -227,7 +227,7 @@ return new class implements DatabaseTest {
         return [
             'database' => $expectedDatabase,
             'cases' => $results,
-            'photo_endpoint_mode' => 'safe_404_deferred_to_VCARD-FOTO-PUBLICA-1',
+            'photo_endpoint_mode' => 'controlled_public_serving_after_VCARD-FOTO-PUBLICA-1',
             'persistent_counts_before' => $before,
             'transient_counts_during' => $during,
             'persistent_counts_after' => $after,

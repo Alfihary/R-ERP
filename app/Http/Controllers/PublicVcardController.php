@@ -53,19 +53,16 @@ final class PublicVcardController
         $slug = $this->slugFromParams($params);
 
         if ($slug === '') {
-            return $this->notFound();
+            return $this->photoNotFound();
         }
 
-        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+        $photo = $this->vcards->obtenerFotoPublicaPorSlug($slug);
 
-        if (
-            $vcard === null
-            || ($vcard['foto_publica_disponible'] ?? false) !== true
-        ) {
-            return $this->notFound();
+        if ($photo === null) {
+            return $this->photoNotFound();
         }
 
-        return $this->notFound();
+        return $this->servePhoto($photo);
     }
 
     private function notFound(): Response
@@ -73,6 +70,14 @@ final class PublicVcardController
         return $this->withPublicHeaders(Response::html(View::render('vcards/not-found', [
             'appName' => $this->appName(),
         ]), 404))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function photoNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
     /**
@@ -194,5 +199,129 @@ final class PublicVcardController
             ->withHeader('X-Content-Type-Options', 'nosniff')
             ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
             ->withHeader('X-Frame-Options', 'DENY');
+    }
+
+    /**
+     * @param array<string, mixed> $photo
+     */
+    private function servePhoto(array $photo): Response
+    {
+        $mime = strtolower((string) ($photo['mime'] ?? ''));
+        $extension = strtolower((string) ($photo['extension'] ?? ''));
+        $relativePath = (string) ($photo['ruta_relativa'] ?? '');
+        $declaredSize = (int) ($photo['tamano_bytes'] ?? 0);
+
+        if (!$this->allowedPhotoMetadata($mime, $extension, $declaredSize)) {
+            return $this->photoNotFound();
+        }
+
+        $path = $this->safePhotoPath($relativePath);
+
+        if ($path === null || !is_file($path) || !is_readable($path)) {
+            return $this->photoNotFound();
+        }
+
+        $actualSize = filesize($path);
+
+        if ($actualSize === false || $actualSize < 1) {
+            return $this->photoNotFound();
+        }
+
+        $actualMime = $this->detectMime($path);
+
+        if ($actualMime !== $mime) {
+            return $this->photoNotFound();
+        }
+
+        $body = file_get_contents($path);
+
+        if (!is_string($body) || $body === '') {
+            return $this->photoNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary($body, $mime, [
+            'Cache-Control' => 'public, max-age=3600',
+        ]));
+    }
+
+    private function allowedPhotoMetadata(
+        string $mime,
+        string $extension,
+        int $declaredSize
+    ): bool {
+        if ($declaredSize < 1) {
+            return false;
+        }
+
+        return match ($mime) {
+            'image/jpeg' => in_array($extension, ['jpg', 'jpeg'], true),
+            'image/png' => $extension === 'png',
+            'image/webp' => $extension === 'webp',
+            default => false,
+        };
+    }
+
+    private function safePhotoPath(string $relativePath): ?string
+    {
+        if (
+            $relativePath === ''
+            || !str_starts_with($relativePath, 'uploads/usuarios/')
+            || str_contains($relativePath, '..')
+            || str_contains($relativePath, '\\')
+            || str_starts_with($relativePath, '/')
+        ) {
+            return null;
+        }
+
+        $storagePath = rtrim(
+            (string) $this->config->get('paths.STORAGE_PATH', STORAGE_PATH),
+            '/\\'
+        );
+        $root = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, 'uploads/usuarios');
+        $rootReal = realpath($root);
+
+        if ($rootReal === false) {
+            return null;
+        }
+
+        $candidate = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+        $realPath = realpath($candidate);
+
+        if ($realPath === false) {
+            return null;
+        }
+
+        $normalizedRoot = $this->normalizedPath($rootReal) . '/';
+        $normalizedPath = $this->normalizedPath($realPath);
+
+        if (!str_starts_with($normalizedPath, $normalizedRoot)) {
+            return null;
+        }
+
+        return $realPath;
+    }
+
+    private function detectMime(string $path): string
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+        if ($finfo === false) {
+            return '';
+        }
+
+        try {
+            $mime = finfo_file($finfo, $path);
+        } finally {
+            finfo_close($finfo);
+        }
+
+        return is_string($mime) ? strtolower($mime) : '';
+    }
+
+    private function normalizedPath(string $path): string
+    {
+        return rtrim(str_replace('\\', '/', $path), '/');
     }
 }

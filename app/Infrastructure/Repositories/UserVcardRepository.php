@@ -224,6 +224,48 @@ final class UserVcardRepository
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function publicPhotoForSlug(string $slug): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            SELECT
+                v.id AS vcard_id,
+                v.usuario_id,
+                v.slug,
+                uf.id AS foto_id,
+                uf.ruta_relativa,
+                uf.nombre_archivo,
+                uf.mime,
+                uf.extension,
+                uf.tamano_bytes,
+                uf.sha256,
+                uf.ancho,
+                uf.alto
+            FROM vcards_usuario v
+            INNER JOIN usuarios u
+                ON u.id = v.usuario_id
+               AND u.activo = 1
+               AND u.eliminado_en IS NULL
+            INNER JOIN usuarios_fotos uf
+                ON uf.usuario_id = u.id
+               AND uf.activa = 1
+               AND uf.reemplazada_en IS NULL
+               AND uf.eliminada_en IS NULL
+            WHERE v.slug = :slug
+              AND v.publicada = 1
+              AND v.despublicado_en IS NULL
+            LIMIT 1
+            SQL
+        );
+        $statement->execute(['slug' => $slug]);
+        $photo = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($photo) ? $photo : null;
+    }
+
+    /**
      * @template T
      * @param callable(): T $operation
      * @return T

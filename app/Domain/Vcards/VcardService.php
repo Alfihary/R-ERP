@@ -168,6 +168,52 @@ final class VcardService
     }
 
     /**
+     * @return array{
+     *     ruta_relativa: string,
+     *     mime: string,
+     *     extension: string,
+     *     tamano_bytes: int
+     * }|null
+     */
+    public function obtenerFotoPublicaPorSlug(string $slug): ?array
+    {
+        $normalized = $this->normalizeSlug($slug);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        $publicData = $this->vcards->publicDataForSlug($normalized);
+
+        if ($publicData === null) {
+            return null;
+        }
+
+        $vcardId = (int) ($publicData['vcard_id'] ?? $publicData['id'] ?? 0);
+        $privacy = $this->privacy->privacyForVcard($vcardId);
+        $visible = $this->privacy->aplicarPrivacidad([
+            'foto' => !empty($publicData['foto_id']),
+        ], $privacy);
+
+        if (($visible['foto'] ?? false) !== true) {
+            return null;
+        }
+
+        $photo = $this->vcards->publicPhotoForSlug($normalized);
+
+        if ($photo === null) {
+            return null;
+        }
+
+        return [
+            'ruta_relativa' => (string) ($photo['ruta_relativa'] ?? ''),
+            'mime' => (string) ($photo['mime'] ?? ''),
+            'extension' => (string) ($photo['extension'] ?? ''),
+            'tamano_bytes' => (int) ($photo['tamano_bytes'] ?? 0),
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $vcard
      * @return array<string, mixed>
      */
