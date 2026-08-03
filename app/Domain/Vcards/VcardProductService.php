@@ -1,0 +1,212 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domain\Vcards;
+
+use App\Infrastructure\Repositories\VcardProductRepository;
+
+final class VcardProductService
+{
+    public function __construct(
+        private readonly VcardProductRepository $products,
+        private readonly VcardService $vcards
+    ) {
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listarPrivados(int $usuarioId): array
+    {
+        $vcard = $this->ensureVcard($usuarioId);
+
+        return $this->safePrivateProducts(
+            $this->products->privateLinkedProducts((int) $vcard['id'])
+        );
+    }
+
+    /**
+     * @param list<array<string, mixed>> $productos
+     */
+    public function sincronizarProductos(int $usuarioId, array $productos): void
+    {
+        $pdo = $this->products->pdo();
+        $startedTransaction = !$pdo->inTransaction();
+
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $vcard = $this->ensureVcard($usuarioId);
+            $normalized = $this->normalizedProducts($productos);
+            $this->products->syncProducts((int) $vcard['id'], $usuarioId, $normalized);
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+        } catch (\Throwable $exception) {
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listarPublicosPorSlug(string $slug): array
+    {
+        $slug = trim($slug);
+
+        if ($slug === '') {
+            return [];
+        }
+
+        return $this->safePublicProducts($this->products->publicProductsBySlug($slug));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function ensureVcard(int $usuarioId): array
+    {
+        if ($this->products->activeUser($usuarioId) === null) {
+            throw new VcardValidationException([
+                'usuario_id' => 'El usuario no existe o no está activo.',
+            ]);
+        }
+
+        return $this->vcards->asegurarVcard($usuarioId);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $productos
+     * @return list<array{
+     *     id_producto: string,
+     *     activo: int,
+     *     destacado: int,
+     *     orden: int,
+     *     texto_publico: string|null
+     * }>
+     */
+    private function normalizedProducts(array $productos): array
+    {
+        $normalized = [];
+        $seen = [];
+        $position = 0;
+
+        foreach ($productos as $product) {
+            $id = strtoupper(trim((string) ($product['id_producto'] ?? '')));
+
+            if ($id === '') {
+                continue;
+            }
+
+            if (!preg_match('/^[A-Z0-9]{1,16}$/', $id)) {
+                throw new VcardValidationException([
+                    'id_producto' => 'El producto no es válido.',
+                ]);
+            }
+
+            if (!$this->products->productExists($id)) {
+                throw new VcardValidationException([
+                    'id_producto' => 'El producto no existe.',
+                ]);
+            }
+
+            if (isset($seen[$id])) {
+                continue;
+            }
+
+            $seen[$id] = true;
+            $order = (int) ($product['orden'] ?? $position);
+            $text = $this->nullableText($product['texto_publico'] ?? null);
+
+            $normalized[] = [
+                'id_producto' => $id,
+                'activo' => !empty($product['activo']) ? 1 : 0,
+                'destacado' => !empty($product['destacado']) ? 1 : 0,
+                'orden' => max(0, $order),
+                'texto_publico' => $text,
+            ];
+            $position++;
+        }
+
+        return $normalized;
+    }
+
+    private function nullableText(mixed $value): ?string
+    {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $text = trim((string) $value);
+
+        if ($text === '') {
+            return null;
+        }
+
+        if (function_exists('mb_strlen') && mb_strlen($text, 'UTF-8') > 255) {
+            throw new VcardValidationException([
+                'texto_publico' => 'Máximo 255 caracteres.',
+            ]);
+        }
+
+        if (!function_exists('mb_strlen') && strlen($text) > 255) {
+            throw new VcardValidationException([
+                'texto_publico' => 'Máximo 255 caracteres.',
+            ]);
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function safePrivateProducts(array $rows): array
+    {
+        return array_map($this->safeProduct(...), $rows);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function safePublicProducts(array $rows): array
+    {
+        return array_map($this->safeProduct(...), $rows);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function safeProduct(array $row): array
+    {
+        return [
+            'id_producto' => (string) ($row['id_producto'] ?? ''),
+            'descripcion' => (string) ($row['descripcion'] ?? ''),
+            'texto_publico' => $row['texto_publico'] !== null
+                ? (string) $row['texto_publico']
+                : null,
+            'destacado' => (int) ($row['destacado'] ?? 0) === 1,
+            'orden' => (int) ($row['orden'] ?? 0),
+            'unidad' => (string) ($row['unidad_nombre'] ?? $row['unidad_codigo'] ?? ''),
+            'marca' => $row['marca_nombre'] !== null ? (string) $row['marca_nombre'] : null,
+            'linea' => $row['linea_nombre'] !== null ? (string) $row['linea_nombre'] : null,
+            'clasificacion' => $row['clasificacion_nombre'] !== null
+                ? (string) $row['clasificacion_nombre']
+                : null,
+            'activo' => array_key_exists('activo', $row)
+                ? (int) $row['activo'] === 1
+                : true,
+        ];
+    }
+}

@@ -208,7 +208,7 @@ return new class implements DatabaseTest {
                     && ($public['telefono_movil'] ?? null) === '5555551111'
                     && ($public['whatsapp'] ?? null) === '5555552222'
                     && ($public['puesto'] ?? null) === 'Ventas QA'
-                    && ($public['productos_habilitados'] ?? null) === false,
+                    && ($public['productos_habilitados'] ?? null) === true,
                 'private_fields_omitted' =>
                     is_array($public)
                     && !array_key_exists('correo', $public)

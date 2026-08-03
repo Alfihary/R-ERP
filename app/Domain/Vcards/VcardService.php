@@ -237,7 +237,7 @@ final class VcardService
             'instagram' => $vcard['instagram_url'] ?? null,
             'whatsapp' => $vcard['whatsapp'] ?? null,
             'google_maps' => $vcard['google_maps_url'] ?? null,
-            'productos' => false,
+            'productos' => true,
         ];
         $public = [
             'slug' => (string) ($vcard['slug'] ?? ''),

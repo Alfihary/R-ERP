@@ -15,6 +15,7 @@ if (
 $contactAction = is_array($contactAction ?? null) ? $contactAction : null;
 $qrUrl = is_string($qrUrl ?? null) && $qrUrl !== '' ? $qrUrl : null;
 $vcfUrl = is_string($vcfUrl ?? null) && $vcfUrl !== '' ? $vcfUrl : null;
+$publicProducts = is_array($publicProducts ?? null) ? $publicProducts : [];
 $slug = (string) ($vcard['slug'] ?? '');
 $name = trim((string) ($vcard['nombre'] ?? ''));
 $title = trim((string) ($vcard['titulo_publico'] ?? $pageTitle));
@@ -171,6 +172,43 @@ $initial = function_exists('mb_substr')
                     <p class="vcard-public__empty">
                         El QR apunta únicamente a esta página pública.
                     </p>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($publicProducts !== []): ?>
+                <section class="vcard-public__section" aria-labelledby="vcard-public-products">
+                    <h2 id="vcard-public-products">Productos</h2>
+                    <div class="vcard-public__products">
+                        <?php foreach ($publicProducts as $product): ?>
+                            <?php
+                            $productName = trim((string) ($product['descripcion'] ?? ''));
+                            $publicText = trim((string) ($product['texto_publico'] ?? ''));
+                            $meta = array_filter([
+                                $product['marca'] ?? null,
+                                $product['linea'] ?? null,
+                                $product['clasificacion'] ?? null,
+                                $product['unidad'] ?? null,
+                            ], static fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+                            ?>
+                            <article class="vcard-public__product">
+                                <div>
+                                    <h3><?= e($productName !== '' ? $productName : 'Producto') ?></h3>
+                                    <?php if ($publicText !== ''): ?>
+                                        <p><?= e($publicText) ?></p>
+                                    <?php endif; ?>
+                                    <?php if ($meta !== []): ?>
+                                        <p class="vcard-public__product-meta">
+                                            <?= e(implode(' · ', array_map('strval', $meta))) ?>
+                                        </p>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php if (($product['destacado'] ?? false) === true): ?>
+                                    <span class="vcard-public__product-badge">Destacado</span>
+                                <?php endif; ?>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
                 </section>
             <?php endif; ?>
         </article>

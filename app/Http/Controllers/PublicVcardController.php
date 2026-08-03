@@ -9,6 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Domain\Vcards\VcardQrService;
+use App\Domain\Vcards\VcardProductService;
 use App\Domain\Vcards\VcardService;
 use App\Domain\Vcards\VcardVcfService;
 
@@ -21,7 +22,8 @@ final class PublicVcardController
         private readonly Config $config,
         private readonly VcardService $vcards,
         ?VcardVcfService $vcf = null,
-        ?VcardQrService $qr = null
+        ?VcardQrService $qr = null,
+        private readonly ?VcardProductService $products = null
     ) {
         $this->vcf = $vcf ?? new VcardVcfService();
         $this->qr = $qr ?? new VcardQrService();
@@ -50,6 +52,7 @@ final class PublicVcardController
             'contactAction' => $this->contactAction($vcard['canal_contacto'] ?? null),
             'metaDescription' => $this->metaDescription($vcard),
             'pageTitle' => $this->pageTitle($vcard),
+            'publicProducts' => $this->publicProducts($slug, $vcard),
             'qrUrl' => $slug !== '' ? '/v/' . rawurlencode($slug) . '/' . 'qr' : null,
             'vcfUrl' => $this->vcf->hasMinimumData($vcard) && $slug !== ''
                 ? '/v/' . rawurlencode($slug) . '/vcf'
@@ -269,6 +272,23 @@ final class PublicVcardController
             ],
             default => null,
         };
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     * @return list<array<string, mixed>>
+     */
+    private function publicProducts(string $slug, array $vcard): array
+    {
+        if (
+            $this->products === null
+            || $slug === ''
+            || ($vcard['productos_habilitados'] ?? false) !== true
+        ) {
+            return [];
+        }
+
+        return $this->products->listarPublicosPorSlug($slug);
     }
 
     private function limit(string $value, int $max): string
