@@ -24,6 +24,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -46,6 +47,7 @@ return static function (
     ProfileController $profileController,
     CredentialController $credentialController,
     PublicVcardController $publicVcardController,
+    PublicCredentialController $publicCredentialController,
     ProductController $productController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
@@ -81,6 +83,11 @@ return static function (
         '/v/{slug}/' . 'qr',
         static fn (Request $request, array $params): Response =>
             $publicVcardController->qr($request, $params)
+    );
+    $router->get(
+        '/credencial/' . 'verificar/{token}',
+        static fn (Request $request, array $params): Response =>
+            $publicCredentialController->verify($request, $params)
     );
 
     $router->get('/login', static function (Request $request) use ($auth, $csrf): Response {

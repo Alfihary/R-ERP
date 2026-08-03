@@ -4,7 +4,7 @@
 
 Implementar token verificable y QR privado para la credencial interna del usuario autenticado.
 
-Esta fase prepara la base para una futura verificación pública, pero todavía no crea la ruta pública de verificación.
+Esta fase preparó la base para una futura verificación pública. En su cierre original todavía no creó la ruta pública de verificación.
 
 ## Rutas privadas creadas
 
@@ -81,7 +81,7 @@ El QR privado contiene el path futuro:
 /credencial/verificar/{token}
 ```
 
-La ruta pública todavía no existe. El QR solo se entrega dentro del área autenticada y con permiso.
+En `CREDENCIAL-TOKEN-QR-1` la ruta pública todavía no existía. Después de `CREDENCIAL-VERIFICACION-PUBLICA-1`, ese payload queda resuelto por la ruta pública aprobada. El QR solo se entrega dentro del área autenticada y con permiso.
 
 ## Manejo de token plano
 
@@ -89,7 +89,7 @@ Como el token plano no se guarda en DB, el QR solo puede generarse con el token 
 
 ## Fuera de alcance
 
-- No crea `GET /credencial/verificar/{token}`.
+- En su cierre original no creó `GET /credencial/verificar/{token}`; esa ruta pertenece a `CREDENCIAL-VERIFICACION-PUBLICA-1`.
 - No implementa verificación pública.
 - No expone `token_hash`.
 - No persiste PNG QR.
@@ -125,7 +125,7 @@ php database/credencial-token-qr.php functional:test --database=r_erp_db_core_0_
 - QR privado responde PNG.
 - Descarga privada responde PNG.
 - QR contiene payload futuro de verificación.
-- No existe ruta pública de verificación.
+- La ruta pública de verificación no existía en el cierre original de esta fase; si `CREDENCIAL-VERIFICACION-PUBLICA-1` ya fue aplicada, el payload del QR debe resolver ahí.
 - No se persiste QR físico.
 - `token_hash` no aparece en HTML.
 - Token plano no queda en DB.

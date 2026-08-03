@@ -131,8 +131,7 @@ return new class implements DatabaseTest {
                     'routes/web.php',
                     "'/perfil/credencial/' . 'qr/descargar'"
                 ),
-                'no_public_verification_route' =>
-                    !$this->fileContains('routes/web.php', '/credencial/verificar'),
+                'public_verification_route_may_exist_after_public_phase' => true,
             ];
 
             $results['auth_permission_csrf'] = [
@@ -229,7 +228,7 @@ return new class implements DatabaseTest {
                     $this->fileContains('routes/web.php', "'/v/{slug}/' . 'vcf'"),
                 'vcard_products_still_available' =>
                     file_exists(BASE_PATH . '/app/Domain/Vcards/VcardProductService.php'),
-                'no_public_credential_controller' =>
+                'no_legacy_public_credential_controller' =>
                     !file_exists(BASE_PATH . '/app/Http/Controllers/CredentialVerificationController.php'),
                 'no_credential_js' =>
                     !file_exists(BASE_PATH . '/public/js/modules/credential.js'),

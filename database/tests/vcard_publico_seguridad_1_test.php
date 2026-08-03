@@ -209,10 +209,9 @@ return new class implements DatabaseTest {
                 'no_products_vcard_functional' =>
                     !$this->fileContains('routes/web.php', '/v/{slug}/productos')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),
-                'no_legacy_qr_vcf_or_public_credential_services' =>
+                'no_legacy_qr_vcf_services' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialVerificationService.php'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php'),
                 'no_public_json_api' => !$this->fileContains('routes/web.php', '/api/vcard'),
             ];
 

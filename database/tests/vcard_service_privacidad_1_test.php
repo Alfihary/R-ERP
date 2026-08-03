@@ -264,10 +264,9 @@ return new class implements DatabaseTest {
                     && !file_exists(BASE_PATH . '/public/css/modules/vcard.css')
                     && !file_exists(BASE_PATH . '/public/js/vcard.js')
                     && !file_exists(BASE_PATH . '/public/js/modules/vcard.js'),
-                'no_qr_vcf_or_public_credential_classes' =>
+                'no_qr_vcf_classes' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php')
-                    && !file_exists(BASE_PATH . '/app/Domain/Credentials/CredentialVerificationService.php'),
+                    && !file_exists(BASE_PATH . '/app/Domain/Vcards/VcfService.php'),
             ];
 
             $during = $this->counts($pdo);

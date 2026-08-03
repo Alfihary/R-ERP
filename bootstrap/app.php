@@ -18,6 +18,7 @@ use App\Domain\Configuration\WarehouseService;
 use App\Domain\Credentials\CredentialQrService;
 use App\Domain\Credentials\CredentialService;
 use App\Domain\Credentials\CredentialTokenService;
+use App\Domain\Credentials\CredentialVerificationService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
@@ -49,6 +50,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
@@ -161,6 +163,9 @@ $credentialTokens = new CredentialTokenService(
     new CredentialTokenRepository($connection)
 );
 $credentialQr = new CredentialQrService();
+$credentialVerification = new CredentialVerificationService(
+    $connection
+);
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
 $profiles = new ProfileService(
@@ -288,6 +293,10 @@ $publicVcardController = new PublicVcardController(
     $vcardQr,
     $vcardProducts
 );
+$publicCredentialController = new PublicCredentialController(
+    $config,
+    $credentialVerification
+);
 $productController = new ProductController(
     $config,
     $auth,
@@ -355,6 +364,7 @@ $registerRoutes(
     $profileController,
     $credentialController,
     $publicVcardController,
+    $publicCredentialController,
     $productController,
     $priceListController,
     $productPriceController,
