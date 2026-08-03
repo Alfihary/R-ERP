@@ -9,13 +9,18 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Domain\Vcards\VcardService;
+use App\Domain\Vcards\VcardVcfService;
 
 final class PublicVcardController
 {
+    private readonly VcardVcfService $vcf;
+
     public function __construct(
         private readonly Config $config,
-        private readonly VcardService $vcards
+        private readonly VcardService $vcards,
+        ?VcardVcfService $vcf = null
     ) {
+        $this->vcf = $vcf ?? new VcardVcfService();
     }
 
     /**
@@ -41,6 +46,9 @@ final class PublicVcardController
             'contactAction' => $this->contactAction($vcard['canal_contacto'] ?? null),
             'metaDescription' => $this->metaDescription($vcard),
             'pageTitle' => $this->pageTitle($vcard),
+            'vcfUrl' => $this->vcf->hasMinimumData($vcard) && $slug !== ''
+                ? '/v/' . rawurlencode($slug) . '/vcf'
+                : null,
             'vcard' => $vcard,
         ])));
     }
@@ -65,6 +73,41 @@ final class PublicVcardController
         return $this->servePhoto($photo);
     }
 
+    /**
+     * @param array<string, string> $params
+     */
+    public function vcf(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->vcfNotFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null) {
+            return $this->vcfNotFound();
+        }
+
+        $body = $this->vcf->generate($vcard);
+
+        if ($body === null) {
+            return $this->vcfNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary(
+            $body,
+            'text/vcard; charset=utf-8',
+            [
+                'Content-Disposition' => 'attachment; filename="contacto-'
+                    . $this->safeFilenameSlug($slug)
+                    . '.vcf"',
+                'Cache-Control' => 'public, max-age=300',
+            ]
+        ));
+    }
+
     private function notFound(): Response
     {
         return $this->withPublicHeaders(Response::html(View::render('vcards/not-found', [
@@ -73,6 +116,14 @@ final class PublicVcardController
     }
 
     private function photoNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function vcfNotFound(): Response
     {
         return $this->withPublicHeaders(new Response('', 404, [
             'Content-Type' => 'text/plain; charset=UTF-8',
@@ -323,5 +374,13 @@ final class PublicVcardController
     private function normalizedPath(string $path): string
     {
         return rtrim(str_replace('\\', '/', $path), '/');
+    }
+
+    private function safeFilenameSlug(string $slug): string
+    {
+        $safe = preg_replace('/[^a-z0-9-]+/', '-', strtolower($slug));
+        $safe = is_string($safe) ? trim($safe, '-') : '';
+
+        return $safe !== '' ? $safe : 'contacto';
     }
 }

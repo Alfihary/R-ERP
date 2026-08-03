@@ -86,8 +86,12 @@ return new class implements DatabaseTest {
             $results['routes'] = [
                 'public_vcard_declared' => $this->fileContains('routes/web.php', "'/v/{slug}'"),
                 'public_photo_declared' => $this->fileContains('routes/web.php', "'/v/{slug}/foto'"),
+                'public_vcf_available_after_vcard_vcf_1' =>
+                    $this->fileContains(
+                        'app/Http/Controllers/PublicVcardController.php',
+                        'function vcf('
+                    ),
                 'no_qr_route' => !$this->fileContains('routes/web.php', '/v/{slug}/qr'),
-                'no_vcf_route' => !$this->fileContains('routes/web.php', '/v/{slug}/vcf'),
                 'no_products_route' => !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
                 'no_credential_verify_route' => !$this->fileContains('routes/web.php', '/credencial/verificar'),
             ];
@@ -169,7 +173,9 @@ return new class implements DatabaseTest {
 
             $results['contact']['no_visible_channel_no_action'] =
                 $noContact->status() === 200
-                && !str_contains($noContact->body(), 'vcard-public__action');
+                && !str_contains($noContact->body(), 'Contactar por WhatsApp')
+                && !str_contains($noContact->body(), 'Enviar correo')
+                && !str_contains($noContact->body(), 'Llamar');
 
             $privatePhoto = $controller->photo(
                 new Request('GET', '/v/' . self::SLUG . '/foto'),

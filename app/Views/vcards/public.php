@@ -13,6 +13,7 @@ if (
 }
 
 $contactAction = is_array($contactAction ?? null) ? $contactAction : null;
+$vcfUrl = is_string($vcfUrl ?? null) && $vcfUrl !== '' ? $vcfUrl : null;
 $slug = (string) ($vcard['slug'] ?? '');
 $name = trim((string) ($vcard['nombre'] ?? ''));
 $title = trim((string) ($vcard['titulo_publico'] ?? $pageTitle));
@@ -85,17 +86,27 @@ $initial = function_exists('mb_substr')
                     </div>
                 </div>
 
-                <?php if ($contactAction !== null): ?>
-                    <a
-                        class="vcard-public__action"
-                        href="<?= e((string) $contactAction['href']) ?>"
-                        <?php if (str_starts_with((string) $contactAction['href'], 'http')): ?>
-                            target="_blank"
-                            rel="noopener noreferrer"
+                <?php if ($contactAction !== null || $vcfUrl !== null): ?>
+                    <div class="vcard-public__actions">
+                        <?php if ($contactAction !== null): ?>
+                            <a
+                                class="vcard-public__action"
+                                href="<?= e((string) $contactAction['href']) ?>"
+                                <?php if (str_starts_with((string) $contactAction['href'], 'http')): ?>
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                <?php endif; ?>
+                            >
+                                <?= e((string) $contactAction['label']) ?>
+                            </a>
                         <?php endif; ?>
-                    >
-                        <?= e((string) $contactAction['label']) ?>
-                    </a>
+
+                        <?php if ($vcfUrl !== null): ?>
+                            <a class="vcard-public__action vcard-public__action--secondary" href="<?= e($vcfUrl) ?>">
+                                Descargar contacto
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 <?php endif; ?>
             </header>
 

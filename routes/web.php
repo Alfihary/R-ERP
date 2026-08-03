@@ -70,6 +70,11 @@ return static function (
         static fn (Request $request, array $params): Response =>
             $publicVcardController->photo($request, $params)
     );
+    $router->get(
+        '/v/{slug}/' . 'vcf',
+        static fn (Request $request, array $params): Response =>
+            $publicVcardController->vcf($request, $params)
+    );
 
     $router->get('/login', static function (Request $request) use ($auth, $csrf): Response {
         if ($auth->check()) {

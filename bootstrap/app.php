@@ -28,6 +28,7 @@ use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
 use App\Domain\Vcards\VcardPrivacyService;
 use App\Domain\Vcards\VcardService;
+use App\Domain\Vcards\VcardVcfService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
@@ -159,6 +160,7 @@ $vcards = new VcardService(
     $vcardPrivacyRepository,
     $vcardPrivacy
 );
+$vcardVcf = new VcardVcfService();
 $productPrices = new ProductPriceService(
     new ProductPriceRepository($connection),
     new PriceListRepository($connection),
@@ -246,7 +248,7 @@ $profileController = new ProfileController(
     $profiles,
     $userPhotoStorage
 );
-$publicVcardController = new PublicVcardController($config, $vcards);
+$publicVcardController = new PublicVcardController($config, $vcards, $vcardVcf);
 $productController = new ProductController(
     $config,
     $auth,
