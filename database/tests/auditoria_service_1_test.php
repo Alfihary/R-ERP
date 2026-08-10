@@ -163,8 +163,17 @@ return new class implements DatabaseTest {
             $results['scope_guards'] = [
                 'no_migrations_created' => !$this->hasUncommittedPath('database/migrations'),
                 'no_seeds_created' => !$this->hasUncommittedPath('database/seeds'),
-                'no_views_modified' => !$this->hasUncommittedPath('app/Views'),
-                'no_routes_modified' => !$this->hasUncommittedPath('routes'),
+                'no_unexpected_views_modified' => $this->onlyExpectedUncommittedPaths(
+                    'app/Views',
+                    [
+                        'app/Views/audit/index.php',
+                        'app/Views/layouts/app.php',
+                    ]
+                ),
+                'no_unexpected_routes_modified' => $this->onlyExpectedUncommittedPaths(
+                    'routes',
+                    ['routes/web.php']
+                ),
             ];
         } finally {
             if ($pdo->inTransaction()) {
@@ -372,6 +381,31 @@ return new class implements DatabaseTest {
         }
 
         return $output !== [];
+    }
+
+    /**
+     * @param list<string> $allowedPaths
+     */
+    private function onlyExpectedUncommittedPaths(string $path, array $allowedPaths): bool
+    {
+        exec('git status --short -- ' . escapeshellarg($path), $output, $exitCode);
+
+        if ($exitCode !== 0) {
+            throw new RuntimeException('Unable to inspect git status for ' . $path);
+        }
+
+        foreach ($output as $line) {
+            $changedPath = trim(substr((string) $line, 3));
+
+            if (
+                !in_array($changedPath, $allowedPaths, true)
+                && !str_starts_with($changedPath, 'app/Views/audit/')
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

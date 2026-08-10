@@ -39,6 +39,7 @@ use App\Domain\Vcards\VcardVcfService;
 use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
+use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
@@ -58,6 +59,7 @@ use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Repositories\AuditRepository;
+use App\Infrastructure\Repositories\AuditQueryRepository;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
@@ -346,6 +348,14 @@ $inventoryTransferController = new InventoryTransferController(
     $inventoryTransfers,
     $inventoryQueries
 );
+$auditController = new AuditController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    new AuditQueryRepository($connection)
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -375,7 +385,8 @@ $registerRoutes(
     $priceListController,
     $productPriceController,
     $inventoryController,
-    $inventoryTransferController
+    $inventoryTransferController,
+    $auditController
 );
 
 return new App($router, $config, $debug, $errorHandler);

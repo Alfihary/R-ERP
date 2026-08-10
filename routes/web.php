@@ -12,6 +12,7 @@ use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
+use App\Http\Controllers\AuditController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
@@ -52,7 +53,8 @@ return static function (
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
-    InventoryTransferController $inventoryTransferController
+    InventoryTransferController $inventoryTransferController,
+    AuditController $auditController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -174,6 +176,9 @@ return static function (
         ) || $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'precios.listas.acceder'
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            AuditController::PERMISSION
         );
 
         return Response::html(View::render('layouts/app', [
@@ -202,6 +207,10 @@ return static function (
             'canAccessPriceLists' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
                 'precios.listas.acceder'
+            ),
+            'canAccessAudit' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                AuditController::PERMISSION
             ),
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
@@ -359,6 +368,18 @@ return static function (
 
         return Response::redirect('/login');
     }, [$authMiddleware]);
+
+    $auditBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, AuditController::PERMISSION),
+    ];
+
+    $router->get(
+        '/auditoria',
+        static fn (Request $request): Response =>
+            $auditController->index($request),
+        $auditBaseMiddleware
+    );
 
     $companyBaseMiddleware = [
         $authMiddleware,
