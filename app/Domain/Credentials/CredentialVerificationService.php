@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Credentials;
 
+use App\Domain\Audit\AuditService;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\AuditRepository;
 use PDO;
 
 final class CredentialVerificationService
@@ -17,8 +19,14 @@ final class CredentialVerificationService
      */
     private static array $publicRateLimit = [];
 
-    public function __construct(private readonly ConnectionProvider $connection)
+    private AuditService $audit;
+
+    public function __construct(
+        private readonly ConnectionProvider $connection,
+        ?AuditService $audit = null
+    )
     {
+        $this->audit = $audit ?? new AuditService(new AuditRepository($connection));
     }
 
     /**
@@ -137,42 +145,12 @@ final class CredentialVerificationService
         ?string $ip,
         ?string $userAgent
     ): void {
-        if (!$this->tableExists('auditoria_eventos')) {
-            return;
-        }
-
-        $statement = $this->connection->pdo()->prepare(
-            <<<'SQL'
-            INSERT INTO auditoria_eventos (
-                actor_usuario_id,
-                accion,
-                entidad,
-                entidad_id,
-                resultado,
-                ip,
-                user_agent,
-                metadata_json
-            ) VALUES (
-                NULL,
-                :accion,
-                'credencial_publica',
-                NULL,
-                :resultado,
-                :ip,
-                :user_agent,
-                :metadata_json
-            )
-            SQL
-        );
-        $statement->execute([
-            'accion' => $action,
+        $this->audit->recordPublic($action, [
+            'entidad' => 'credencial_publica',
             'resultado' => $result,
             'ip' => $this->safeIp($ip ?? ''),
             'user_agent' => $this->safeUserAgent($userAgent),
-            'metadata_json' => json_encode(
-                ['surface' => 'public_credential_verification'],
-                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES
-            ),
+            'surface' => 'public_credential_verification',
         ]);
     }
 
@@ -198,19 +176,6 @@ final class CredentialVerificationService
         }
 
         return substr(str_replace(["\r", "\n"], ' ', $userAgent), 0, 500);
-    }
-
-    private function tableExists(string $table): bool
-    {
-        $statement = $this->connection->pdo()->prepare(
-            'SELECT COUNT(*)
-             FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = :table_name'
-        );
-        $statement->execute(['table_name' => $table]);
-
-        return (int) $statement->fetchColumn() === 1;
     }
 
     /**

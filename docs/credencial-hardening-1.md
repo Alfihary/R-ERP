@@ -1,5 +1,9 @@
 # CREDENCIAL-HARDENING-1
 
+## Nota AUDITORIA-SERVICE-1
+
+La auditoria publica de verificacion de credencial queda centralizada en `AuditService`. Los eventos `credencial.verificacion.publica.ok`, `credencial.verificacion.publica.fail` y `credencial.verificacion.publica.rate_limited` no deben guardar token plano, `token_hash`, `password_hash`, rutas privadas ni `storage/uploads`.
+
 ## Objetivo
 
 Endurecer la verificación pública de credenciales sin cambiar el flujo principal ya cerrado.

@@ -9,6 +9,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Domain\Audit\AuditService;
 use App\Domain\Auth\AuthService;
 use App\Domain\Credentials\CredentialQrService;
 use App\Domain\Credentials\CredentialService;
@@ -28,7 +29,8 @@ final class CredentialController
         private readonly CredentialService $credentials,
         private readonly CredentialTokenService $tokens,
         private readonly CredentialQrService $qr,
-        private readonly Session $session
+        private readonly Session $session,
+        private readonly ?AuditService $audit = null
     ) {
     }
 
@@ -84,6 +86,10 @@ final class CredentialController
         }
 
         $qr = $this->qr->generate($this->tokens->verificationPath($token));
+        $this->audit?->record('credencial.qr.ver', $this->user()['user_id'], [
+            'entidad' => 'credencial',
+            'resultado' => 'ok',
+        ]);
 
         return Response::binary($qr['png'], 'image/png', [
             'Cache-Control' => 'private, no-store',
@@ -102,7 +108,17 @@ final class CredentialController
             return $this->photoNotFound();
         }
 
-        return $this->servePhoto($photo);
+        $response = $this->servePhoto($photo);
+
+        if ($response->status() === 200) {
+            $this->audit?->record('credencial.foto.ver', $this->user()['user_id'], [
+                'entidad' => 'credencial',
+                'resultado' => 'ok',
+                'mime' => $photo['mime'] ?? null,
+            ]);
+        }
+
+        return $response;
     }
 
     public function downloadQr(Request $request): Response
@@ -122,6 +138,10 @@ final class CredentialController
         }
 
         $qr = $this->qr->generate($this->tokens->verificationPath($token));
+        $this->audit?->record('credencial.qr.descargar', $this->user()['user_id'], [
+            'entidad' => 'credencial',
+            'resultado' => 'ok',
+        ]);
 
         return Response::binary($qr['png'], 'image/png', [
             'Cache-Control' => 'private, no-store',

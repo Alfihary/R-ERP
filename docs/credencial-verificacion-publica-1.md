@@ -1,5 +1,9 @@
 # CREDENCIAL-VERIFICACION-PUBLICA-1
 
+## Nota AUDITORIA-SERVICE-1
+
+La verificacion publica de credencial registra auditoria mediante `AuditService`, no mediante SQL directo en el controlador o servicio de verificacion. La metadata se sanitiza para evitar tokens, hashes, secretos, rutas privadas y `storage/uploads`.
+
 ## Objetivo
 
 Implementar la verificación pública mínima de credenciales internas mediante un token URL-safe previamente emitido por el flujo privado de credencial.

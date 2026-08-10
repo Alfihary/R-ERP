@@ -8,6 +8,7 @@ use App\Core\Env;
 use App\Core\ErrorHandler;
 use App\Core\Router;
 use App\Core\Session;
+use App\Domain\Audit\AuditService;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
 use App\Domain\Catalogs\ClassificationService;
@@ -56,6 +57,7 @@ use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\CatalogRepository;
 use App\Infrastructure\Repositories\ClassificationRepository;
@@ -139,6 +141,7 @@ if (!is_array($databaseConfig)) {
 }
 
 $connection = new ConnectionProvider($databaseConfig);
+$audit = new AuditService(new AuditRepository($connection));
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
 $catalogs = new CatalogService(new CatalogRepository($connection));
@@ -160,11 +163,13 @@ $credentials = new CredentialService(
 );
 $credentialTokens = new CredentialTokenService(
     $credentials,
-    new CredentialTokenRepository($connection)
+    new CredentialTokenRepository($connection),
+    $audit
 );
 $credentialQr = new CredentialQrService();
 $credentialVerification = new CredentialVerificationService(
-    $connection
+    $connection,
+    $audit
 );
 $productRepository = new ProductRepository($connection);
 $productDocuments = new ProductDocumentRepository($connection);
@@ -284,7 +289,8 @@ $credentialController = new CredentialController(
     $credentials,
     $credentialTokens,
     $credentialQr,
-    $session
+    $session,
+    $audit
 );
 $publicVcardController = new PublicVcardController(
     $config,

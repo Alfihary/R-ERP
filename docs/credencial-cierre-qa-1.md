@@ -1,5 +1,9 @@
 # CREDENCIAL-CIERRE-QA-1
 
+## Nota AUDITORIA-SERVICE-1
+
+El cierre QA de credencial mantiene la superficie publica/privada existente y agrega auditoria centralizada mediante `AuditService` para eventos publicos de verificacion y eventos privados de token, QR y foto. No se agregan rutas publicas nuevas ni se exponen datos sensibles.
+
 ## Objetivo
 
 Realizar el cierre integral de QA del bloque perfil, vCard y credencial sin agregar funcionalidad nueva.

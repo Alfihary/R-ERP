@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domain\Credentials;
 
+use App\Domain\Audit\AuditService;
 use App\Infrastructure\Repositories\CredentialTokenRepository;
 
 final class CredentialTokenService
 {
     public function __construct(
         private readonly CredentialService $credentials,
-        private readonly CredentialTokenRepository $tokens
+        private readonly CredentialTokenRepository $tokens,
+        private readonly ?AuditService $audit = null
     ) {
     }
 
@@ -37,6 +39,12 @@ final class CredentialTokenService
             $this->tokens->revokeActiveTokens($credentialId);
             $this->tokens->createToken($credentialId, $tokenHash, $tokenPrefix);
         });
+        $this->audit?->record('credencial.token.renovar', $usuarioId, [
+            'entidad' => 'credencial',
+            'entidad_id' => (string) $credentialId,
+            'resultado' => 'ok',
+            'token_prefix' => $tokenPrefix,
+        ]);
 
         $state = $this->obtenerEstadoToken($usuarioId);
 
@@ -60,6 +68,11 @@ final class CredentialTokenService
         }
 
         $this->tokens->revokeActiveTokens($credentialId);
+        $this->audit?->record('credencial.token.revocar', $usuarioId, [
+            'entidad' => 'credencial',
+            'entidad_id' => (string) $credentialId,
+            'resultado' => 'ok',
+        ]);
     }
 
     /**

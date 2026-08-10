@@ -1,5 +1,9 @@
 # CREDENCIAL-TOKEN-QR-1
 
+## Nota AUDITORIA-SERVICE-1
+
+La auditoria de renovacion/revocacion de token y de visualizacion/descarga de QR queda centralizada en `AuditService`. Los eventos privados `credencial.token.renovar`, `credencial.token.revocar`, `credencial.qr.ver` y `credencial.qr.descargar` registran usuario autenticado sin guardar token plano, `token_hash` ni URL de verificacion con token.
+
 ## Objetivo
 
 Implementar token verificable y QR privado para la credencial interna del usuario autenticado.
