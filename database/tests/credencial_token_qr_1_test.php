@@ -12,6 +12,8 @@ use App\Domain\Credentials\CredentialTokenService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardService;
 use App\Http\Controllers\CredentialController;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\CsrfMiddleware;
@@ -22,6 +24,8 @@ use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserCredentialRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\UserVcardRepository;
+use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Support\Security\CsrfTokenService;
 
 return new class implements DatabaseTest {
@@ -45,6 +49,8 @@ return new class implements DatabaseTest {
             'perfiles_usuario',
             'credenciales_usuario',
             'credencial_tokens',
+            'vcards_usuario',
+            'vcard_privacidad',
         ] as $table) {
             if (!$this->tableExists($pdo, $table)) {
                 throw new RuntimeException('CREDENCIAL-TOKEN-QR-1 requires table: ' . $table);
@@ -68,6 +74,7 @@ return new class implements DatabaseTest {
             $this->insertProfile($pdo, $userId);
             $this->insertProfile($pdo, $noQrUserId);
             $this->insertProfile($pdo, $noDownloadUserId);
+            $this->publishVcard($userId, 'qa-credencial-token-qr');
             $this->assignRoleWithPermissions($pdo, $userId, 'QA_CRED_TOKEN_FULL', [
                 'credencial.ver',
                 'credencial.qr.ver',
@@ -113,9 +120,7 @@ return new class implements DatabaseTest {
             );
             $bodyAfterRevoke = $controller->show(new Request('GET', '/perfil/credencial'))->body();
 
-            $qrContract = (new CredentialQrService())->generate(
-                (string) $renewedForQr['verification_path']
-            );
+            $qrContract = (new CredentialQrService())->generate('/v/qa-credencial-token-qr');
 
             $results['routes'] = [
                 'qr_declared' => $this->fileContains('routes/web.php', "'/perfil/credencial/' . 'qr'"),
@@ -189,23 +194,23 @@ return new class implements DatabaseTest {
                 'qr_status_200' => $qrResponse->status() === 200,
                 'qr_png_signature' => str_starts_with($qrResponse->body(), "\x89PNG\r\n\x1A\n"),
                 'download_status_200' => $downloadResponse->status() === 200,
-                'payload_future_verification_path' =>
-                    $qrContract['payload'] === (string) $renewedForQr['verification_path']
-                    && str_starts_with($qrContract['payload'], '/credencial/verificar/'),
+                'payload_vcard_public_path' =>
+                    $qrContract['payload'] === '/v/qa-credencial-token-qr'
+                    && !str_contains($qrContract['payload'], '/credencial/verificar/'),
                 'png_not_persisted' => !$this->physicalQrExists(),
                 'revoke_redirects' => $revokeResponse->status() === 302,
-                'qr_unavailable_after_revoke' =>
-                    $controller->showQr(new Request('GET', '/perfil/credencial/qr'))->status() === 404,
+                'qr_available_after_revoke_because_it_uses_vcard_slug' =>
+                    $controller->showQr(new Request('GET', '/perfil/credencial/qr'))->status() === 200,
             ];
 
             $results['html'] = [
-                'shows_token_state' =>
-                    str_contains($bodyAfterRenew, 'Token y QR privado')
-                    && str_contains($bodyAfterRenew, 'QR privado disponible')
-                    && str_contains($bodyAfterRenew, 'La verificación pública aún no está habilitada'),
+                'shows_vcard_qr_state' =>
+                    str_contains($bodyAfterRenew, 'QR hacia vCard pública')
+                    && str_contains($bodyAfterRenew, 'QR de vCard')
+                    && str_contains($bodyAfterRenew, '/v/qa-credencial-token-qr'),
                 'shows_revoked_state_after_revoke' =>
-                    str_contains($bodyAfterRevoke, 'Inactivo')
-                    && str_contains($bodyAfterRevoke, 'No hay token activo'),
+                    str_contains($bodyAfterRevoke, 'QR hacia vCard pública')
+                    && str_contains($bodyAfterRevoke, '/v/qa-credencial-token-qr'),
                 'no_token_hash' => !str_contains($bodyAfterRenew, 'token_hash'),
                 'no_plain_token' => !str_contains($bodyAfterRenew, (string) $renewedForQr['token']),
                 'no_private_data' =>
@@ -254,7 +259,7 @@ return new class implements DatabaseTest {
             'database' => $expectedDatabase,
             'cases' => $results,
             'token_mechanism' => 'random_bytes(32) encoded as 64-character hex; DB stores sha256 hash only',
-            'qr_payload' => '/credencial/verificar/{token}',
+            'qr_payload' => '/v/{slug}',
             'persistent_counts_before' => $before,
             'transient_counts_during' => $during,
             'persistent_counts_after' => $after,
@@ -291,8 +296,35 @@ return new class implements DatabaseTest {
             ),
             $this->tokenService(),
             new CredentialQrService(),
+            $this->vcardService(),
             $session
         );
+    }
+
+    private function vcardService(): VcardService
+    {
+        $privacy = new VcardPrivacyService(
+            new VcardPrivacyRepository($GLOBALS['credencial_token_qr_connection'])
+        );
+
+        return new VcardService(
+            new UserVcardRepository($GLOBALS['credencial_token_qr_connection']),
+            new VcardPrivacyRepository($GLOBALS['credencial_token_qr_connection']),
+            $privacy
+        );
+    }
+
+    private function publishVcard(int $userId, string $slug): void
+    {
+        $service = $this->vcardService();
+        $service->asegurarVcard($userId);
+        $service->actualizarConfiguracion($userId, [
+            'slug' => $slug,
+            'titulo_publico' => 'Credencial QR pública QA',
+            'descripcion_publica' => 'Destino público controlado desde credencial.',
+            'canal_contacto_preferido' => 'telefono_movil',
+        ]);
+        $service->publicar($userId);
     }
 
     private function authForUser(string $username, ?Session $session = null): AuthService

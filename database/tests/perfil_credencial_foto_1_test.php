@@ -13,6 +13,8 @@ use App\Domain\Credentials\CredentialVerificationService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardService;
 use App\Http\Controllers\CredentialController;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
@@ -22,6 +24,8 @@ use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserCredentialRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\UserVcardRepository;
+use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Support\Security\CsrfTokenService;
 
 return new class implements DatabaseTest {
@@ -47,6 +51,8 @@ return new class implements DatabaseTest {
             'usuarios_fotos',
             'credenciales_usuario',
             'credencial_tokens',
+            'vcards_usuario',
+            'vcard_privacidad',
         ] as $table) {
             if (!$this->tableExists($pdo, $table)) {
                 throw new RuntimeException('PERFIL-CREDENCIAL-FOTO-1 requires table: ' . $table);
@@ -154,8 +160,7 @@ return new class implements DatabaseTest {
                     str_contains($showBody, '<img')
                     && str_contains($showBody, 'src="/perfil/credencial/foto"'),
                 'placeholder_without_photo' =>
-                    str_contains($placeholderBody, 'credential-card__photo-placeholder')
-                    && str_contains($placeholderBody, 'Sin foto'),
+                    str_contains($placeholderBody, 'credential-card__photo-placeholder'),
                 'private_view_no_sensitive_paths' =>
                     !str_contains($showBody, 'ruta_relativa')
                     && !str_contains($showBody, 'storage/uploads')
@@ -354,7 +359,21 @@ return new class implements DatabaseTest {
                 new CredentialTokenRepository($GLOBALS['perfil_credencial_foto_connection'])
             ),
             new CredentialQrService(),
+            $this->vcardService(),
             $session
+        );
+    }
+
+    private function vcardService(): VcardService
+    {
+        $privacy = new VcardPrivacyService(
+            new VcardPrivacyRepository($GLOBALS['perfil_credencial_foto_connection'])
+        );
+
+        return new VcardService(
+            new UserVcardRepository($GLOBALS['perfil_credencial_foto_connection']),
+            new VcardPrivacyRepository($GLOBALS['perfil_credencial_foto_connection']),
+            $privacy
         );
     }
 

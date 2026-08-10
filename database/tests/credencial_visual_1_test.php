@@ -12,6 +12,8 @@ use App\Domain\Credentials\CredentialValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardService;
 use App\Http\Controllers\CredentialController;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
@@ -21,6 +23,8 @@ use App\Infrastructure\Repositories\CredentialTokenRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserCredentialRepository;
 use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\UserVcardRepository;
+use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Support\Security\CsrfTokenService;
 
 return new class implements DatabaseTest {
@@ -45,14 +49,18 @@ return new class implements DatabaseTest {
             'usuarios_fotos',
             'credenciales_usuario',
             'credencial_tokens',
+            'vcards_usuario',
+            'vcard_privacidad',
         ] as $table) {
             if (!$this->tableExists($pdo, $table)) {
                 throw new RuntimeException('CREDENCIAL-VISUAL-1 requires table: ' . $table);
             }
         }
 
-        if (!$this->activePermissionExists($pdo, 'credencial.ver')) {
-            throw new RuntimeException('CREDENCIAL-VISUAL-1 requires permission: credencial.ver');
+        foreach (['credencial.ver', 'credencial.qr.ver'] as $permission) {
+            if (!$this->activePermissionExists($pdo, $permission)) {
+                throw new RuntimeException('CREDENCIAL-VISUAL-1 requires permission: ' . $permission);
+            }
         }
 
         $before = $this->counts($pdo);
@@ -65,7 +73,11 @@ return new class implements DatabaseTest {
             $inactiveUserId = $this->insertUser($pdo, self::INACTIVE_USERNAME, 0);
             $this->insertProfile($pdo, $userId);
             $this->insertActivePhoto($pdo, $userId);
-            $this->assignRoleWithPermission($pdo, $userId, 'credencial.ver');
+            $this->publishVcard($userId, 'qa-credencial-visual');
+            $this->assignRoleWithPermissions($pdo, $userId, 'QA_CREDENCIAL_VISUAL_PERMITIDO', [
+                'credencial.ver',
+                'credencial.qr.ver',
+            ]);
             $this->assignRoleWithoutPermission($pdo, $withoutPermissionUserId);
 
             $service = new CredentialService(
@@ -136,8 +148,10 @@ return new class implements DatabaseTest {
                     && str_contains($body, self::USERNAME . '@example.test')
                     && str_contains($body, 'Operación interna')
                     && str_contains($body, '/perfil/credencial/foto')
+                    && str_contains($body, '/perfil/credencial/qr')
+                    && str_contains($body, '/v/qa-credencial-visual')
                     && str_contains($body, 'Credencial interna')
-                    && str_contains($body, 'La foto se mantiene privada'),
+                    && str_contains($body, 'QR hacia vCard pública'),
                 'no_password_hash' => !str_contains($body, 'password_hash'),
                 'no_tokens' =>
                     !str_contains($body, 'token_hash')
@@ -155,9 +169,7 @@ return new class implements DatabaseTest {
                     str_contains($body, '<img')
                     && str_contains($body, 'src="/perfil/credencial/foto"')
                     && !str_contains($body, 'storage/uploads'),
-                'no_public_verification_link' =>
-                    !str_contains($body, '/perfil/credencial/qr')
-                    && !str_contains($body, '/credencial/verificar'),
+                'no_public_verification_link' => !str_contains($body, '/credencial/verificar'),
             ];
 
             $results['guardrails'] = [
@@ -217,7 +229,6 @@ return new class implements DatabaseTest {
                 'permisos',
                 'ruta_relativa',
                 'storage/uploads',
-                'qr publico',
                 'verificacion_publica',
             ],
             'persistent_counts_before' => $before,
@@ -248,8 +259,35 @@ return new class implements DatabaseTest {
                 new CredentialTokenRepository($GLOBALS['credencial_visual_connection'])
             ),
             new CredentialQrService(),
+            $this->vcardService(),
             $this->session()
         );
+    }
+
+    private function vcardService(): VcardService
+    {
+        $privacy = new VcardPrivacyService(
+            new VcardPrivacyRepository($GLOBALS['credencial_visual_connection'])
+        );
+
+        return new VcardService(
+            new UserVcardRepository($GLOBALS['credencial_visual_connection']),
+            new VcardPrivacyRepository($GLOBALS['credencial_visual_connection']),
+            $privacy
+        );
+    }
+
+    private function publishVcard(int $userId, string $slug): void
+    {
+        $service = $this->vcardService();
+        $service->asegurarVcard($userId);
+        $service->actualizarConfiguracion($userId, [
+            'slug' => $slug,
+            'titulo_publico' => 'Credencial visual QA',
+            'descripcion_publica' => 'vCard pública para credencial QA.',
+            'canal_contacto_preferido' => 'telefono_movil',
+        ]);
+        $service->publicar($userId);
     }
 
     private function authForUser(string $username): AuthService
@@ -457,13 +495,34 @@ return new class implements DatabaseTest {
 
     private function assignRoleWithPermission(PDO $pdo, int $userId, string $permissionCode): void
     {
-        $roleId = $this->insertRole($pdo, 'QA_CREDENCIAL_VISUAL_PERMITIDO');
-        $permissionId = $this->permissionId($pdo, $permissionCode);
+        $this->assignRoleWithPermissions($pdo, $userId, 'QA_CREDENCIAL_VISUAL_PERMITIDO', [
+            $permissionCode,
+        ]);
+    }
+
+    /**
+     * @param list<string> $permissionCodes
+     */
+    private function assignRoleWithPermissions(
+        PDO $pdo,
+        int $userId,
+        string $roleCode,
+        array $permissionCodes
+    ): void
+    {
+        $roleId = $this->insertRole($pdo, $roleCode);
         $statement = $pdo->prepare(
             'INSERT INTO rol_permisos (rol_id, permiso_id, activo)
              VALUES (:rol_id, :permiso_id, 1)'
         );
-        $statement->execute(['rol_id' => $roleId, 'permiso_id' => $permissionId]);
+
+        foreach ($permissionCodes as $permissionCode) {
+            $statement->execute([
+                'rol_id' => $roleId,
+                'permiso_id' => $this->permissionId($pdo, $permissionCode),
+            ]);
+        }
+
         $this->assignRole($pdo, $userId, $roleId);
     }
 

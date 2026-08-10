@@ -16,6 +16,7 @@ use App\Domain\Credentials\CredentialService;
 use App\Domain\Credentials\CredentialTokenService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
+use App\Domain\Vcards\VcardService;
 use App\Support\Security\CsrfTokenService;
 
 final class CredentialController
@@ -29,6 +30,7 @@ final class CredentialController
         private readonly CredentialService $credentials,
         private readonly CredentialTokenService $tokens,
         private readonly CredentialQrService $qr,
+        private readonly VcardService $vcards,
         private readonly Session $session,
         private readonly ?AuditService $audit = null
     ) {
@@ -54,6 +56,7 @@ final class CredentialController
                 'credential' => $this->credentials->obtenerCredencialVisual(
                     $user['user_id']
                 ),
+                'publicVcard' => $this->publicVcardForView($request, $user['user_id']),
                 'tokenState' => $this->tokenStateForView($user['user_id']),
                 'canViewCredentialQr' => $this->permissions->allows(
                     $user['user_id'],
@@ -79,16 +82,18 @@ final class CredentialController
             return Response::html(View::render('errors/403'), 403);
         }
 
-        $token = $this->activeSessionToken($this->user()['user_id']);
+        $user = $this->user();
+        $payload = $this->publicVcardPayload($request, $user['user_id']);
 
-        if ($token === null) {
+        if ($payload === null) {
             return Response::html('', 404);
         }
 
-        $qr = $this->qr->generate($this->tokens->verificationPath($token));
-        $this->audit?->record('credencial.qr.ver', $this->user()['user_id'], [
+        $qr = $this->qr->generate($payload);
+        $this->audit?->record('credencial.qr.ver', $user['user_id'], [
             'entidad' => 'credencial',
             'resultado' => 'ok',
+            'destino' => 'vcard_publica',
         ]);
 
         return Response::binary($qr['png'], 'image/png', [
@@ -131,21 +136,23 @@ final class CredentialController
             return Response::html(View::render('errors/403'), 403);
         }
 
-        $token = $this->activeSessionToken($this->user()['user_id']);
+        $user = $this->user();
+        $payload = $this->publicVcardPayload($request, $user['user_id']);
 
-        if ($token === null) {
+        if ($payload === null) {
             return Response::html('', 404);
         }
 
-        $qr = $this->qr->generate($this->tokens->verificationPath($token));
-        $this->audit?->record('credencial.qr.descargar', $this->user()['user_id'], [
+        $qr = $this->qr->generate($payload);
+        $this->audit?->record('credencial.qr.descargar', $user['user_id'], [
             'entidad' => 'credencial',
             'resultado' => 'ok',
+            'destino' => 'vcard_publica',
         ]);
 
         return Response::binary($qr['png'], 'image/png', [
             'Cache-Control' => 'private, no-store',
-            'Content-Disposition' => 'attachment; filename="credencial-qr.png"',
+            'Content-Disposition' => 'attachment; filename="credencial-vcard-qr.png"',
         ]);
     }
 
@@ -261,6 +268,74 @@ final class CredentialController
     private function tokenSessionKey(int $userId): string
     {
         return 'credential_plain_token_' . $userId;
+    }
+
+    /**
+     * @return array{
+     *     available: bool,
+     *     published: bool,
+     *     path: string|null,
+     *     url: string|null
+     * }
+     */
+    private function publicVcardForView(Request $request, int $userId): array
+    {
+        $vcard = $this->vcards->obtenerConfiguracionPrivada($userId);
+        $slug = trim((string) ($vcard['slug'] ?? ''));
+
+        if ($slug === '') {
+            return [
+                'available' => false,
+                'published' => false,
+                'path' => null,
+                'url' => null,
+            ];
+        }
+
+        $path = '/v/' . rawurlencode($slug);
+
+        return [
+            'available' => true,
+            'published' => ($vcard['publicada'] ?? false) === true,
+            'path' => $path,
+            'url' => $this->publicVcardUrl($request, $slug),
+        ];
+    }
+
+    private function publicVcardPayload(Request $request, int $userId): ?string
+    {
+        $vcard = $this->publicVcardForView($request, $userId);
+
+        if (($vcard['available'] ?? false) !== true || !is_string($vcard['path'] ?? null)) {
+            return null;
+        }
+
+        $url = is_string($vcard['url'] ?? null) ? $vcard['url'] : '';
+
+        return $url !== '' && strlen($url) <= 106
+            ? $url
+            : $vcard['path'];
+    }
+
+    private function publicVcardUrl(Request $request, string $slug): string
+    {
+        $path = '/v/' . rawurlencode($slug);
+        $host = trim((string) ($request->header('host') ?? ''));
+
+        if ($host !== '' && preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/', $host) === 1) {
+            $proto = strtolower(trim((string) ($request->header('x-forwarded-proto') ?? '')));
+            $scheme = in_array($proto, ['http', 'https'], true) ? $proto : 'http';
+
+            return $scheme . '://' . $host . $path;
+        }
+
+        $baseUrl = rtrim((string) $this->config->get('app.url', ''), '/');
+
+        if ($baseUrl !== '' && preg_match('/^https?:\/\/[^\/\s]+$/', $baseUrl) === 1) {
+            return $baseUrl . $path;
+        }
+
+        return $path;
     }
 
     /**

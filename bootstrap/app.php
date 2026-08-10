@@ -291,6 +291,7 @@ $credentialController = new CredentialController(
     $credentials,
     $credentialTokens,
     $credentialQr,
+    $vcards,
     $session,
     $audit
 );
