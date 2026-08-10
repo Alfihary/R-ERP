@@ -90,8 +90,10 @@ final class UserCredentialRepository
                 p.telefono_movil,
                 p.ubicacion_publica,
                 f.id AS foto_id,
+                f.ruta_relativa AS foto_ruta_relativa,
                 f.nombre_archivo AS foto_nombre_archivo,
                 f.mime AS foto_mime,
+                f.extension AS foto_extension,
                 f.tamano_bytes AS foto_tamano_bytes,
                 f.creado_en AS foto_creado_en
             FROM usuarios u
@@ -113,5 +115,37 @@ final class UserCredentialRepository
         $visual = $statement->fetch(PDO::FETCH_ASSOC);
 
         return $visual === false ? null : $visual;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function activePhotoByUser(int $userId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            SELECT
+                f.ruta_relativa,
+                f.nombre_archivo,
+                f.mime,
+                f.extension,
+                f.tamano_bytes
+            FROM usuarios u
+            INNER JOIN usuarios_fotos f
+                ON f.usuario_id = u.id
+               AND f.activa = 1
+               AND f.reemplazada_en IS NULL
+               AND f.eliminada_en IS NULL
+            WHERE u.id = :usuario_id
+              AND u.activo = 1
+              AND u.eliminado_en IS NULL
+            ORDER BY f.id DESC
+            LIMIT 1
+            SQL
+        );
+        $statement->execute(['usuario_id' => $userId]);
+        $photo = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return $photo === false ? null : $photo;
     }
 }

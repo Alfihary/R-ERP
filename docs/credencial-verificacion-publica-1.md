@@ -74,6 +74,10 @@ La vista pública no debe mostrar:
 - stock;
 - costos.
 
+Después de `PERFIL-CREDENCIAL-FOTO-1`, la foto de credencial continúa excluida
+de la verificación pública. No existe endpoint público de foto de credencial en
+`/credencial/verificar/{token}/foto`.
+
 ## Headers de seguridad
 
 La respuesta pública aplica headers defensivos en `200`, `404` y, después de `CREDENCIAL-HARDENING-1`, también en `429`:

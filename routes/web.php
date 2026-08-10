@@ -277,6 +277,15 @@ return static function (
         ]
     );
     $router->get(
+        '/perfil/credencial/foto',
+        static fn (Request $request): Response =>
+            $credentialController->photo($request),
+        [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, 'credencial.ver'),
+        ]
+    );
+    $router->get(
         '/perfil/credencial/' . 'qr',
         static fn (Request $request): Response =>
             $credentialController->showQr($request),

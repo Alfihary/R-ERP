@@ -21,7 +21,7 @@ $sessionTokenAvailable = ($tokenState['session_token_available'] ?? false) === t
             <p class="eyebrow">Identificación interna</p>
             <h1>Mi credencial</h1>
             <p>
-                Credencial visual para uso interno del ERP. No verificable públicamente todavía.
+                Credencial visual para uso interno del ERP. La foto se mantiene privada.
             </p>
         </div>
         <button class="button button--secondary credential-page__print" type="button" onclick="window.print()">
@@ -43,11 +43,17 @@ $sessionTokenAvailable = ($tokenState['session_token_available'] ?? false) === t
             <div class="credential-card__body">
                 <div class="credential-card__photo" aria-label="Estado de foto">
                     <?php if ($photo !== null): ?>
-                        <strong>Foto registrada</strong>
-                        <span><?= e($photo['mime'] ?? 'Imagen privada') ?></span>
+                        <img
+                            src="/perfil/credencial/foto"
+                            alt="Foto privada de la credencial"
+                            loading="lazy"
+                            decoding="async"
+                        >
                     <?php else: ?>
+                        <div class="credential-card__photo-placeholder" aria-hidden="true">
+                            <?= e(strtoupper(substr((string) ($credential['nombre_completo'] ?? 'U'), 0, 1))) ?>
+                        </div>
                         <strong>Sin foto</strong>
-                        <span>Archivo privado no expuesto</span>
                     <?php endif; ?>
                 </div>
 
@@ -80,7 +86,7 @@ $sessionTokenAvailable = ($tokenState['session_token_available'] ?? false) === t
             </dl>
 
             <footer class="credential-card__footer">
-                <span>La verificación pública aún no está habilitada</span>
+                <span>La verificación pública no expone la foto</span>
                 <span>QR privado autenticado</span>
             </footer>
         </article>
@@ -89,17 +95,18 @@ $sessionTokenAvailable = ($tokenState['session_token_available'] ?? false) === t
             <h2>Alcance de esta credencial</h2>
             <p>
                 Esta pantalla no publica enlaces externos y no expone archivos privados. La foto
-                activa se indica como metadata segura.
+                activa se sirve únicamente mediante endpoint privado autenticado.
             </p>
             <p>
-                La verificación pública aún no está habilitada. El QR privado prepara una URL futura
-                de verificación, pero esa ruta pública no existe todavía.
+                La verificación pública confirma la vigencia de la credencial, pero no publica
+                la foto privada del usuario.
+                La verificación pública aún no está habilitada para mostrar foto.
             </p>
             <?php if ($photo !== null): ?>
                 <dl>
                     <div>
                         <dt>Foto</dt>
-                        <dd><?= e($photo['nombre_archivo'] ?? 'Registrada') ?></dd>
+                        <dd>Disponible en endpoint privado</dd>
                     </div>
                     <div>
                         <dt>Registrada</dt>

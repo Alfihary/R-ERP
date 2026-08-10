@@ -69,6 +69,10 @@ No se registra token plano, `token_hash`, URL completa, path con token ni datos 
 
 La auditoría privada de renovar/revocar/ver/descargar QR queda pendiente porque todavía no existe un `AuditService` central reutilizable. Agregar SQL directo al controlador privado duplicaría responsabilidad.
 
+`PERFIL-CREDENCIAL-FOTO-1` agrega un endpoint privado para la foto de la
+credencial visual, pero mantiene la superficie pública endurecida sin foto ni
+endpoint público de imagen de credencial.
+
 ## Headers de seguridad
 
 La ruta pública aplica los mismos headers en `200`, `404` y `429`:

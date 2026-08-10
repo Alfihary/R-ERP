@@ -38,6 +38,11 @@ Responsabilidades:
 
 Muestra una credencial compacta e imprimible dentro del layout autenticado.
 
+Desde `PERFIL-CREDENCIAL-FOTO-1`, la foto activa se muestra mediante el endpoint
+privado `GET /perfil/credencial/foto`. La vista no imprime `ruta_relativa`,
+`storage/uploads` ni path físico. Si no hay foto activa, muestra un placeholder
+visual seguro.
+
 ## CSS creado
 
 - `public/css/modules/credential.css`
@@ -54,7 +59,7 @@ Usa CSS modular, tokens globales disponibles, reglas responsivas y soporte bási
 - Ubicación si existe.
 - Estado de credencial.
 - Fecha de emisión o creación.
-- Metadata segura de foto activa si existe.
+- Foto activa vía endpoint privado o placeholder seguro.
 
 ## Datos prohibidos
 

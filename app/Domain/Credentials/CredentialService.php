@@ -79,6 +79,30 @@ final class CredentialService
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function obtenerFotoPrivada(int $usuarioId): ?array
+    {
+        if ($usuarioId < 1 || $this->credentials->activeUser($usuarioId) === null) {
+            return null;
+        }
+
+        $photo = $this->credentials->activePhotoByUser($usuarioId);
+
+        if ($photo === null) {
+            return null;
+        }
+
+        return [
+            'ruta_relativa' => (string) ($photo['ruta_relativa'] ?? ''),
+            'nombre_archivo' => (string) ($photo['nombre_archivo'] ?? ''),
+            'mime' => (string) ($photo['mime'] ?? ''),
+            'extension' => (string) ($photo['extension'] ?? ''),
+            'tamano_bytes' => (int) ($photo['tamano_bytes'] ?? 0),
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $credential
      * @return array<string, mixed>
      */
@@ -110,6 +134,7 @@ final class CredentialService
             'registrada' => true,
             'nombre_archivo' => (string) ($visual['foto_nombre_archivo'] ?? ''),
             'mime' => (string) ($visual['foto_mime'] ?? ''),
+            'endpoint' => '/perfil/credencial/foto',
             'tamano_bytes' => (int) ($visual['foto_tamano_bytes'] ?? 0),
             'creado_en' => $visual['foto_creado_en'] ?? null,
         ];

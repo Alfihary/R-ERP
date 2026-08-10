@@ -90,6 +90,21 @@ final class CredentialController
         ]);
     }
 
+    public function photo(Request $request): Response
+    {
+        if (!$this->allowed('credencial.ver')) {
+            return Response::html(View::render('errors/403'), 403);
+        }
+
+        $photo = $this->credentials->obtenerFotoPrivada($this->user()['user_id']);
+
+        if ($photo === null) {
+            return $this->photoNotFound();
+        }
+
+        return $this->servePhoto($photo);
+    }
+
     public function downloadQr(Request $request): Response
     {
         if (
@@ -226,5 +241,164 @@ final class CredentialController
     private function tokenSessionKey(int $userId): string
     {
         return 'credential_plain_token_' . $userId;
+    }
+
+    /**
+     * @param array<string, mixed> $photo
+     */
+    private function servePhoto(array $photo): Response
+    {
+        $mime = strtolower((string) ($photo['mime'] ?? ''));
+        $extension = strtolower((string) ($photo['extension'] ?? ''));
+        $relativePath = (string) ($photo['ruta_relativa'] ?? '');
+        $declaredSize = (int) ($photo['tamano_bytes'] ?? 0);
+
+        if (!$this->allowedPhotoMetadata($mime, $extension, $declaredSize, $relativePath)) {
+            return $this->photoNotFound();
+        }
+
+        $path = $this->safePhotoPath($relativePath);
+
+        if ($path === null || !is_file($path) || !is_readable($path)) {
+            return $this->photoNotFound();
+        }
+
+        $actualSize = filesize($path);
+
+        if ($actualSize === false || $actualSize < 1) {
+            return $this->photoNotFound();
+        }
+
+        $actualMime = $this->detectMime($path);
+
+        if ($actualMime !== $mime) {
+            return $this->photoNotFound();
+        }
+
+        $body = file_get_contents($path);
+
+        if (!is_string($body) || $body === '') {
+            return $this->photoNotFound();
+        }
+
+        return $this->withPhotoHeaders(Response::binary($body, $mime, [
+            'Cache-Control' => 'private, max-age=300',
+        ]));
+    }
+
+    private function allowedPhotoMetadata(
+        string $mime,
+        string $extension,
+        int $declaredSize,
+        string $relativePath
+    ): bool {
+        if ($declaredSize < 1 || $this->hasDangerousDoubleExtension($relativePath)) {
+            return false;
+        }
+
+        return match ($mime) {
+            'image/jpeg' => in_array($extension, ['jpg', 'jpeg'], true),
+            'image/png' => $extension === 'png',
+            'image/webp' => $extension === 'webp',
+            default => false,
+        };
+    }
+
+    private function safePhotoPath(string $relativePath): ?string
+    {
+        if (
+            $relativePath === ''
+            || !str_starts_with($relativePath, 'uploads/usuarios/')
+            || str_contains($relativePath, '..')
+            || str_contains($relativePath, '\\')
+            || str_starts_with($relativePath, '/')
+        ) {
+            return null;
+        }
+
+        $storagePath = rtrim(
+            (string) $this->config->get('paths.STORAGE_PATH', STORAGE_PATH),
+            '/\\'
+        );
+        $root = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, 'uploads/usuarios');
+        $rootReal = realpath($root);
+
+        if ($rootReal === false) {
+            return null;
+        }
+
+        $candidate = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+        $realPath = realpath($candidate);
+
+        if ($realPath === false) {
+            return null;
+        }
+
+        $normalizedRoot = $this->normalizedPath($rootReal) . '/';
+        $normalizedPath = $this->normalizedPath($realPath);
+
+        return str_starts_with($normalizedPath, $normalizedRoot)
+            ? $realPath
+            : null;
+    }
+
+    private function detectMime(string $path): string
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+        if ($finfo === false) {
+            return '';
+        }
+
+        try {
+            $mime = finfo_file($finfo, $path);
+        } finally {
+            finfo_close($finfo);
+        }
+
+        return is_string($mime) ? strtolower($mime) : '';
+    }
+
+    private function hasDangerousDoubleExtension(string $relativePath): bool
+    {
+        $name = strtolower(basename(str_replace('\\', '/', $relativePath)));
+        $parts = explode('.', $name);
+
+        if (count($parts) < 3) {
+            return false;
+        }
+
+        $dangerous = ['php', 'phtml', 'phar', 'php3', 'php4', 'php5', 'html', 'htm', 'js'];
+
+        foreach (array_slice($parts, 0, -1) as $part) {
+            if (in_array($part, $dangerous, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function normalizedPath(string $path): string
+    {
+        return str_replace('\\', '/', $path);
+    }
+
+    private function photoNotFound(): Response
+    {
+        return $this->withPhotoHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-store',
+        ]));
+    }
+
+    private function withPhotoHeaders(Response $response): Response
+    {
+        return $response
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->withHeader('X-Frame-Options', 'DENY');
     }
 }

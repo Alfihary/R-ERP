@@ -135,9 +135,9 @@ return new class implements DatabaseTest {
                     && str_contains($body, self::USERNAME)
                     && str_contains($body, self::USERNAME . '@example.test')
                     && str_contains($body, 'Operación interna')
-                    && str_contains($body, 'Foto registrada')
+                    && str_contains($body, '/perfil/credencial/foto')
                     && str_contains($body, 'Credencial interna')
-                    && str_contains($body, 'No verificable públicamente todavía'),
+                    && str_contains($body, 'La foto se mantiene privada'),
                 'no_password_hash' => !str_contains($body, 'password_hash'),
                 'no_tokens' =>
                     !str_contains($body, 'token_hash')
@@ -151,15 +151,18 @@ return new class implements DatabaseTest {
                     !str_contains($body, 'ruta_relativa')
                     && !str_contains($body, 'storage/uploads')
                     && !str_contains($body, 'profile/users/'),
-                'no_qr_or_public_verification' =>
+                'private_photo_endpoint_only' =>
+                    str_contains($body, '<img')
+                    && str_contains($body, 'src="/perfil/credencial/foto"')
+                    && !str_contains($body, 'storage/uploads'),
+                'no_public_verification_link' =>
                     !str_contains($body, '/perfil/credencial/qr')
-                    && !str_contains($body, '/credencial/verificar')
-                    && !str_contains($body, '<img'),
+                    && !str_contains($body, '/credencial/verificar'),
             ];
 
             $results['guardrails'] = [
-                'no_public_verification_route' =>
-                    !$this->fileContains('routes/web.php', '/credencial/verificar'),
+                'public_verification_route_exists_after_verification_phase' =>
+                    $this->fileContains('routes/web.php', "'/credencial/' . 'verificar/{token}'"),
                 'credential_qr_routes_private_after_token_qr_phase' =>
                     $this->fileContains('routes/web.php', "'/perfil/credencial/' . 'qr'")
                     && $this->fileContains('routes/web.php', "'/perfil/credencial/token/renovar'")
