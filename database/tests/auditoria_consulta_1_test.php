@@ -98,7 +98,7 @@ return new class implements DatabaseTest {
 
             $results['route_and_access'] = [
                 'route_declared' => $this->fileContains('routes/web.php', "'/auditoria'"),
-                'uses_existing_permission' => AuditController::PERMISSION === 'seguridad.rbac.ver',
+                'uses_formal_audit_permission' => AuditController::PERMISSION === 'auditoria.ver',
                 'no_session_redirects_to_login' =>
                     $this->middlewareStatus(
                         new AuthMiddleware($this->guestAuth()),
@@ -209,7 +209,10 @@ return new class implements DatabaseTest {
                     $this->fileContains('routes/web.php', "'/v/{slug}'")
                     && $this->fileContains('routes/web.php', "'/v/{slug}/' . 'qr'"),
                 'no_migrations_modified' => !$this->hasUncommittedPath('database/migrations'),
-                'no_seeds_modified' => !$this->hasUncommittedPath('database/seeds'),
+                'no_unexpected_seeds_modified' => $this->onlyExpectedUncommittedPaths(
+                    'database/seeds',
+                    ['database/seeds/permisos_auditoria_1_seed.php']
+                ),
             ];
 
             $during = $this->counts($pdo);
@@ -559,6 +562,28 @@ return new class implements DatabaseTest {
         }
 
         return $output !== [];
+    }
+
+    /**
+     * @param list<string> $allowedPaths
+     */
+    private function onlyExpectedUncommittedPaths(string $path, array $allowedPaths): bool
+    {
+        exec('git status --short -- ' . escapeshellarg($path), $output, $exitCode);
+
+        if ($exitCode !== 0) {
+            throw new RuntimeException('Unable to inspect git status for ' . $path);
+        }
+
+        foreach ($output as $line) {
+            $changedPath = trim(substr((string) $line, 3));
+
+            if (!in_array($changedPath, $allowedPaths, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

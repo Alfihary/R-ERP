@@ -16,7 +16,7 @@ use App\Support\Security\CsrfTokenService;
 
 final class AuditController
 {
-    public const PERMISSION = 'seguridad.rbac.ver';
+    public const PERMISSION = 'auditoria.ver';
 
     public function __construct(
         private readonly Config $config,

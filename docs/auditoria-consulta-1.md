@@ -12,11 +12,11 @@ No se crean rutas `POST`, `PUT`, `PATCH` ni `DELETE` para auditoria.
 
 ## Permiso usado
 
-Se usa temporalmente el permiso existente:
+Se usa el permiso formal:
 
-- `seguridad.rbac.ver`
+- `auditoria.ver`
 
-Decision: `auditoria.ver` no existe y la fase no autoriza modificar seeds. `seguridad.rbac.ver` es el permiso administrativo existente mas cercano para lectura de seguridad/RBAC.
+Decision actualizada en PERMISOS-AUDITORIA-1: `auditoria.ver` es el permiso operativo definitivo para consultar la bitacora privada de auditoria. `seguridad.rbac.ver` fue un antecedente temporal y ya no debe conceder acceso por si solo a `/auditoria`.
 
 ## Componentes creados
 

@@ -162,7 +162,10 @@ return new class implements DatabaseTest {
 
             $results['scope_guards'] = [
                 'no_migrations_created' => !$this->hasUncommittedPath('database/migrations'),
-                'no_seeds_created' => !$this->hasUncommittedPath('database/seeds'),
+                'no_unexpected_seeds_created' => $this->onlyExpectedUncommittedPaths(
+                    'database/seeds',
+                    ['database/seeds/permisos_auditoria_1_seed.php']
+                ),
                 'no_unexpected_views_modified' => $this->onlyExpectedUncommittedPaths(
                     'app/Views',
                     [
