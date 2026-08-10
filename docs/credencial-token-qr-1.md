@@ -44,6 +44,8 @@ bin2hex(random_bytes(32))
 
 El resultado es un valor URL-safe de 64 caracteres hexadecimales derivado de 32 bytes aleatorios.
 
+Después de `CREDENCIAL-HARDENING-1`, la verificación pública acepta únicamente ese patrón exacto en minúsculas (`^[a-f0-9]{64}$`) y rechaza espacios, caracteres reservados, unicode y longitudes incorrectas.
+
 La base de datos almacena únicamente:
 
 - `token_hash = sha256(token_plano)`
@@ -72,6 +74,8 @@ Al revocar se marca el token activo como:
 
 - `activo = 0`
 - `revocado_en = CURRENT_TIMESTAMP`
+
+La verificación pública endurecida mantiene el token revocado como `404` uniforme sin revelar la causa.
 
 ## Payload del QR
 

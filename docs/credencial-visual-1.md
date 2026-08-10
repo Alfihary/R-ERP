@@ -121,7 +121,9 @@ php database/credencial-visual.php functional:test --database=r_erp_db_core_0_te
 - No existen rutas públicas de verificación de credencial.
 - Datos QA revertidos por transacción.
 
-Después de `CREDENCIAL-TOKEN-QR-1`, puede existir QR privado autenticado y token hash en base de datos. La verificación pública sigue fuera de alcance.
+Después de `CREDENCIAL-TOKEN-QR-1`, puede existir QR privado autenticado y token hash en base de datos.
+
+Después de `CREDENCIAL-VERIFICACION-PUBLICA-1` y `CREDENCIAL-HARDENING-1`, la verificación pública existe solo mediante token/QR activo. La vista privada de credencial no imprime token plano, `token_hash`, rutas privadas ni archivos de storage.
 
 ## Siguiente fase sugerida
 

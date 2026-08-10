@@ -9,6 +9,14 @@ use PDO;
 
 final class CredentialVerificationService
 {
+    private const PUBLIC_RATE_LIMIT_MAX_ATTEMPTS = 30;
+    private const PUBLIC_RATE_LIMIT_WINDOW_SECONDS = 300;
+
+    /**
+     * @var array<string, array{window_start: int, attempts: int}>
+     */
+    private static array $publicRateLimit = [];
+
     public function __construct(private readonly ConnectionProvider $connection)
     {
     }
@@ -16,19 +24,26 @@ final class CredentialVerificationService
     /**
      * @return array<string, mixed>|null
      */
-    public function verificarTokenPublico(string $token): ?array
-    {
-        $token = trim($token);
-
+    public function verificarTokenPublico(
+        string $token,
+        ?string $ip = null,
+        ?string $userAgent = null
+    ): ?array {
         if (preg_match('/^[a-f0-9]{64}$/', $token) !== 1) {
+            $this->auditPublicVerification('credencial.verificacion.publica.fail', 'fail', $ip, $userAgent);
+
             return null;
         }
 
         $record = $this->publicVerificationByHash(hash('sha256', $token));
 
         if ($record === null || !$this->isValidRecord($record)) {
+            $this->auditPublicVerification('credencial.verificacion.publica.fail', 'fail', $ip, $userAgent);
+
             return null;
         }
+
+        $this->auditPublicVerification('credencial.verificacion.publica.ok', 'ok', $ip, $userAgent);
 
         $fullName = trim(implode(' ', array_filter([
             $record['primer_nombre'] ?? null,
@@ -75,6 +90,127 @@ final class CredentialVerificationService
     private function optionalString(mixed $value): ?string
     {
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    public function allowsPublicVerificationAttempt(string $ip): bool
+    {
+        $ip = $this->safeIp($ip);
+        $now = time();
+        $state = self::$publicRateLimit[$ip] ?? null;
+
+        if (
+            !is_array($state)
+            || $now - (int) $state['window_start'] >= self::PUBLIC_RATE_LIMIT_WINDOW_SECONDS
+        ) {
+            self::$publicRateLimit[$ip] = [
+                'window_start' => $now,
+                'attempts' => 1,
+            ];
+
+            return true;
+        }
+
+        $attempts = (int) $state['attempts'] + 1;
+        self::$publicRateLimit[$ip]['attempts'] = $attempts;
+
+        return $attempts <= self::PUBLIC_RATE_LIMIT_MAX_ATTEMPTS;
+    }
+
+    public function auditPublicRateLimited(?string $ip, ?string $userAgent): void
+    {
+        $this->auditPublicVerification(
+            'credencial.verificacion.publica.rate_limited',
+            'rate_limited',
+            $ip,
+            $userAgent
+        );
+    }
+
+    public static function resetPublicRateLimitForTests(): void
+    {
+        self::$publicRateLimit = [];
+    }
+
+    private function auditPublicVerification(
+        string $action,
+        string $result,
+        ?string $ip,
+        ?string $userAgent
+    ): void {
+        if (!$this->tableExists('auditoria_eventos')) {
+            return;
+        }
+
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            INSERT INTO auditoria_eventos (
+                actor_usuario_id,
+                accion,
+                entidad,
+                entidad_id,
+                resultado,
+                ip,
+                user_agent,
+                metadata_json
+            ) VALUES (
+                NULL,
+                :accion,
+                'credencial_publica',
+                NULL,
+                :resultado,
+                :ip,
+                :user_agent,
+                :metadata_json
+            )
+            SQL
+        );
+        $statement->execute([
+            'accion' => $action,
+            'resultado' => $result,
+            'ip' => $this->safeIp($ip ?? ''),
+            'user_agent' => $this->safeUserAgent($userAgent),
+            'metadata_json' => json_encode(
+                ['surface' => 'public_credential_verification'],
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES
+            ),
+        ]);
+    }
+
+    private function safeIp(string $ip): string
+    {
+        $ip = trim(explode(',', $ip)[0] ?? '');
+
+        if ($ip === '' || strlen($ip) > 45) {
+            return '0.0.0.0';
+        }
+
+        if (preg_match('/^[A-Fa-f0-9:.]{3,45}$/', $ip) !== 1) {
+            return '0.0.0.0';
+        }
+
+        return $ip;
+    }
+
+    private function safeUserAgent(?string $userAgent): ?string
+    {
+        if (!is_string($userAgent) || trim($userAgent) === '') {
+            return null;
+        }
+
+        return substr(str_replace(["\r", "\n"], ' ', $userAgent), 0, 500);
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = :table_name'
+        );
+        $statement->execute(['table_name' => $table]);
+
+        return (int) $statement->fetchColumn() === 1;
     }
 
     /**

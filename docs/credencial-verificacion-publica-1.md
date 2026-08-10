@@ -35,6 +35,10 @@ La verificación pública solo responde 200 cuando se cumplen todas las condicio
 
 Si cualquiera de esas condiciones falla, se responde 404 seguro.
 
+Después de `CREDENCIAL-HARDENING-1`, los rechazos mantienen cuerpo uniforme y no revelan si la causa fue token inválido, token inexistente, revocación, expiración o usuario/credencial no vigente.
+
+La validación del token no normaliza entradas inválidas: espacios, caracteres reservados, unicode y longitudes fuera del patrón se rechazan antes de consultar la base de datos.
+
 ## Datos públicos permitidos
 
 La vista pública solo puede mostrar:
@@ -72,12 +76,18 @@ La vista pública no debe mostrar:
 
 ## Headers de seguridad
 
-La respuesta pública aplica headers defensivos:
+La respuesta pública aplica headers defensivos en `200`, `404` y, después de `CREDENCIAL-HARDENING-1`, también en `429`:
 
 - `Cache-Control: no-store`;
 - `Referrer-Policy: strict-origin-when-cross-origin`;
 - `X-Content-Type-Options: nosniff`;
 - `X-Frame-Options: DENY`.
+
+## Rate limit y auditoría
+
+`CREDENCIAL-HARDENING-1` agregó rate-limit básico en memoria de 30 intentos por IP cada 5 minutos. Al exceder el límite se responde `429` con cuerpo genérico.
+
+También registra eventos públicos mínimos en `auditoria_eventos` sin guardar token plano, `token_hash`, URL con token ni datos sensibles.
 
 ## Integración con fases previas
 

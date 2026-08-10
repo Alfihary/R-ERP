@@ -24,7 +24,18 @@ final class PublicCredentialController
     public function verify(Request $request, array $params): Response
     {
         $token = (string) ($params['token'] ?? '');
-        $credential = $this->verification->verificarTokenPublico($token);
+        $ip = $this->clientIp($request);
+        $userAgent = $request->header('user-agent');
+
+        if (!$this->verification->allowsPublicVerificationAttempt($ip)) {
+            $this->verification->auditPublicRateLimited($ip, $userAgent);
+
+            return $this->secureResponse(
+                Response::html(View::render('errors/404'), 429)
+            );
+        }
+
+        $credential = $this->verification->verificarTokenPublico($token, $ip, $userAgent);
 
         if ($credential === null) {
             return $this->secureResponse(
@@ -47,5 +58,24 @@ final class PublicCredentialController
             ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
             ->withHeader('X-Content-Type-Options', 'nosniff')
             ->withHeader('X-Frame-Options', 'DENY');
+    }
+
+    private function clientIp(Request $request): string
+    {
+        $forwarded = $request->header('x-forwarded-for');
+
+        if (is_string($forwarded) && trim($forwarded) !== '') {
+            return trim(explode(',', $forwarded)[0] ?? '');
+        }
+
+        $realIp = $request->header('x-real-ip');
+
+        if (is_string($realIp) && trim($realIp) !== '') {
+            return trim($realIp);
+        }
+
+        $remote = $_SERVER['REMOTE_ADDR'] ?? null;
+
+        return is_string($remote) && trim($remote) !== '' ? trim($remote) : '0.0.0.0';
     }
 }
