@@ -38,8 +38,8 @@ La funcionalidad usa el permiso:
 vcard.productos.administrar
 ```
 
-Esta fase no modifica seeds por alcance explícito. El DB-TEST crea el permiso
-solo dentro de transacción cuando lo necesita para validar la funcionalidad.
+El permiso queda formalizado por la fase `PERMISOS-VCARD-PRODUCTOS-1`, que crea
+el seed idempotente y lo asigna al rol `ADMIN`.
 
 ## Administración desde `/perfil`
 
