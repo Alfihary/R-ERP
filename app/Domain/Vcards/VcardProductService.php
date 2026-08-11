@@ -27,6 +27,97 @@ final class VcardProductService
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function buscarProductosActivos(string $term): array
+    {
+        return $this->safePrivateProducts(
+            $this->products->searchActiveProducts($term)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    public function agregarProducto(int $usuarioId, array $input): void
+    {
+        $pdo = $this->products->pdo();
+        $startedTransaction = !$pdo->inTransaction();
+
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $vcard = $this->ensureVcard($usuarioId);
+            $productId = $this->normalizedProductId($input['id_producto'] ?? '');
+
+            if (!$this->products->activeProductExists($productId)) {
+                throw new VcardValidationException([
+                    'id_producto' => 'El producto debe existir y estar activo.',
+                ]);
+            }
+
+            $this->products->upsertProduct(
+                (int) $vcard['id'],
+                $usuarioId,
+                $productId,
+                1,
+                !empty($input['destacado']) ? 1 : 0,
+                $this->nullableText($input['texto_publico'] ?? null)
+            );
+
+            if ($startedTransaction) {
+                $pdo->commit();
+            }
+        } catch (\Throwable $exception) {
+            if ($startedTransaction && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    public function actualizarProducto(int $usuarioId, array $input): void
+    {
+        $vcard = $this->ensureVcard($usuarioId);
+        $productId = $this->normalizedProductId($input['id_producto'] ?? '');
+        $updated = $this->products->updateProductLink(
+            (int) $vcard['id'],
+            $productId,
+            !empty($input['activo']) ? 1 : 0,
+            !empty($input['destacado']) ? 1 : 0,
+            $this->nullableText($input['texto_publico'] ?? null)
+        );
+
+        if (!$updated) {
+            throw new VcardValidationException([
+                'id_producto' => 'El producto no está vinculado a tu vCard.',
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    public function quitarProducto(int $usuarioId, array $input): void
+    {
+        $vcard = $this->ensureVcard($usuarioId);
+        $productId = $this->normalizedProductId($input['id_producto'] ?? '');
+        $removed = $this->products->removeProductLink((int) $vcard['id'], $productId);
+
+        if (!$removed) {
+            throw new VcardValidationException([
+                'id_producto' => 'El producto no está vinculado a tu vCard.',
+            ]);
+        }
+    }
+
+    /**
      * @param list<array<string, mixed>> $productos
      */
     public function sincronizarProductos(int $usuarioId, array $productos): void
@@ -166,6 +257,19 @@ final class VcardProductService
         return $text;
     }
 
+    private function normalizedProductId(mixed $value): string
+    {
+        $id = strtoupper(trim(is_scalar($value) ? (string) $value : ''));
+
+        if ($id === '' || !preg_match('/^[A-Z0-9]{1,16}$/', $id)) {
+            throw new VcardValidationException([
+                'id_producto' => 'El producto no es válido.',
+            ]);
+        }
+
+        return $id;
+    }
+
     /**
      * @param list<array<string, mixed>> $rows
      * @return list<array<string, mixed>>
@@ -193,15 +297,19 @@ final class VcardProductService
         return [
             'id_producto' => (string) ($row['id_producto'] ?? ''),
             'descripcion' => (string) ($row['descripcion'] ?? ''),
-            'texto_publico' => $row['texto_publico'] !== null
+            'texto_publico' => ($row['texto_publico'] ?? null) !== null
                 ? (string) $row['texto_publico']
                 : null,
             'destacado' => (int) ($row['destacado'] ?? 0) === 1,
             'orden' => (int) ($row['orden'] ?? 0),
             'unidad' => (string) ($row['unidad_nombre'] ?? $row['unidad_codigo'] ?? ''),
-            'marca' => $row['marca_nombre'] !== null ? (string) $row['marca_nombre'] : null,
-            'linea' => $row['linea_nombre'] !== null ? (string) $row['linea_nombre'] : null,
-            'clasificacion' => $row['clasificacion_nombre'] !== null
+            'marca' => ($row['marca_nombre'] ?? null) !== null
+                ? (string) $row['marca_nombre']
+                : null,
+            'linea' => ($row['linea_nombre'] ?? null) !== null
+                ? (string) $row['linea_nombre']
+                : null,
+            'clasificacion' => ($row['clasificacion_nombre'] ?? null) !== null
                 ? (string) $row['clasificacion_nombre']
                 : null,
             'activo' => array_key_exists('activo', $row)

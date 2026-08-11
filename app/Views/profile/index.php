@@ -21,7 +21,18 @@ $canViewVcard = ($abilities['vcard_ver'] ?? false) === true;
 $canEditVcard = ($abilities['vcard_editar'] ?? false) === true;
 $canPublishVcard = ($abilities['vcard_publicar'] ?? false) === true;
 $canEditVcardPrivacy = ($abilities['vcard_privacidad'] ?? false) === true;
+$canManageVcardProducts = ($abilities['vcard_productos_administrar'] ?? false) === true;
 $vcardPrivacy = is_array($vcard['privacidad'] ?? null) ? $vcard['privacidad'] : [];
+$vcardProducts = is_array($vcardProducts ?? null) ? $vcardProducts : [];
+$vcardProductSearchResults = is_array($vcardProductSearchResults ?? null)
+    ? $vcardProductSearchResults
+    : [];
+$vcardProductErrors = is_array($vcardProductErrors ?? null)
+    ? $vcardProductErrors
+    : [];
+$vcardProductQuery = is_string($vcardProductQuery ?? null) ? $vcardProductQuery : '';
+$vcardProductError = static fn (string $key): string =>
+    (string) ($vcardProductErrors[$key] ?? '');
 $publicSlug = trim($vcardValue('slug'));
 $publicUrl = $publicSlug !== '' ? '/v/' . rawurlencode($publicSlug) : null;
 $privacyLabels = [
@@ -275,6 +286,153 @@ $privacyLabels = [
                 <?php endif; ?>
             </div>
         </form>
+
+        <?php if ($canManageVcardProducts): ?>
+            <section class="profile-panel profile-panel--wide" aria-labelledby="profile-vcard-products-title">
+                <div class="profile-panel__heading">
+                    <div>
+                        <h2 id="profile-vcard-products-title">Productos en mi vCard</h2>
+                        <p>
+                            Selecciona productos activos para mostrarlos en tu vCard pública.
+                            No se publican precios, stock, costos, proveedor ni almacén.
+                        </p>
+                    </div>
+                    <span class="badge badge--neutral"><?= e((string) count($vcardProducts)) ?> vinculados</span>
+                </div>
+
+                <?php if ($vcardProductErrors !== []): ?>
+                    <div class="alert alert--danger">
+                        Revisa el producto seleccionado. No se guardaron cambios.
+                    </div>
+                <?php endif; ?>
+
+                <form class="profile-search-form" method="get" action="/perfil">
+                    <label class="field field--wide">
+                        <span>Buscar producto activo</span>
+                        <input
+                            name="producto"
+                            maxlength="80"
+                            value="<?= e($vcardProductQuery) ?>"
+                            placeholder="ID o descripción"
+                        >
+                        <?php if ($vcardProductError('id_producto') !== ''): ?>
+                            <small><?= e($vcardProductError('id_producto')) ?></small>
+                        <?php endif; ?>
+                    </label>
+                    <button class="button button--secondary" type="submit">Buscar</button>
+                </form>
+
+                <?php if ($vcardProductQuery !== '' && $vcardProductSearchResults === []): ?>
+                    <div class="profile-empty">
+                        <strong>Sin resultados</strong>
+                        <p>No se encontraron productos activos para agregar.</p>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($vcardProductSearchResults !== []): ?>
+                    <div class="profile-product-results" aria-label="Resultados de productos activos">
+                        <?php foreach ($vcardProductSearchResults as $product): ?>
+                            <form class="profile-product-result" method="post" action="/perfil/vcard/productos/agregar">
+                                <?= csrf_field($csrf) ?>
+                                <input type="hidden" name="id_producto" value="<?= e((string) $product['id_producto']) ?>">
+                                <div>
+                                    <strong><?= e((string) $product['descripcion']) ?></strong>
+                                    <small><?= e((string) $product['id_producto']) ?></small>
+                                </div>
+                                <label>
+                                    <input type="checkbox" name="destacado" value="1">
+                                    Destacado
+                                </label>
+                                <label class="field">
+                                    <span>Texto público opcional</span>
+                                    <input name="texto_publico" maxlength="255">
+                                </label>
+                                <button class="button" type="submit">Agregar</button>
+                            </form>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($vcardProducts === []): ?>
+                    <div class="profile-empty">
+                        <strong>Aún no has agregado productos a tu vCard.</strong>
+                        <p>Usa el buscador para vincular productos activos.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-wrap">
+                        <table class="data-table profile-product-table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Detalle público</th>
+                                    <th>Visible</th>
+                                    <th>Destacado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($vcardProducts as $product): ?>
+                                    <?php $productFormId = 'vcard-product-' . preg_replace('/[^A-Za-z0-9_-]/', '-', (string) $product['id_producto']); ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?= e((string) $product['descripcion']) ?></strong>
+                                            <small><?= e((string) $product['id_producto']) ?></small>
+                                        </td>
+                                        <td>
+                                            <input
+                                                form="<?= e($productFormId) ?>"
+                                                name="texto_publico"
+                                                maxlength="255"
+                                                value="<?= e((string) ($product['texto_publico'] ?? '')) ?>"
+                                                placeholder="Texto público opcional"
+                                            >
+                                        </td>
+                                        <td>
+                                            <input form="<?= e($productFormId) ?>" type="hidden" name="activo" value="0">
+                                            <label>
+                                                <input
+                                                    form="<?= e($productFormId) ?>"
+                                                    type="checkbox"
+                                                    name="activo"
+                                                    value="1"
+                                                    <?= ($product['activo'] ?? false) === true ? 'checked' : '' ?>
+                                                >
+                                                Visible
+                                            </label>
+                                        </td>
+                                        <td>
+                                            <input form="<?= e($productFormId) ?>" type="hidden" name="destacado" value="0">
+                                            <label>
+                                                <input
+                                                    form="<?= e($productFormId) ?>"
+                                                    type="checkbox"
+                                                    name="destacado"
+                                                    value="1"
+                                                    <?= ($product['destacado'] ?? false) === true ? 'checked' : '' ?>
+                                                >
+                                                Destacado
+                                            </label>
+                                        </td>
+                                        <td class="table-actions">
+                                            <form id="<?= e($productFormId) ?>" method="post" action="/perfil/vcard/productos/actualizar">
+                                                <?= csrf_field($csrf) ?>
+                                                <input type="hidden" name="id_producto" value="<?= e((string) $product['id_producto']) ?>">
+                                                <button class="button button--secondary" type="submit">Actualizar</button>
+                                            </form>
+                                            <form method="post" action="/perfil/vcard/productos/quitar">
+                                                <?= csrf_field($csrf) ?>
+                                                <input type="hidden" name="id_producto" value="<?= e((string) $product['id_producto']) ?>">
+                                                <button class="button button--secondary" type="submit">Quitar</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
     <?php endif; ?>
 
     <form class="profile-form" method="post" action="/perfil/actualizar">

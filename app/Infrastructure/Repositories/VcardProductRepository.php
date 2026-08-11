@@ -67,6 +67,70 @@ final class VcardProductRepository
         return (int) $statement->fetchColumn() === 1;
     }
 
+    public function activeProductExists(string $productId): bool
+    {
+        $statement = $this->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM productos
+             WHERE id_producto = :id_producto
+               AND activo = 1
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute(['id_producto' => $productId]);
+
+        return (int) $statement->fetchColumn() === 1;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function searchActiveProducts(string $term, int $limit = 10): array
+    {
+        $term = trim($term);
+
+        if ($term === '') {
+            return [];
+        }
+
+        $limit = max(1, min(25, $limit));
+        $sql = <<<'SQL'
+            SELECT
+                p.id_producto,
+                p.descripcion,
+                u.codigo AS unidad_codigo,
+                u.nombre AS unidad_nombre,
+                m.nombre AS marca_nombre,
+                l.nombre AS linea_nombre,
+                c.nombre AS clasificacion_nombre
+            FROM productos p
+            INNER JOIN unidades_medida u
+                ON u.id = p.unidad_medida_id
+            LEFT JOIN marcas m
+                ON m.id = p.marca_id
+            LEFT JOIN lineas_producto l
+                ON l.id = p.linea_producto_id
+            LEFT JOIN clasificaciones_producto c
+                ON c.id = p.clasificacion_producto_id
+            WHERE p.activo = 1
+              AND p.eliminado_en IS NULL
+              AND (
+                    p.id_producto LIKE :term_id
+                    OR p.descripcion LIKE :term_description
+                  )
+            ORDER BY p.descripcion ASC, p.id_producto ASC
+            SQL
+            . ' LIMIT ' . $limit;
+        $statement = $this->pdo()->prepare(
+            $sql
+        );
+        $statement->execute([
+            'term_id' => '%' . $term . '%',
+            'term_description' => '%' . $term . '%',
+        ]);
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -168,6 +232,111 @@ final class VcardProductRepository
                 'creado_por' => $userId,
             ]);
         }
+    }
+
+    public function upsertProduct(
+        int $vcardId,
+        int $userId,
+        string $productId,
+        int $active,
+        int $featured,
+        ?string $publicText
+    ): void {
+        $nextOrder = $this->nextOrder($vcardId);
+        $statement = $this->pdo()->prepare(
+            <<<'SQL'
+            INSERT INTO vcard_productos (
+                vcard_id,
+                id_producto,
+                activo,
+                destacado,
+                orden,
+                texto_publico,
+                creado_por,
+                eliminado_en
+            ) VALUES (
+                :vcard_id,
+                :id_producto,
+                :activo,
+                :destacado,
+                :orden,
+                :texto_publico,
+                :creado_por,
+                NULL
+            )
+            ON DUPLICATE KEY UPDATE
+                activo = VALUES(activo),
+                destacado = VALUES(destacado),
+                texto_publico = VALUES(texto_publico),
+                eliminado_en = NULL
+            SQL
+        );
+        $statement->execute([
+            'vcard_id' => $vcardId,
+            'id_producto' => $productId,
+            'activo' => $active,
+            'destacado' => $featured,
+            'orden' => $nextOrder,
+            'texto_publico' => $publicText,
+            'creado_por' => $userId,
+        ]);
+    }
+
+    public function updateProductLink(
+        int $vcardId,
+        string $productId,
+        int $active,
+        int $featured,
+        ?string $publicText
+    ): bool {
+        $statement = $this->pdo()->prepare(
+            'UPDATE vcard_productos
+             SET activo = :activo,
+                 destacado = :destacado,
+                 texto_publico = :texto_publico
+             WHERE vcard_id = :vcard_id
+               AND id_producto = :id_producto
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'activo' => $active,
+            'destacado' => $featured,
+            'texto_publico' => $publicText,
+            'vcard_id' => $vcardId,
+            'id_producto' => $productId,
+        ]);
+
+        return $statement->rowCount() > 0;
+    }
+
+    public function removeProductLink(int $vcardId, string $productId): bool
+    {
+        $statement = $this->pdo()->prepare(
+            'UPDATE vcard_productos
+             SET activo = 0,
+                 eliminado_en = CURRENT_TIMESTAMP
+             WHERE vcard_id = :vcard_id
+               AND id_producto = :id_producto
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute([
+            'vcard_id' => $vcardId,
+            'id_producto' => $productId,
+        ]);
+
+        return $statement->rowCount() > 0;
+    }
+
+    private function nextOrder(int $vcardId): int
+    {
+        $statement = $this->pdo()->prepare(
+            'SELECT COALESCE(MAX(orden), 0) + 10
+             FROM vcard_productos
+             WHERE vcard_id = :vcard_id'
+        );
+        $statement->execute(['vcard_id' => $vcardId]);
+
+        return max(10, (int) $statement->fetchColumn());
     }
 
     /**

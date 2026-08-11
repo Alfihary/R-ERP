@@ -300,6 +300,24 @@ return static function (
             $profileController->unpublishVcard($request),
         $profileMiddleware('vcard.publicar')
     );
+    $router->post(
+        '/perfil/vcard/productos/agregar',
+        static fn (Request $request): Response =>
+            $profileController->addVcardProduct($request),
+        $profileMiddleware('vcard.productos.administrar')
+    );
+    $router->post(
+        '/perfil/vcard/productos/actualizar',
+        static fn (Request $request): Response =>
+            $profileController->updateVcardProduct($request),
+        $profileMiddleware('vcard.productos.administrar')
+    );
+    $router->post(
+        '/perfil/vcard/productos/quitar',
+        static fn (Request $request): Response =>
+            $profileController->removeVcardProduct($request),
+        $profileMiddleware('vcard.productos.administrar')
+    );
     $router->get(
         '/perfil/credencial',
         static fn (Request $request): Response =>

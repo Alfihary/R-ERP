@@ -282,7 +282,8 @@ $profileController = new ProfileController(
     $profiles,
     $userPhotoStorage,
     $vcards,
-    $vcardPrivacy
+    $vcardPrivacy,
+    $vcardProducts
 );
 $credentialController = new CredentialController(
     $config,

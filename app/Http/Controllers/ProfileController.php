@@ -14,6 +14,7 @@ use App\Domain\Profile\ProfileValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardProductService;
 use App\Domain\Vcards\VcardService;
 use App\Domain\Vcards\VcardValidationException;
 use App\Infrastructure\Storage\UserPhotoStorage;
@@ -30,7 +31,8 @@ final class ProfileController
         private readonly ProfileService $profiles,
         private readonly UserPhotoStorage $photoStorage,
         private readonly ?VcardService $vcards = null,
-        private readonly ?VcardPrivacyService $vcardPrivacy = null
+        private readonly ?VcardPrivacyService $vcardPrivacy = null,
+        private readonly ?VcardProductService $vcardProducts = null
     ) {
     }
 
@@ -50,6 +52,7 @@ final class ProfileController
             'profile' => $this->profiles->asegurarPerfil($user['user_id']),
             'vcard' => $this->vcardConfiguration($user['user_id']),
             'vcardErrors' => [],
+            ...$this->vcardProductsPayload($user['user_id'], $request),
         ], 'Mi perfil');
     }
 
@@ -76,6 +79,7 @@ final class ProfileController
                     + $this->profiles->asegurarPerfil($user['user_id']),
                 'vcard' => $this->vcardConfiguration($user['user_id']),
                 'vcardErrors' => [],
+                ...$this->vcardProductsPayload($user['user_id'], $request),
             ], 'Mi perfil', $exception->statusCode());
         }
 
@@ -104,6 +108,7 @@ final class ProfileController
                 'profile' => $this->profiles->asegurarPerfil($user['user_id']),
                 'vcard' => $this->vcardConfiguration($user['user_id']),
                 'vcardErrors' => $exception->errors(),
+                ...$this->vcardProductsPayload($user['user_id'], $request),
             ], 'Mi perfil', $exception->statusCode());
         }
 
@@ -137,6 +142,7 @@ final class ProfileController
                 'profile' => $this->profiles->asegurarPerfil($user['user_id']),
                 'vcard' => $this->vcardConfiguration($user['user_id']),
                 'vcardErrors' => $exception->errors(),
+                ...$this->vcardProductsPayload($user['user_id'], $request),
             ], 'Mi perfil', $exception->statusCode());
         }
 
@@ -163,6 +169,69 @@ final class ProfileController
         $this->vcards->despublicar($this->user()['user_id']);
 
         return Response::redirect('/perfil?result=vcard_unpublished');
+    }
+
+    public function addVcardProduct(Request $request): Response
+    {
+        if (
+            !$this->allowed('vcard.productos.administrar')
+            || $this->vcardProducts === null
+        ) {
+            return $this->forbidden();
+        }
+
+        try {
+            $this->vcardProducts->agregarProducto(
+                $this->user()['user_id'],
+                $request->body()
+            );
+        } catch (VcardValidationException $exception) {
+            return $this->renderVcardProductError($request, $exception);
+        }
+
+        return Response::redirect('/perfil?result=vcard_product_added');
+    }
+
+    public function updateVcardProduct(Request $request): Response
+    {
+        if (
+            !$this->allowed('vcard.productos.administrar')
+            || $this->vcardProducts === null
+        ) {
+            return $this->forbidden();
+        }
+
+        try {
+            $this->vcardProducts->actualizarProducto(
+                $this->user()['user_id'],
+                $request->body()
+            );
+        } catch (VcardValidationException $exception) {
+            return $this->renderVcardProductError($request, $exception);
+        }
+
+        return Response::redirect('/perfil?result=vcard_product_updated');
+    }
+
+    public function removeVcardProduct(Request $request): Response
+    {
+        if (
+            !$this->allowed('vcard.productos.administrar')
+            || $this->vcardProducts === null
+        ) {
+            return $this->forbidden();
+        }
+
+        try {
+            $this->vcardProducts->quitarProducto(
+                $this->user()['user_id'],
+                $request->body()
+            );
+        } catch (VcardValidationException $exception) {
+            return $this->renderVcardProductError($request, $exception);
+        }
+
+        return Response::redirect('/perfil?result=vcard_product_removed');
     }
 
     public function passwordForm(Request $request): Response
@@ -242,6 +311,7 @@ final class ProfileController
                 'profile' => $this->profiles->asegurarPerfil($user['user_id']),
                 'vcard' => $this->vcardConfiguration($user['user_id']),
                 'vcardErrors' => [],
+                ...$this->vcardProductsPayload($user['user_id'], $request),
             ], 'Mi perfil', $exception->statusCode());
         } catch (\Throwable $exception) {
             if (is_array($stored) && isset($stored['ruta_relativa'])) {
@@ -330,6 +400,10 @@ final class ProfileController
             'vcard_privacidad' => $this->permissions->allows(
                 $userId,
                 'vcard.privacidad.editar'
+            ),
+            'vcard_productos_administrar' => $this->permissions->allows(
+                $userId,
+                'vcard.productos.administrar'
             ),
         ];
     }
@@ -458,6 +532,66 @@ final class ProfileController
     }
 
     /**
+     * @return array{
+     *     vcardProducts: list<array<string, mixed>>,
+     *     vcardProductSearchResults: list<array<string, mixed>>,
+     *     vcardProductQuery: string,
+     *     vcardProductErrors: array<string, string>
+     * }
+     */
+    private function vcardProductsPayload(
+        int $userId,
+        Request $request,
+        array $errors = []
+    ): array {
+        $queryValue = $request->query()['producto'] ?? '';
+        $query = is_string($queryValue) ? trim($queryValue) : '';
+
+        if (
+            $this->vcardProducts === null
+            || !$this->permissions->allows($userId, 'vcard.productos.administrar')
+        ) {
+            return [
+                'vcardProducts' => [],
+                'vcardProductSearchResults' => [],
+                'vcardProductQuery' => $query,
+                'vcardProductErrors' => $errors,
+            ];
+        }
+
+        return [
+            'vcardProducts' => $this->vcardProducts->listarPrivados($userId),
+            'vcardProductSearchResults' => $query !== ''
+                ? $this->vcardProducts->buscarProductosActivos($query)
+                : [],
+            'vcardProductQuery' => $query,
+            'vcardProductErrors' => $errors,
+        ];
+    }
+
+    private function renderVcardProductError(
+        Request $request,
+        VcardValidationException $exception
+    ): Response {
+        $user = $this->user();
+
+        return $this->render('profile/index', [
+            'abilities' => $this->abilities($user['user_id']),
+            'errors' => [],
+            'notice' => null,
+            'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
+            'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+            'vcard' => $this->vcardConfiguration($user['user_id']),
+            'vcardErrors' => [],
+            ...$this->vcardProductsPayload(
+                $user['user_id'],
+                $request,
+                $exception->errors()
+            ),
+        ], 'Mi perfil', $exception->statusCode());
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function vcardInput(Request $request): array
@@ -503,6 +637,9 @@ final class ProfileController
             'vcard_privacy_updated' => 'Privacidad pública de vCard actualizada.',
             'vcard_published' => 'vCard publicada correctamente.',
             'vcard_unpublished' => 'vCard despublicada correctamente.',
+            'vcard_product_added' => 'Producto agregado a tu vCard.',
+            'vcard_product_updated' => 'Producto de vCard actualizado.',
+            'vcard_product_removed' => 'Producto removido de tu vCard.',
             default => null,
         };
     }
