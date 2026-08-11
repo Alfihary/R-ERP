@@ -149,9 +149,16 @@ return new class implements DatabaseTest {
                     && str_contains($body, 'Operación interna')
                     && str_contains($body, '/perfil/credencial/foto')
                     && str_contains($body, '/perfil/credencial/qr')
-                    && str_contains($body, '/v/qa-credencial-visual')
-                    && str_contains($body, 'Credencial interna')
                     && str_contains($body, 'QR hacia vCard pública'),
+                'removed_internal_card_label' => !str_contains($body, 'Credencial interna'),
+                'reversible_card_available' =>
+                    str_contains($body, 'credential-flip')
+                    && str_contains($body, 'Ver datos')
+                    && str_contains($body, 'Volver al QR'),
+                'public_vcard_destination_on_back' =>
+                    str_contains($body, 'Destino')
+                    && str_contains($body, '/v/qa-credencial-visual')
+                    && !str_contains($body, 'QR de vCard pública:'),
                 'no_password_hash' => !str_contains($body, 'password_hash'),
                 'no_tokens' =>
                     !str_contains($body, 'token_hash')

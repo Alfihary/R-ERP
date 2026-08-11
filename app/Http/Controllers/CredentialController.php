@@ -89,7 +89,7 @@ final class CredentialController
             return Response::html('', 404);
         }
 
-        $qr = $this->qr->generate($payload);
+        $qr = $this->qr->generate($payload, 8);
         $this->audit?->record('credencial.qr.ver', $user['user_id'], [
             'entidad' => 'credencial',
             'resultado' => 'ok',
@@ -143,7 +143,7 @@ final class CredentialController
             return Response::html('', 404);
         }
 
-        $qr = $this->qr->generate($payload);
+        $qr = $this->qr->generate($payload, 8);
         $this->audit?->record('credencial.qr.descargar', $user['user_id'], [
             'entidad' => 'credencial',
             'resultado' => 'ok',

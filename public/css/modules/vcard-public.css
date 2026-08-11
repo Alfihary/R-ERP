@@ -1,4 +1,11 @@
 .vcard-public-body {
+    --vcard-space-1: 0.25rem;
+    --vcard-space-2: 0.5rem;
+    --vcard-space-3: 0.75rem;
+    --vcard-space-4: 1rem;
+    --vcard-space-5: 1.5rem;
+    --vcard-space-6: 2rem;
+
     background:
         radial-gradient(circle at 12% 18%, rgba(16, 185, 129, 0.18), transparent 28rem),
         linear-gradient(135deg, #071512 0%, #0d2420 42%, #102f2a 100%);
@@ -36,9 +43,9 @@
         #062f2a;
     color: #ecfdf5;
     display: grid;
-    gap: var(--space-5);
+    gap: var(--vcard-space-5);
     min-height: 100%;
-    padding: var(--space-6);
+    padding: var(--vcard-space-6);
 }
 
 .vcard-public__brand-name {
@@ -86,7 +93,7 @@
 .vcard-public__brand-copy {
     align-self: end;
     display: grid;
-    gap: var(--space-4);
+    gap: var(--vcard-space-4);
 }
 
 .vcard-public__brand-copy p {
@@ -99,18 +106,18 @@
     border-radius: var(--radius-sm);
     display: block;
     inline-size: 8.25rem;
-    padding: var(--space-2);
+    padding: var(--vcard-space-2);
 }
 
 .vcard-public__content {
     display: grid;
-    gap: var(--space-5);
-    padding: var(--space-6);
+    gap: var(--vcard-space-5);
+    padding: var(--vcard-space-6);
 }
 
 .vcard-public__header {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--vcard-space-3);
 }
 
 .vcard-public__label {
@@ -159,8 +166,8 @@
 .vcard-public__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
-    padding-block-start: var(--space-2);
+    gap: var(--vcard-space-2);
+    padding-block-start: var(--vcard-space-2);
 }
 
 .vcard-public__action {
@@ -173,7 +180,7 @@
     font-weight: 800;
     justify-content: center;
     min-height: 2.75rem;
-    padding: var(--space-2) var(--space-4);
+    padding: var(--vcard-space-2) var(--vcard-space-4);
     text-decoration: none;
     transition:
         background-color 160ms ease,
@@ -204,14 +211,14 @@
 .vcard-public__section {
     border-top: 1px solid #dbe7e3;
     display: grid;
-    gap: var(--space-3);
-    padding-top: var(--space-5);
+    gap: var(--vcard-space-3);
+    padding-top: var(--vcard-space-5);
 }
 
 .vcard-public__section-heading {
     align-items: center;
     display: flex;
-    gap: var(--space-3);
+    gap: var(--vcard-space-3);
     justify-content: space-between;
 }
 
@@ -222,12 +229,12 @@
     color: #0b5b46;
     font-size: 0.75rem;
     font-weight: 850;
-    padding: var(--space-1) var(--space-3);
+    padding: var(--vcard-space-1) var(--vcard-space-3);
 }
 
 .vcard-public__details {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--vcard-space-3);
     grid-template-columns: repeat(2, minmax(0, 1fr));
     margin: 0;
 }
@@ -237,7 +244,7 @@
     border: 1px solid #dbe7e3;
     border-radius: var(--radius-sm);
     min-width: 0;
-    padding: var(--space-3);
+    padding: var(--vcard-space-3);
 }
 
 .vcard-public__details dt {
@@ -249,14 +256,14 @@
 .vcard-public__details dd {
     color: #10231f;
     font-weight: 750;
-    margin: var(--space-1) 0 0;
+    margin: var(--vcard-space-1) 0 0;
     overflow-wrap: anywhere;
 }
 
 .vcard-public__links {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
+    gap: var(--vcard-space-2);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -271,7 +278,7 @@
     display: inline-flex;
     font-weight: 800;
     min-height: 2.35rem;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--vcard-space-2) var(--vcard-space-3);
     text-decoration: none;
 }
 
@@ -287,7 +294,7 @@
 
 .vcard-public__products {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--vcard-space-3);
 }
 
 .vcard-public__product {
@@ -296,9 +303,9 @@
     border: 1px solid #dbe7e3;
     border-radius: var(--radius-sm);
     display: flex;
-    gap: var(--space-4);
+    gap: var(--vcard-space-4);
     justify-content: space-between;
-    padding: var(--space-4);
+    padding: var(--vcard-space-4);
 }
 
 .vcard-public__product h3 {
@@ -310,7 +317,7 @@
 .vcard-public__product p {
     color: #52615d;
     line-height: 1.5;
-    margin: var(--space-1) 0 0;
+    margin: var(--vcard-space-1) 0 0;
 }
 
 .vcard-public__product-meta {
@@ -325,7 +332,7 @@
     flex: 0 0 auto;
     font-size: 0.75rem;
     font-weight: 850;
-    padding: var(--space-1) var(--space-3);
+    padding: var(--vcard-space-1) var(--vcard-space-3);
 }
 
 @media (max-width: 48rem) {
@@ -335,7 +342,7 @@
 
     .vcard-public__brand {
         min-height: auto;
-        padding: var(--space-5);
+        padding: var(--vcard-space-5);
     }
 
     .vcard-public__brand-copy {
@@ -343,7 +350,7 @@
     }
 
     .vcard-public__content {
-        padding: var(--space-5);
+        padding: var(--vcard-space-5);
     }
 
     .vcard-public h1 {
@@ -354,7 +361,7 @@
 @media (max-width: 40rem) {
     .vcard-public {
         align-items: stretch;
-        padding: var(--space-3);
+        padding: var(--vcard-space-3);
     }
 
     .vcard-public__details {
