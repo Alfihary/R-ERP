@@ -7,12 +7,40 @@ $photo = is_array($photo ?? null) ? $photo : null;
 $errors = is_array($errors ?? null) ? $errors : [];
 $abilities = is_array($abilities ?? null) ? $abilities : [];
 $notice = is_string($notice ?? null) ? $notice : null;
+$vcard = is_array($vcard ?? null) ? $vcard : null;
+$vcardErrors = is_array($vcardErrors ?? null) ? $vcardErrors : [];
 $value = static fn (string $key): string => (string) ($profile[$key] ?? '');
 $error = static fn (string $key): string => (string) ($errors[$key] ?? '');
+$vcardValue = static fn (string $key): string => (string) ($vcard[$key] ?? '');
+$vcardError = static fn (string $key): string => (string) ($vcardErrors[$key] ?? '');
 $canEdit = ($abilities['editar'] ?? false) === true;
 $canChangePassword = ($abilities['password'] ?? false) === true;
 $canDeletePhoto = ($abilities['foto_eliminar'] ?? false) === true;
 $canUpdatePhoto = ($abilities['foto_actualizar'] ?? false) === true;
+$canViewVcard = ($abilities['vcard_ver'] ?? false) === true;
+$canEditVcard = ($abilities['vcard_editar'] ?? false) === true;
+$canPublishVcard = ($abilities['vcard_publicar'] ?? false) === true;
+$canEditVcardPrivacy = ($abilities['vcard_privacidad'] ?? false) === true;
+$vcardPrivacy = is_array($vcard['privacidad'] ?? null) ? $vcard['privacidad'] : [];
+$publicSlug = trim($vcardValue('slug'));
+$publicUrl = $publicSlug !== '' ? '/v/' . rawurlencode($publicSlug) : null;
+$privacyLabels = [
+    'foto' => 'Foto pública',
+    'correo' => 'Correo',
+    'telefono_fijo' => 'Teléfono fijo',
+    'telefono_movil' => 'Teléfono móvil',
+    'puesto' => 'Puesto',
+    'empresa' => 'Empresa',
+    'almacen' => 'Almacén',
+    'ubicacion' => 'Ubicación',
+    'sitio_web' => 'Sitio web',
+    'linkedin' => 'LinkedIn',
+    'facebook' => 'Facebook',
+    'instagram' => 'Instagram',
+    'whatsapp' => 'WhatsApp',
+    'google_maps' => 'Google Maps',
+    'productos' => 'Productos públicos',
+];
 ?>
 <section class="profile-page">
     <header class="profile-page__header">
@@ -128,6 +156,126 @@ $canUpdatePhoto = ($abilities['foto_actualizar'] ?? false) === true;
             <?php endif; ?>
         </aside>
     </div>
+
+    <?php if ($canViewVcard && $vcard !== null): ?>
+        <div class="profile-grid">
+            <aside class="profile-panel">
+                <div class="profile-panel__heading">
+                    <div>
+                        <h2>vCard pública</h2>
+                        <p>Controla el slug, presentación y estado público.</p>
+                    </div>
+                    <span class="badge <?= ($vcard['publicada'] ?? false) === true ? 'badge--success' : 'badge--neutral' ?>">
+                        <?= ($vcard['publicada'] ?? false) === true ? 'Publicada' : 'No publicada' ?>
+                    </span>
+                </div>
+
+                <dl class="profile-readonly-list">
+                    <div>
+                        <dt>Ruta pública</dt>
+                        <dd>
+                            <?php if (($vcard['publicada'] ?? false) === true && $publicUrl !== null): ?>
+                                <a href="<?= e($publicUrl) ?>" target="_blank" rel="noopener noreferrer">
+                                    <?= e($publicUrl) ?>
+                                </a>
+                            <?php else: ?>
+                                Disponible después de publicar.
+                            <?php endif; ?>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Última publicación</dt>
+                        <dd><?= e((string) ($vcard['publicado_en'] ?? 'Sin publicación')) ?></dd>
+                    </div>
+                </dl>
+
+                <?php if ($canPublishVcard): ?>
+                    <form class="profile-danger-action" method="post" action="<?= ($vcard['publicada'] ?? false) === true ? '/perfil/vcard/despublicar' : '/perfil/vcard/publicar' ?>">
+                        <?= csrf_field($csrf) ?>
+                        <button class="button" type="submit">
+                            <?= ($vcard['publicada'] ?? false) === true ? 'Despublicar vCard' : 'Publicar vCard' ?>
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </aside>
+
+            <form class="profile-form" method="post" action="/perfil/vcard/configuracion">
+                <?= csrf_field($csrf) ?>
+                <fieldset>
+                    <legend>Configuración pública</legend>
+                    <label class="field">
+                        <span>Slug público</span>
+                        <input name="slug" maxlength="80" value="<?= e($vcardValue('slug')) ?>" <?= $canEditVcard ? '' : 'readonly' ?>>
+                        <?php if ($vcardError('slug') !== ''): ?><small><?= e($vcardError('slug')) ?></small><?php endif; ?>
+                    </label>
+                    <label class="field">
+                        <span>Canal preferido</span>
+                        <select name="canal_contacto_preferido" <?= $canEditVcard ? '' : 'disabled' ?>>
+                            <?php foreach ([
+                                'ninguno' => 'Sin preferencia',
+                                'whatsapp' => 'WhatsApp',
+                                'telefono_movil' => 'Teléfono móvil',
+                                'telefono_fijo' => 'Teléfono fijo',
+                                'correo' => 'Correo',
+                            ] as $channel => $label): ?>
+                                <option value="<?= e($channel) ?>" <?= $vcardValue('canal_contacto_preferido') === $channel ? 'selected' : '' ?>>
+                                    <?= e($label) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <?php if ($vcardError('canal_contacto_preferido') !== ''): ?><small><?= e($vcardError('canal_contacto_preferido')) ?></small><?php endif; ?>
+                    </label>
+                    <label class="field field--wide">
+                        <span>Título público</span>
+                        <input name="titulo_publico" maxlength="160" value="<?= e($vcardValue('titulo_publico')) ?>" <?= $canEditVcard ? '' : 'readonly' ?>>
+                        <?php if ($vcardError('titulo_publico') !== ''): ?><small><?= e($vcardError('titulo_publico')) ?></small><?php endif; ?>
+                    </label>
+                    <label class="field field--wide">
+                        <span>Descripción pública</span>
+                        <textarea name="descripcion_publica" maxlength="2000" rows="4" <?= $canEditVcard ? '' : 'readonly' ?>><?= e($vcardValue('descripcion_publica')) ?></textarea>
+                        <?php if ($vcardError('descripcion_publica') !== ''): ?><small><?= e($vcardError('descripcion_publica')) ?></small><?php endif; ?>
+                    </label>
+                </fieldset>
+                <div class="form-actions">
+                    <?php if ($canEditVcard): ?>
+                        <button class="button" type="submit">Guardar vCard</button>
+                    <?php else: ?>
+                        <span class="badge badge--neutral">Sin permiso de edición vCard</span>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+
+        <form class="profile-form" method="post" action="/perfil/vcard/privacidad">
+            <?= csrf_field($csrf) ?>
+            <fieldset>
+                <legend>Privacidad pública</legend>
+                <?php foreach ($privacyLabels as $field => $label): ?>
+                    <label class="field">
+                        <span><?= e($label) ?></span>
+                        <input type="hidden" name="<?= e($field) ?>" value="0">
+                        <label>
+                            <input
+                                type="checkbox"
+                                name="<?= e($field) ?>"
+                                value="1"
+                                <?= ($vcardPrivacy[$field] ?? false) === true ? 'checked' : '' ?>
+                                <?= $canEditVcardPrivacy ? '' : 'disabled' ?>
+                            >
+                            Visible en vCard pública
+                        </label>
+                    </label>
+                <?php endforeach; ?>
+            </fieldset>
+            <div class="form-actions">
+                <?php if ($canEditVcardPrivacy): ?>
+                    <button class="button" type="submit">Guardar privacidad</button>
+                <?php else: ?>
+                    <span class="badge badge--neutral">Sin permiso de privacidad vCard</span>
+                <?php endif; ?>
+            </div>
+        </form>
+    <?php endif; ?>
 
     <form class="profile-form" method="post" action="/perfil/actualizar">
         <?= csrf_field($csrf) ?>

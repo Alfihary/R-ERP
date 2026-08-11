@@ -276,6 +276,30 @@ return static function (
             $profileController->deletePhoto($request),
         $profileMiddleware('perfil.foto.eliminar')
     );
+    $router->post(
+        '/perfil/vcard/configuracion',
+        static fn (Request $request): Response =>
+            $profileController->updateVcard($request),
+        $profileMiddleware('vcard.editar')
+    );
+    $router->post(
+        '/perfil/vcard/privacidad',
+        static fn (Request $request): Response =>
+            $profileController->updateVcardPrivacy($request),
+        $profileMiddleware('vcard.privacidad.editar')
+    );
+    $router->post(
+        '/perfil/vcard/publicar',
+        static fn (Request $request): Response =>
+            $profileController->publishVcard($request),
+        $profileMiddleware('vcard.publicar')
+    );
+    $router->post(
+        '/perfil/vcard/despublicar',
+        static fn (Request $request): Response =>
+            $profileController->unpublishVcard($request),
+        $profileMiddleware('vcard.publicar')
+    );
     $router->get(
         '/perfil/credencial',
         static fn (Request $request): Response =>

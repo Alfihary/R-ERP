@@ -280,7 +280,9 @@ $profileController = new ProfileController(
     $scopeContext,
     $csrf,
     $profiles,
-    $userPhotoStorage
+    $userPhotoStorage,
+    $vcards,
+    $vcardPrivacy
 );
 $credentialController = new CredentialController(
     $config,

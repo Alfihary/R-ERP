@@ -13,6 +13,9 @@ use App\Domain\Profile\ProfileService;
 use App\Domain\Profile\ProfileValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardService;
+use App\Domain\Vcards\VcardValidationException;
 use App\Infrastructure\Storage\UserPhotoStorage;
 use App\Support\Security\CsrfTokenService;
 
@@ -25,7 +28,9 @@ final class ProfileController
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
         private readonly ProfileService $profiles,
-        private readonly UserPhotoStorage $photoStorage
+        private readonly UserPhotoStorage $photoStorage,
+        private readonly ?VcardService $vcards = null,
+        private readonly ?VcardPrivacyService $vcardPrivacy = null
     ) {
     }
 
@@ -43,6 +48,8 @@ final class ProfileController
             'notice' => $this->resultMessage($request),
             'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
             'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+            'vcard' => $this->vcardConfiguration($user['user_id']),
+            'vcardErrors' => [],
         ], 'Mi perfil');
     }
 
@@ -67,10 +74,95 @@ final class ProfileController
                 'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
                 'profile' => $this->profileInput($request)
                     + $this->profiles->asegurarPerfil($user['user_id']),
+                'vcard' => $this->vcardConfiguration($user['user_id']),
+                'vcardErrors' => [],
             ], 'Mi perfil', $exception->statusCode());
         }
 
         return Response::redirect('/perfil?result=updated');
+    }
+
+    public function updateVcard(Request $request): Response
+    {
+        if (!$this->allowed('vcard.editar') || $this->vcards === null) {
+            return $this->forbidden();
+        }
+
+        $user = $this->user();
+
+        try {
+            $this->vcards->actualizarConfiguracion(
+                $user['user_id'],
+                $this->vcardInput($request)
+            );
+        } catch (VcardValidationException $exception) {
+            return $this->render('profile/index', [
+                'abilities' => $this->abilities($user['user_id']),
+                'errors' => [],
+                'notice' => null,
+                'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
+                'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+                'vcard' => $this->vcardConfiguration($user['user_id']),
+                'vcardErrors' => $exception->errors(),
+            ], 'Mi perfil', $exception->statusCode());
+        }
+
+        return Response::redirect('/perfil?result=vcard_updated');
+    }
+
+    public function updateVcardPrivacy(Request $request): Response
+    {
+        if (
+            !$this->allowed('vcard.privacidad.editar')
+            || $this->vcards === null
+            || $this->vcardPrivacy === null
+        ) {
+            return $this->forbidden();
+        }
+
+        $user = $this->user();
+
+        try {
+            $vcard = $this->vcards->obtenerConfiguracionPrivada($user['user_id']);
+            $this->vcardPrivacy->actualizarPrivacidad(
+                (int) $vcard['id'],
+                $this->vcardPrivacyInput($request)
+            );
+        } catch (VcardValidationException $exception) {
+            return $this->render('profile/index', [
+                'abilities' => $this->abilities($user['user_id']),
+                'errors' => [],
+                'notice' => null,
+                'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
+                'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+                'vcard' => $this->vcardConfiguration($user['user_id']),
+                'vcardErrors' => $exception->errors(),
+            ], 'Mi perfil', $exception->statusCode());
+        }
+
+        return Response::redirect('/perfil?result=vcard_privacy_updated');
+    }
+
+    public function publishVcard(Request $request): Response
+    {
+        if (!$this->allowed('vcard.publicar') || $this->vcards === null) {
+            return $this->forbidden();
+        }
+
+        $this->vcards->publicar($this->user()['user_id']);
+
+        return Response::redirect('/perfil?result=vcard_published');
+    }
+
+    public function unpublishVcard(Request $request): Response
+    {
+        if (!$this->allowed('vcard.publicar') || $this->vcards === null) {
+            return $this->forbidden();
+        }
+
+        $this->vcards->despublicar($this->user()['user_id']);
+
+        return Response::redirect('/perfil?result=vcard_unpublished');
     }
 
     public function passwordForm(Request $request): Response
@@ -148,6 +240,8 @@ final class ProfileController
                 'notice' => null,
                 'photo' => $this->profiles->obtenerFotoActiva($user['user_id']),
                 'profile' => $this->profiles->asegurarPerfil($user['user_id']),
+                'vcard' => $this->vcardConfiguration($user['user_id']),
+                'vcardErrors' => [],
             ], 'Mi perfil', $exception->statusCode());
         } catch (\Throwable $exception) {
             if (is_array($stored) && isset($stored['ruta_relativa'])) {
@@ -226,6 +320,16 @@ final class ProfileController
             'foto_actualizar' => $this->permissions->allows(
                 $userId,
                 'perfil.foto.actualizar'
+            ),
+            'vcard_ver' => $this->permissions->allows($userId, 'vcard.ver'),
+            'vcard_editar' => $this->permissions->allows($userId, 'vcard.editar'),
+            'vcard_publicar' => $this->permissions->allows(
+                $userId,
+                'vcard.publicar'
+            ),
+            'vcard_privacidad' => $this->permissions->allows(
+                $userId,
+                'vcard.privacidad.editar'
             ),
         ];
     }
@@ -341,6 +445,53 @@ final class ProfileController
         return $input;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function vcardConfiguration(int $userId): ?array
+    {
+        if ($this->vcards === null) {
+            return null;
+        }
+
+        return $this->vcards->obtenerConfiguracionPrivada($userId);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function vcardInput(Request $request): array
+    {
+        $allowed = [
+            'slug',
+            'titulo_publico',
+            'descripcion_publica',
+            'canal_contacto_preferido',
+        ];
+        $input = [];
+
+        foreach ($allowed as $field) {
+            $value = $request->input($field);
+            $input[$field] = is_string($value) ? $value : null;
+        }
+
+        return $input;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function vcardPrivacyInput(Request $request): array
+    {
+        $input = [];
+
+        foreach (VcardPrivacyService::FIELDS as $field) {
+            $input[$field] = $request->input($field, '0');
+        }
+
+        return $input;
+    }
+
     private function resultMessage(Request $request): ?string
     {
         return match ($request->query()['result'] ?? null) {
@@ -348,6 +499,10 @@ final class ProfileController
             'password_updated' => 'Contraseña actualizada correctamente.',
             'photo_uploaded' => 'Foto actualizada correctamente.',
             'photo_deleted' => 'Foto activa eliminada correctamente.',
+            'vcard_updated' => 'Configuración pública de vCard actualizada.',
+            'vcard_privacy_updated' => 'Privacidad pública de vCard actualizada.',
+            'vcard_published' => 'vCard publicada correctamente.',
+            'vcard_unpublished' => 'vCard despublicada correctamente.',
             default => null,
         };
     }
