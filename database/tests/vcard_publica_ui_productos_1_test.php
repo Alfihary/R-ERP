@@ -157,11 +157,10 @@ return new class implements DatabaseTest {
                     str_contains($body, 'Llamar ahora')
                     && str_contains($body, 'Enviar correo')
                     && str_contains($body, 'Enviar WhatsApp')
-                    && str_contains($body, 'Agregar a contactos')
-                    && str_contains($body, 'QR público'),
-                'vcf_and_qr_links_present' =>
+                    && str_contains($body, 'Agregar a contactos'),
+                'vcf_link_present_and_qr_link_absent' =>
                     str_contains($body, '/v/' . self::SLUG . '/vcf')
-                    && str_contains($body, '/v/' . self::SLUG . '/qr'),
+                    && !str_contains($body, '/v/' . self::SLUG . '/qr'),
                 'social_links_present_if_visible' =>
                     str_contains($body, 'Sitio web')
                     && str_contains($body, 'LinkedIn')

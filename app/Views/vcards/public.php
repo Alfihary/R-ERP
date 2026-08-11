@@ -22,6 +22,12 @@ $title = trim((string) ($vcard['titulo_publico'] ?? $pageTitle));
 $description = trim((string) ($vcard['descripcion_publica'] ?? ''));
 $displayName = $name !== '' ? $name : $title;
 $headline = $title !== '' ? $title : $displayName;
+$role = isset($vcard['puesto']) && is_string($vcard['puesto'])
+    ? trim((string) $vcard['puesto'])
+    : '';
+$introTitle = $headline !== '' && $headline !== $displayName && $headline !== $role
+    ? $headline
+    : '';
 $details = [
     'puesto' => 'Puesto',
     'empresa' => 'Empresa',
@@ -36,6 +42,13 @@ $links = [
     'facebook' => 'Facebook',
     'instagram' => 'Instagram',
     'google_maps' => 'Mapa',
+];
+$linkIcons = [
+    'sitio_web' => '🌐',
+    'linkedin' => 'in',
+    'facebook' => 'f',
+    'instagram' => '◎',
+    'google_maps' => '⌖',
 ];
 $safeTel = static fn (string $value): string => preg_replace('/[^0-9+]/', '', $value) ?? '';
 $quickActions = [];
@@ -73,9 +86,19 @@ if ($quickActions === [] && $contactAction !== null) {
 if ($vcfUrl !== null) {
     $quickActions[] = ['label' => 'Agregar a contactos', 'href' => $vcfUrl, 'type' => 'secondary'];
 }
-if ($qrUrl !== null) {
-    $quickActions[] = ['label' => 'QR público', 'href' => $qrUrl, 'type' => 'secondary'];
-}
+
+$contactCards = [
+    'telefono_movil' => ['label' => 'Móvil', 'icon' => '▯'],
+    'telefono_fijo' => ['label' => 'Teléfono', 'icon' => '☎'],
+    'correo' => ['label' => 'Email', 'icon' => '✉'],
+];
+$secondaryDetails = [
+    'empresa' => 'Empresa',
+    'ubicacion' => 'Ubicación',
+];
+$visibleContactCards = 0;
+$visibleSecondaryDetails = 0;
+$visibleLinks = 0;
 
 $initial = $displayName !== '' ? $displayName : 'C';
 $initial = function_exists('mb_substr')
@@ -105,8 +128,10 @@ $initial = function_exists('mb_substr')
         <article class="vcard-public__card" aria-labelledby="vcard-public-title">
             <aside class="vcard-public__brand" aria-label="Identidad pública">
                 <div class="vcard-public__brand-top">
-                    <p class="vcard-public__brand-name">Grupo Refrigerantes</p>
-                    <span>ERP</span>
+                    <div class="vcard-public__logo" aria-label="Grupo Refrigerantes">
+                        <span>GR</span>
+                        <strong>Grupo Refrigerantes</strong>
+                    </div>
                 </div>
 
                 <div class="vcard-public__portrait">
@@ -127,45 +152,54 @@ $initial = function_exists('mb_substr')
 
                 <div class="vcard-public__brand-identity">
                     <p><?= e($displayName) ?></p>
-                    <?php if (isset($vcard['puesto']) && is_string($vcard['puesto']) && trim($vcard['puesto']) !== ''): ?>
-                        <span><?= e((string) $vcard['puesto']) ?></span>
+                    <?php if ($role !== ''): ?>
+                        <span><?= e($role) ?></span>
+                    <?php elseif ($headline !== '' && $headline !== $displayName): ?>
+                        <span><?= e($headline) ?></span>
                     <?php endif; ?>
                 </div>
 
-                <div class="vcard-public__cooling-mark" aria-hidden="true">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+                <div class="vcard-public__service-strip" aria-label="Áreas de servicio">
+                    <span>❄ Refrigeración</span>
+                    <span>⚙ Soluciones técnicas</span>
+                    <span>◇ Soporte</span>
                 </div>
 
                 <div class="vcard-public__brand-copy">
                     <p>Sistemas de Refrigeración y Climatización</p>
                     <p>Innovación • Eficiencia • Confianza</p>
-                    <?php if ($qrUrl !== null): ?>
-                        <p class="vcard-public__qr-label">QR público</p>
-                        <img
-                            class="vcard-public__qr"
-                            src="<?= e($qrUrl) ?>"
-                            alt="Código QR para abrir esta vCard pública"
-                            width="132"
-                            height="132"
-                        >
-                    <?php endif; ?>
                 </div>
             </aside>
 
             <div class="vcard-public__content">
                 <header class="vcard-public__header">
-                    <p class="vcard-public__label">Contacto corporativo</p>
                     <h1 id="vcard-public-title"><?= e($displayName) ?></h1>
-                    <?php if ($headline !== '' && $headline !== $displayName): ?>
+                    <?php if ($role !== ''): ?>
+                        <p class="vcard-public__name"><?= e($role) ?></p>
+                    <?php elseif ($headline !== '' && $headline !== $displayName): ?>
                         <p class="vcard-public__name"><?= e($headline) ?></p>
-                    <?php elseif (isset($vcard['puesto']) && is_string($vcard['puesto']) && trim($vcard['puesto']) !== ''): ?>
-                        <p class="vcard-public__name"><?= e((string) $vcard['puesto']) ?></p>
+                    <?php endif; ?>
+                    <?php if ($introTitle !== ''): ?>
+                        <p class="vcard-public__intro"><?= e($introTitle) ?></p>
                     <?php endif; ?>
                     <?php if ($description !== ''): ?>
                         <p class="vcard-public__description"><?= e($description) ?></p>
                     <?php endif; ?>
+
+                    <div class="vcard-public__contact-grid" aria-label="Datos de contacto">
+                        <?php foreach ($contactCards as $field => $config): ?>
+                            <?php if (isset($vcard[$field]) && is_string($vcard[$field]) && trim($vcard[$field]) !== ''): ?>
+                                <?php $visibleContactCards++; ?>
+                                <div class="vcard-public__contact-card">
+                                    <span aria-hidden="true"><?= e($config['icon']) ?></span>
+                                    <div>
+                                        <p><?= e($config['label']) ?></p>
+                                        <strong><?= e((string) $vcard[$field]) ?></strong>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
 
                     <?php if ($quickActions !== []): ?>
                         <nav class="vcard-public__actions" aria-label="Acciones de contacto">
@@ -199,13 +233,21 @@ $initial = function_exists('mb_substr')
                     <?php endif; ?>
                 </header>
 
-                <section class="vcard-public__section" aria-labelledby="vcard-public-details">
-                    <h2 id="vcard-public-details">Información de contacto</h2>
+                <?php if ($visibleContactCards === 0): ?>
+                    <section class="vcard-public__section" aria-labelledby="vcard-public-limited">
+                        <h2 id="vcard-public-limited">Información de contacto</h2>
+                        <p class="vcard-public__empty">
+                            Esta vCard está publicada con información limitada por privacidad.
+                        </p>
+                    </section>
+                <?php endif; ?>
+
+                <section class="vcard-public__section vcard-public__section--compact" aria-labelledby="vcard-public-details">
+                    <h2 id="vcard-public-details">Perfil público</h2>
                     <dl class="vcard-public__details">
-                        <?php $visibleDetails = 0; ?>
-                        <?php foreach ($details as $field => $label): ?>
+                        <?php foreach ($secondaryDetails as $field => $label): ?>
                             <?php if (isset($vcard[$field]) && is_string($vcard[$field]) && trim($vcard[$field]) !== ''): ?>
-                                <?php $visibleDetails++; ?>
+                                <?php $visibleSecondaryDetails++; ?>
                                 <div>
                                     <dt><?= e($label) ?></dt>
                                     <dd><?= e((string) $vcard[$field]) ?></dd>
@@ -214,23 +256,28 @@ $initial = function_exists('mb_substr')
                         <?php endforeach; ?>
                     </dl>
 
-                    <?php if ($visibleDetails === 0): ?>
+                    <?php if ($visibleSecondaryDetails === 0): ?>
                         <p class="vcard-public__empty">
-                            Esta vCard está publicada con información limitada por privacidad.
+                            No hay datos adicionales publicados.
                         </p>
                     <?php endif; ?>
                 </section>
 
                 <section class="vcard-public__section" aria-labelledby="vcard-public-links">
-                    <h2 id="vcard-public-links">Enlaces públicos</h2>
+                    <h2 id="vcard-public-links">Redes y enlaces</h2>
                     <ul class="vcard-public__links">
-                        <?php $visibleLinks = 0; ?>
                         <?php foreach ($links as $field => $label): ?>
                             <?php if (isset($vcard[$field]) && is_string($vcard[$field]) && trim($vcard[$field]) !== ''): ?>
                                 <?php $visibleLinks++; ?>
                                 <li>
-                                    <a href="<?= e((string) $vcard[$field]) ?>" target="_blank" rel="noopener noreferrer">
-                                        <?= e($label) ?>
+                                    <a
+                                        href="<?= e((string) $vcard[$field]) ?>"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        aria-label="<?= e($label) ?>"
+                                        title="<?= e($label) ?>"
+                                    >
+                                        <span aria-hidden="true"><?= e($linkIcons[$field] ?? '↗') ?></span>
                                     </a>
                                 </li>
                             <?php endif; ?>
@@ -246,7 +293,6 @@ $initial = function_exists('mb_substr')
                     <section class="vcard-public__section" aria-labelledby="vcard-public-products">
                         <div class="vcard-public__section-heading">
                             <div>
-                                <p class="vcard-public__section-kicker">Oferta pública</p>
                                 <h2 id="vcard-public-products">Productos relacionados</h2>
                             </div>
                             <span><?= count($publicProducts) ?> visibles</span>
@@ -256,15 +302,22 @@ $initial = function_exists('mb_substr')
                                 <?php
                                 $productName = trim((string) ($product['descripcion'] ?? ''));
                                 $publicText = trim((string) ($product['texto_publico'] ?? ''));
-                                    $meta = array_filter([
+                                $meta = array_filter([
                                     $product['id_producto'] ?? null,
-                                    $product['marca'] ?? null,
-                                    $product['linea'] ?? null,
-                                    $product['clasificacion'] ?? null,
-                                    $product['unidad'] ?? null,
+                                    $product['marca_nombre'] ?? $product['marca'] ?? null,
+                                    $product['linea_nombre'] ?? $product['linea'] ?? null,
+                                    $product['clasificacion_nombre'] ?? $product['clasificacion'] ?? null,
+                                    $product['unidad_codigo'] ?? $product['unidad'] ?? null,
                                 ], static fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+                                $productInitial = $productName !== '' ? $productName : (string) ($product['id_producto'] ?? 'P');
+                                $productInitial = function_exists('mb_substr')
+                                    ? mb_substr($productInitial, 0, 1, 'UTF-8')
+                                    : substr($productInitial, 0, 1);
                                 ?>
                                 <article class="vcard-public__product">
+                                    <div class="vcard-public__product-media" aria-hidden="true">
+                                        <?= e($productInitial) ?>
+                                    </div>
                                     <div>
                                         <?php if (($product['destacado'] ?? false) === true): ?>
                                             <span class="vcard-public__product-badge">Destacado</span>

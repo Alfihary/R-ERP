@@ -130,9 +130,8 @@ return new class implements DatabaseTest {
 
             $results['public_surface'] = [
                 'public_page_status_200' => $publicPage->status() === 200,
-                'shows_qr_image' =>
-                    str_contains($publicPage->body(), 'QR público')
-                    && str_contains($publicPage->body(), '/v/' . self::SLUG . '/qr'),
+                'does_not_require_embedded_qr' =>
+                    !str_contains($publicPage->body(), '/v/' . self::SLUG . '/qr'),
                 'vcf_still_works' => $vcfResponse->status() === 200
                     && str_contains($vcfResponse->body(), 'BEGIN:VCARD'),
                 'photo_route_still_controlled' => $photoResponse->status() === 404
