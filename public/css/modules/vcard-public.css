@@ -560,6 +560,13 @@
     justify-content: center;
 }
 
+.vcard-public__product-image {
+    display: block;
+    inline-size: 100%;
+    object-fit: contain;
+    padding: var(--vcard-space-2);
+}
+
 .vcard-public__product h3 {
     color: #ffffff;
     font-size: 0.95rem;

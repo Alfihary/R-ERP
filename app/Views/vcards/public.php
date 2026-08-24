@@ -315,17 +315,28 @@ $initial = function_exists('mb_substr')
                                     $product['marca_nombre'] ?? $product['marca'] ?? null,
                                     $product['linea_nombre'] ?? $product['linea'] ?? null,
                                     $product['clasificacion_nombre'] ?? $product['clasificacion'] ?? null,
-                                    $product['unidad_codigo'] ?? $product['unidad'] ?? null,
                                 ], static fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+                                $imageUrl = is_string($product['imagen_url'] ?? null)
+                                    ? (string) $product['imagen_url']
+                                    : '';
                                 $productInitial = $productName !== '' ? $productName : (string) ($product['id_producto'] ?? 'P');
                                 $productInitial = function_exists('mb_substr')
                                     ? mb_substr($productInitial, 0, 1, 'UTF-8')
                                     : substr($productInitial, 0, 1);
                                 ?>
                                 <article class="vcard-public__product">
-                                    <div class="vcard-public__product-media" aria-hidden="true">
-                                        <?= e($productInitial) ?>
-                                    </div>
+                                    <?php if ($imageUrl !== ''): ?>
+                                        <img
+                                            class="vcard-public__product-media vcard-public__product-image"
+                                            src="<?= e($imageUrl) ?>"
+                                            alt=""
+                                            loading="lazy"
+                                        >
+                                    <?php else: ?>
+                                        <div class="vcard-public__product-media" aria-hidden="true">
+                                            <?= e($productInitial) ?>
+                                        </div>
+                                    <?php endif; ?>
                                     <div>
                                         <?php if (($product['destacado'] ?? false) === true): ?>
                                             <span class="vcard-public__product-badge">Destacado</span>

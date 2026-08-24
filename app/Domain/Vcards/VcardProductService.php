@@ -161,6 +161,34 @@ final class VcardProductService
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function imagenPublicaPorSlug(string $slug, string $productId): ?array
+    {
+        $slug = trim($slug);
+        $productId = $this->normalizedProductId($productId);
+
+        if ($slug === '') {
+            return null;
+        }
+
+        $photo = $this->products->publicProductMainPhotoBySlug($slug, $productId);
+
+        if ($photo === null) {
+            return null;
+        }
+
+        return [
+            'id_producto' => (string) ($photo['id_producto'] ?? ''),
+            'ruta_relativa' => (string) ($photo['ruta_relativa'] ?? ''),
+            'mime_type' => (string) ($photo['mime_type'] ?? ''),
+            'tamano_bytes' => (int) ($photo['tamano_bytes'] ?? 0),
+            'creado_en' => $photo['creado_en'] ?? null,
+            'actualizado_en' => $photo['actualizado_en'] ?? null,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function ensureVcard(int $usuarioId): array
@@ -312,6 +340,7 @@ final class VcardProductService
             'clasificacion' => ($row['clasificacion_nombre'] ?? null) !== null
                 ? (string) $row['clasificacion_nombre']
                 : null,
+            'imagen_disponible' => !empty($row['imagen_id']),
             'activo' => array_key_exists('activo', $row)
                 ? (int) $row['activo'] === 1
                 : true,

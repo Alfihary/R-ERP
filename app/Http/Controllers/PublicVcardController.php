@@ -108,6 +108,32 @@ final class PublicVcardController
     /**
      * @param array<string, string> $params
      */
+    public function productImage(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+        $productId = $params['id_producto'] ?? '';
+
+        if (
+            $this->products === null
+            || $slug === ''
+            || !is_string($productId)
+            || preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1
+        ) {
+            return $this->productImageNotFound();
+        }
+
+        $photo = $this->products->imagenPublicaPorSlug($slug, $productId);
+
+        if ($photo === null) {
+            return $this->productImageNotFound();
+        }
+
+        return $this->serveProductImage($photo);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
     public function photo(Request $request, array $params): Response
     {
         $slug = $this->slugFromParams($params);
@@ -216,6 +242,14 @@ final class PublicVcardController
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Cache-Control' => 'no-store',
         ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function productImageNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex');
     }
 
     /**
@@ -332,7 +366,35 @@ final class PublicVcardController
             return [];
         }
 
-        return $this->products->listarPublicosPorSlug($slug);
+        return array_map(
+            fn (array $product): array => $this->withProductImageUrl($slug, $product),
+            $this->products->listarPublicosPorSlug($slug)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $product
+     * @return array<string, mixed>
+     */
+    private function withProductImageUrl(string $slug, array $product): array
+    {
+        $productId = (string) ($product['id_producto'] ?? '');
+
+        if (
+            ($product['imagen_disponible'] ?? false) === true
+            && $slug !== ''
+            && preg_match('/^[A-Z0-9]{1,16}$/', $productId) === 1
+        ) {
+            $product['imagen_url'] = '/v/'
+                . rawurlencode($slug)
+                . '/productos/'
+                . rawurlencode($productId)
+                . '/imagen';
+        }
+
+        unset($product['imagen_disponible']);
+
+        return $product;
     }
 
     private function limit(string $value, int $max): string
@@ -399,6 +461,49 @@ final class PublicVcardController
         ]));
     }
 
+    /**
+     * @param array<string, mixed> $photo
+     */
+    private function serveProductImage(array $photo): Response
+    {
+        $mime = strtolower((string) ($photo['mime_type'] ?? ''));
+        $relativePath = (string) ($photo['ruta_relativa'] ?? '');
+        $declaredSize = (int) ($photo['tamano_bytes'] ?? 0);
+        $extension = strtolower((string) pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if (!$this->allowedPhotoMetadata($mime, $extension, $declaredSize)) {
+            return $this->productImageNotFound();
+        }
+
+        $path = $this->safeProductImagePath($relativePath);
+
+        if ($path === null || !is_file($path) || !is_readable($path)) {
+            return $this->productImageNotFound();
+        }
+
+        $actualSize = filesize($path);
+
+        if ($actualSize === false || $actualSize < 1) {
+            return $this->productImageNotFound();
+        }
+
+        $actualMime = $this->detectMime($path);
+
+        if ($actualMime !== $mime || @getimagesize($path) === false) {
+            return $this->productImageNotFound();
+        }
+
+        $body = file_get_contents($path);
+
+        if (!is_string($body) || $body === '') {
+            return $this->productImageNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary($body, $mime, [
+            'Cache-Control' => 'public, max-age=3600',
+        ]));
+    }
+
     private function allowedPhotoMetadata(
         string $mime,
         string $extension,
@@ -441,6 +546,48 @@ final class PublicVcardController
         }
 
         $candidate = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+        $realPath = realpath($candidate);
+
+        if ($realPath === false) {
+            return null;
+        }
+
+        $normalizedRoot = $this->normalizedPath($rootReal) . '/';
+        $normalizedPath = $this->normalizedPath($realPath);
+
+        if (!str_starts_with($normalizedPath, $normalizedRoot)) {
+            return null;
+        }
+
+        return $realPath;
+    }
+
+    private function safeProductImagePath(string $relativePath): ?string
+    {
+        if (
+            $relativePath === ''
+            || str_contains($relativePath, '..')
+            || str_contains($relativePath, '\\')
+            || str_starts_with($relativePath, '/')
+            || preg_match('/\.(php|phtml|phar)(\.|$)/i', $relativePath) === 1
+        ) {
+            return null;
+        }
+
+        $storagePath = rtrim(
+            (string) $this->config->get('paths.STORAGE_PATH', STORAGE_PATH),
+            '/\\'
+        );
+        $root = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, 'uploads/productos');
+        $rootReal = realpath($root);
+
+        if ($rootReal === false) {
+            return null;
+        }
+
+        $candidate = $root . DIRECTORY_SEPARATOR
             . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
         $realPath = realpath($candidate);
 

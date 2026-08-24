@@ -356,7 +356,8 @@ final class VcardProductRepository
                 u.nombre AS unidad_nombre,
                 m.nombre AS marca_nombre,
                 l.nombre AS linea_nombre,
-                c.nombre AS clasificacion_nombre
+                c.nombre AS clasificacion_nombre,
+                pd.id AS imagen_id
             FROM vcards_usuario v
             INNER JOIN usuarios usr
                 ON usr.id = v.usuario_id
@@ -382,14 +383,79 @@ final class VcardProductRepository
                 ON l.id = p.linea_producto_id
             LEFT JOIN clasificaciones_producto c
                 ON c.id = p.clasificacion_producto_id
+            LEFT JOIN producto_documentos pd
+                ON pd.id_producto = p.id_producto
+               AND pd.tipo_documento = :tipo_foto_principal
+               AND pd.es_principal = 1
+               AND pd.activo = 1
+               AND pd.eliminado_en IS NULL
             WHERE v.slug = :slug
               AND v.publicada = 1
               AND v.despublicado_en IS NULL
             ORDER BY vp.orden ASC, p.descripcion ASC, p.id_producto ASC
             SQL
         );
-        $statement->execute(['slug' => $slug]);
+        $statement->execute([
+            'slug' => $slug,
+            'tipo_foto_principal' => ProductDocumentRepository::TYPE_MAIN_PHOTO,
+        ]);
 
         return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function publicProductMainPhotoBySlug(string $slug, string $productId): ?array
+    {
+        $statement = $this->pdo()->prepare(
+            <<<'SQL'
+            SELECT
+                pd.id,
+                pd.id_producto,
+                pd.ruta_relativa,
+                pd.mime_type,
+                pd.tamano_bytes,
+                pd.creado_en,
+                pd.actualizado_en
+            FROM vcards_usuario v
+            INNER JOIN usuarios usr
+                ON usr.id = v.usuario_id
+               AND usr.activo = 1
+               AND usr.eliminado_en IS NULL
+            INNER JOIN vcard_privacidad priv
+                ON priv.vcard_id = v.id
+               AND priv.campo = 'productos'
+               AND priv.visible = 1
+            INNER JOIN vcard_productos vp
+                ON vp.vcard_id = v.id
+               AND vp.id_producto = :id_producto
+               AND vp.activo = 1
+               AND vp.eliminado_en IS NULL
+            INNER JOIN productos p
+                ON p.id_producto = vp.id_producto
+               AND p.activo = 1
+               AND p.eliminado_en IS NULL
+            INNER JOIN producto_documentos pd
+                ON pd.id_producto = p.id_producto
+               AND pd.tipo_documento = :tipo_foto_principal
+               AND pd.es_principal = 1
+               AND pd.activo = 1
+               AND pd.eliminado_en IS NULL
+            WHERE v.slug = :slug
+              AND v.publicada = 1
+              AND v.despublicado_en IS NULL
+            ORDER BY pd.id DESC
+            LIMIT 1
+            SQL
+        );
+        $statement->execute([
+            'slug' => $slug,
+            'id_producto' => $productId,
+            'tipo_foto_principal' => ProductDocumentRepository::TYPE_MAIN_PHOTO,
+        ]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
     }
 }
