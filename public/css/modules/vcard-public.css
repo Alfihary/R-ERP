@@ -605,18 +605,30 @@
     border-radius: 999px;
     color: #d9f4ff;
     display: inline-flex;
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     font-weight: 850;
     justify-content: center;
-    margin-block-start: var(--vcard-space-3);
-    min-height: 2.35rem;
-    padding: var(--vcard-space-2) var(--vcard-space-3);
+    justify-self: start;
+    margin-block-start: var(--vcard-space-2);
+    max-width: 100%;
+    min-height: 2rem;
+    padding: 0.5rem 0.75rem;
     text-decoration: none;
     transition:
         background-color 160ms ease,
         border-color 160ms ease,
         box-shadow 160ms ease,
         transform 160ms ease;
+    white-space: nowrap;
+    width: auto;
+}
+
+.vcard-public__products--full .vcard-public__product-cta {
+    font-size: 0.8rem;
+    justify-self: stretch;
+    margin-block-start: var(--vcard-space-3);
+    min-height: 2.35rem;
+    padding: var(--vcard-space-2) var(--vcard-space-3);
     width: 100%;
 }
 
