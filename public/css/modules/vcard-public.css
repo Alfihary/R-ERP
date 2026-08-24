@@ -598,6 +598,37 @@
     padding: var(--vcard-space-1) var(--vcard-space-2);
 }
 
+.vcard-public__product-cta {
+    align-items: center;
+    background: rgba(29, 155, 240, 0.13);
+    border: 1px solid rgba(53, 212, 255, 0.34);
+    border-radius: 999px;
+    color: #d9f4ff;
+    display: inline-flex;
+    font-size: 0.8rem;
+    font-weight: 850;
+    justify-content: center;
+    margin-block-start: var(--vcard-space-3);
+    min-height: 2.35rem;
+    padding: var(--vcard-space-2) var(--vcard-space-3);
+    text-decoration: none;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+    width: 100%;
+}
+
+.vcard-public__product-cta:hover,
+.vcard-public__product-cta:focus-visible {
+    background: rgba(29, 155, 240, 0.22);
+    border-color: rgba(164, 226, 255, 0.56);
+    box-shadow: 0 0 0 3px rgba(29, 155, 240, 0.16);
+    outline: none;
+    transform: translateY(-1px);
+}
+
 @media (max-width: 64rem) {
     .vcard-public__card {
         grid-template-columns: 1fr;
@@ -680,12 +711,15 @@
     .vcard-public__action,
     .vcard-public__back-link,
     .vcard-public__section-link,
-    .vcard-public__links a {
+    .vcard-public__links a,
+    .vcard-public__product-cta {
         transition-duration: 0.01ms !important;
     }
 
     .vcard-public__action:hover,
-    .vcard-public__action:focus-visible {
+    .vcard-public__action:focus-visible,
+    .vcard-public__product-cta:hover,
+    .vcard-public__product-cta:focus-visible {
         transform: none;
     }
 }

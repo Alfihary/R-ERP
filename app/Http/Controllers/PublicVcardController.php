@@ -367,7 +367,7 @@ final class PublicVcardController
         }
 
         return array_map(
-            fn (array $product): array => $this->withProductImageUrl($slug, $product),
+            fn (array $product): array => $this->withProductPresentation($slug, $vcard, $product),
             $this->products->listarPublicosPorSlug($slug)
         );
     }
@@ -376,7 +376,7 @@ final class PublicVcardController
      * @param array<string, mixed> $product
      * @return array<string, mixed>
      */
-    private function withProductImageUrl(string $slug, array $product): array
+    private function withProductPresentation(string $slug, array $vcard, array $product): array
     {
         $productId = (string) ($product['id_producto'] ?? '');
 
@@ -392,9 +392,54 @@ final class PublicVcardController
                 . '/imagen';
         }
 
+        $whatsappUrl = $this->productWhatsappUrl($vcard, $product);
+
+        if ($whatsappUrl !== null) {
+            $product['whatsapp_url'] = $whatsappUrl;
+        }
+
         unset($product['imagen_disponible']);
 
         return $product;
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     * @param array<string, mixed> $product
+     */
+    private function productWhatsappUrl(array $vcard, array $product): ?string
+    {
+        $rawWhatsapp = $vcard['whatsapp'] ?? null;
+
+        if (!is_string($rawWhatsapp) || trim($rawWhatsapp) === '') {
+            return null;
+        }
+
+        $number = preg_replace('/\D/', '', $rawWhatsapp) ?? '';
+
+        if ($number === '') {
+            return null;
+        }
+
+        $description = trim((string) ($product['descripcion'] ?? ''));
+        $productId = trim((string) ($product['id_producto'] ?? ''));
+
+        if ($description === '' || $productId === '' || preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
+            return null;
+        }
+
+        $message = 'Hola, me interesa recibir información sobre el producto '
+            . $description
+            . ', código '
+            . $productId
+            . '.';
+        $brand = trim((string) ($product['marca'] ?? ''));
+
+        if ($brand !== '') {
+            $message .= ' Marca: ' . $brand . '.';
+        }
+
+        return 'https://wa.me/' . $number . '?text=' . rawurlencode($message);
     }
 
     private function limit(string $value, int $max): string

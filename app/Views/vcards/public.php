@@ -319,6 +319,9 @@ $initial = function_exists('mb_substr')
                                 $imageUrl = is_string($product['imagen_url'] ?? null)
                                     ? (string) $product['imagen_url']
                                     : '';
+                                $whatsappUrl = is_string($product['whatsapp_url'] ?? null)
+                                    ? (string) $product['whatsapp_url']
+                                    : '';
                                 $productInitial = $productName !== '' ? $productName : (string) ($product['id_producto'] ?? 'P');
                                 $productInitial = function_exists('mb_substr')
                                     ? mb_substr($productInitial, 0, 1, 'UTF-8')
@@ -349,6 +352,16 @@ $initial = function_exists('mb_substr')
                                             <p class="vcard-public__product-meta">
                                                 <?= e(implode(' · ', array_map('strval', $meta))) ?>
                                             </p>
+                                        <?php endif; ?>
+                                        <?php if ($whatsappUrl !== ''): ?>
+                                            <a
+                                                class="vcard-public__product-cta"
+                                                href="<?= e($whatsappUrl) ?>"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                Solicitar información
+                                            </a>
                                         <?php endif; ?>
                                     </div>
                                 </article>
