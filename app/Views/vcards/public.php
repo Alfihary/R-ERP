@@ -16,6 +16,8 @@ $contactAction = is_array($contactAction ?? null) ? $contactAction : null;
 $qrUrl = is_string($qrUrl ?? null) && $qrUrl !== '' ? $qrUrl : null;
 $vcfUrl = is_string($vcfUrl ?? null) && $vcfUrl !== '' ? $vcfUrl : null;
 $publicProducts = is_array($publicProducts ?? null) ? $publicProducts : [];
+$productsTotal = isset($productsTotal) ? max(0, (int) $productsTotal) : count($publicProducts);
+$productsUrl = is_string($productsUrl ?? null) && $productsUrl !== '' ? $productsUrl : null;
 $slug = (string) ($vcard['slug'] ?? '');
 $name = trim((string) ($vcard['nombre'] ?? ''));
 $title = trim((string) ($vcard['titulo_publico'] ?? $pageTitle));
@@ -295,7 +297,13 @@ $initial = function_exists('mb_substr')
                             <div>
                                 <h2 id="vcard-public-products">Productos relacionados</h2>
                             </div>
-                            <span><?= count($publicProducts) ?> visibles</span>
+                            <?php if ($productsUrl !== null): ?>
+                                <a class="vcard-public__section-link" href="<?= e($productsUrl) ?>">
+                                    Ver todos los productos
+                                </a>
+                            <?php else: ?>
+                                <span><?= count($publicProducts) ?> visibles</span>
+                            <?php endif; ?>
                         </div>
                         <div class="vcard-public__products">
                             <?php foreach ($publicProducts as $product): ?>

@@ -35,6 +35,10 @@
     place-items: center;
 }
 
+.vcard-public--products-page {
+    align-items: start;
+}
+
 .vcard-public__card {
     background: linear-gradient(135deg, rgba(8, 18, 27, 0.98), rgba(5, 14, 20, 0.98));
     border: 1px solid var(--vcard-line);
@@ -64,6 +68,11 @@
 .vcard-public__card--compact {
     grid-template-columns: 1fr;
     max-width: 34rem;
+}
+
+.vcard-public__card--products {
+    grid-template-columns: 1fr;
+    max-width: 76rem;
 }
 
 .vcard-public__brand {
@@ -408,6 +417,39 @@
     white-space: nowrap;
 }
 
+.vcard-public__section-link,
+.vcard-public__back-link {
+    align-items: center;
+    border: 1px solid rgba(29, 155, 240, 0.38);
+    border-radius: 999px;
+    color: #b9eeff;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 850;
+    justify-content: center;
+    min-height: 2.2rem;
+    padding: var(--vcard-space-1) var(--vcard-space-3);
+    text-decoration: none;
+}
+
+.vcard-public__section-link:hover,
+.vcard-public__section-link:focus-visible,
+.vcard-public__back-link:hover,
+.vcard-public__back-link:focus-visible {
+    background: rgba(29, 155, 240, 0.12);
+    outline: 2px solid rgba(29, 155, 240, 0.28);
+    outline-offset: 3px;
+}
+
+.vcard-public__header--products {
+    border-bottom: 1px solid var(--vcard-line);
+    padding-bottom: var(--vcard-space-5);
+}
+
+.vcard-public__back-link {
+    justify-self: start;
+}
+
 .vcard-public__details {
     display: grid;
     gap: var(--vcard-space-3);
@@ -485,7 +527,11 @@
 .vcard-public__products {
     display: grid;
     gap: var(--vcard-space-3);
-    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.vcard-public__products--full {
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
 }
 
 .vcard-public__product {
@@ -591,6 +637,14 @@
         max-width: 26ch;
     }
 
+    .vcard-public__products {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vcard-public__products--full {
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    }
+
     .vcard-public h1 {
         font-size: 1.85rem;
     }
@@ -617,6 +671,8 @@
 
 @media (prefers-reduced-motion: reduce) {
     .vcard-public__action,
+    .vcard-public__back-link,
+    .vcard-public__section-link,
     .vcard-public__links a {
         transition-duration: 0.01ms !important;
     }

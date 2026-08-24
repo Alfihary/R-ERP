@@ -147,10 +147,18 @@ return new class implements DatabaseTest {
                 $this->request('GET', '/v/' . self::SLUG),
                 ['slug' => self::SLUG]
             );
+            $productsAfterAdd = $publicController->products(
+                $this->request('GET', '/v/' . self::SLUG . '/productos'),
+                ['slug' => self::SLUG]
+            );
 
             $this->privacy()->actualizarPrivacidad((int) $vcard['id'], ['productos' => false]);
             $privacyOff = $publicController->show(
                 $this->request('GET', '/v/' . self::SLUG),
+                ['slug' => self::SLUG]
+            );
+            $productsPrivacyOff = $publicController->products(
+                $this->request('GET', '/v/' . self::SLUG . '/productos'),
                 ['slug' => self::SLUG]
             );
             $this->privacy()->actualizarPrivacidad((int) $vcard['id'], ['productos' => true]);
@@ -165,6 +173,10 @@ return new class implements DatabaseTest {
             );
             $hiddenPublic = $publicController->show(
                 $this->request('GET', '/v/' . self::SLUG),
+                ['slug' => self::SLUG]
+            );
+            $productsHidden = $publicController->products(
+                $this->request('GET', '/v/' . self::SLUG . '/productos'),
                 ['slug' => self::SLUG]
             );
             $showAgain = $this->profileController($userId)->updateVcardProduct(
@@ -182,6 +194,10 @@ return new class implements DatabaseTest {
             );
             $removedPublic = $publicController->show(
                 $this->request('GET', '/v/' . self::SLUG),
+                ['slug' => self::SLUG]
+            );
+            $productsRemoved = $publicController->products(
+                $this->request('GET', '/v/' . self::SLUG . '/productos'),
                 ['slug' => self::SLUG]
             );
             $csrf = new CsrfTokenService($this->session(), 7200);
@@ -267,6 +283,38 @@ return new class implements DatabaseTest {
                     !str_contains($publicBody, '<script>')
                     && !str_contains($publicBody, '<b>pública</b>'),
             ];
+            $productsBody = $productsAfterAdd->body();
+            $results['public_products_page'] = [
+                'route_declared' => $this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'allowed_page_200' =>
+                    $productsAfterAdd->status() === 200
+                    && str_contains($productsBody, self::PRODUCT_ID)
+                    && str_contains($productsBody, 'Producto &lt;script&gt; Público')
+                    && str_contains($productsBody, 'Oferta &lt;b&gt;pública&lt;/b&gt;'),
+                'privacy_false_404' => $productsPrivacyOff->status() === 404,
+                'inactive_link_404' => $productsHidden->status() === 404,
+                'removed_link_404' => $productsRemoved->status() === 404,
+                'not_public_api' => !$this->fileContains('routes/web.php', '/api/vcard/productos'),
+                'no_forbidden_fields' => !$this->containsAny($productsBody, [
+                    'precio',
+                    'precio_minimo',
+                    'lista de precio',
+                    'costo',
+                    'margen',
+                    'stock',
+                    'existencia',
+                    'almacén',
+                    'proveedor',
+                    'movimientos',
+                    'auditoría',
+                    'vcard_id',
+                    'usuario_id',
+                    'password_hash',
+                    'token_hash',
+                    'storage/uploads',
+                    '/credencial/verificar/',
+                ]),
+            ];
             $results['security'] = [
                 'no_price_stock_cost_provider_warehouse' => !$this->containsAny($publicBody, [
                     'precio',
@@ -303,8 +351,9 @@ return new class implements DatabaseTest {
                     $this->fileContains('routes/web.php', '/perfil/vcard/productos/agregar')
                     && $this->fileContains('routes/web.php', '/perfil/vcard/productos/actualizar')
                     && $this->fileContains('routes/web.php', '/perfil/vcard/productos/quitar'),
-                'no_public_products_route' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'public_products_route_controlled' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos')
+                    && !$this->fileContains('routes/web.php', '/api/vcard/productos'),
             ];
 
             $during = $this->counts($pdo);

@@ -71,6 +71,9 @@ return new class implements DatabaseTest {
             $this->insertProduct($pdo, 'QAVPUBUI1', 'Refrigerante Público A', $unitId, 1);
             $this->insertProduct($pdo, 'QAVPUBUI2', 'Filtro Público B', $unitId, 1);
             $this->insertProduct($pdo, 'QAVPUBUI3', 'Producto Oculto', $unitId, 0);
+            $this->insertProduct($pdo, 'QAVPUBUI4', 'Condensadora Pública C', $unitId, 1);
+            $this->insertProduct($pdo, 'QAVPUBUI5', 'Control Público D', $unitId, 1);
+            $this->insertProduct($pdo, 'QAVPUBUI6', 'Evaporador Público E', $unitId, 1);
 
             $userId = $this->insertUser($pdo, self::USERNAME, 1);
             $inactiveUserId = $this->insertUser($pdo, self::INACTIVE_USERNAME, 1);
@@ -106,15 +109,45 @@ return new class implements DatabaseTest {
                     'orden' => 30,
                     'texto_publico' => 'No debe aparecer.',
                 ],
+                [
+                    'id_producto' => 'QAVPUBUI4',
+                    'activo' => 1,
+                    'destacado' => 0,
+                    'orden' => 40,
+                    'texto_publico' => 'Producto público de preview.',
+                ],
+                [
+                    'id_producto' => 'QAVPUBUI5',
+                    'activo' => 1,
+                    'destacado' => 0,
+                    'orden' => 50,
+                    'texto_publico' => 'Producto público de preview final.',
+                ],
+                [
+                    'id_producto' => 'QAVPUBUI6',
+                    'activo' => 1,
+                    'destacado' => 0,
+                    'orden' => 60,
+                    'texto_publico' => 'Producto público en listado completo.',
+                ],
             ]);
 
             $controller = $this->controller();
             $public = $controller->show($this->request('/v/' . self::SLUG), ['slug' => self::SLUG]);
             $body = $public->body();
+            $allProducts = $controller->products(
+                $this->request('/v/' . self::SLUG . '/productos'),
+                ['slug' => self::SLUG]
+            );
+            $allProductsBody = $allProducts->body();
 
             $this->privacy()->actualizarPrivacidad((int) $vcard['id'], ['productos' => false]);
             $productsHidden = $controller->show(
                 $this->request('/v/' . self::SLUG),
+                ['slug' => self::SLUG]
+            );
+            $productsRouteHidden = $controller->products(
+                $this->request('/v/' . self::SLUG . '/productos'),
                 ['slug' => self::SLUG]
             );
             $this->privacy()->actualizarPrivacidad((int) $vcard['id'], ['productos' => true]);
@@ -174,8 +207,24 @@ return new class implements DatabaseTest {
                     && str_contains($body, 'Refrigerante Público A')
                     && str_contains($body, 'Filtro Público B')
                     && str_contains($body, 'Destacado'),
+                'preview_limited_to_four_products' =>
+                    str_contains($body, 'Condensadora Pública C')
+                    && str_contains($body, 'Control Público D')
+                    && !str_contains($body, 'Evaporador Público E'),
+                'all_products_link_when_more_than_four' =>
+                    str_contains($body, '/v/' . self::SLUG . '/productos')
+                    && str_contains($body, 'Ver todos los productos'),
+                'all_products_route_lists_full_public_set' =>
+                    $allProducts->status() === 200
+                    && str_contains($allProductsBody, 'Productos públicos')
+                    && str_contains($allProductsBody, 'Refrigerante Público A')
+                    && str_contains($allProductsBody, 'Filtro Público B')
+                    && str_contains($allProductsBody, 'Condensadora Pública C')
+                    && str_contains($allProductsBody, 'Control Público D')
+                    && str_contains($allProductsBody, 'Evaporador Público E'),
                 'hidden_when_privacy_disabled' =>
                     $productsHidden->status() === 200
+                    && $productsRouteHidden->status() === 404
                     && !str_contains($productsHidden->body(), 'Refrigerante Público A')
                     && !str_contains($productsHidden->body(), 'Filtro Público B'),
                 'hidden_when_unpublished' =>
@@ -209,6 +258,24 @@ return new class implements DatabaseTest {
                     'token_hash',
                     'storage/uploads',
                     '/credencial/verificar/',
+                ]) && !$this->containsAny($allProductsBody, [
+                    'precio',
+                    'precio_minimo',
+                    'lista de precio',
+                    'costo',
+                    'margen',
+                    'stock',
+                    'existencia',
+                    'almacén',
+                    'proveedor',
+                    'movimientos',
+                    'auditoría',
+                    'vcard_id',
+                    'usuario_id',
+                    'password_hash',
+                    'token_hash',
+                    'storage/uploads',
+                    '/credencial/verificar/',
                 ]),
                 'no_raw_private_terms' =>
                     !str_contains($body, self::PASSWORD)
@@ -224,8 +291,8 @@ return new class implements DatabaseTest {
                 'credential_qr_points_to_public_vcard' =>
                     str_contains($credential->body(), 'QR hacia vCard pública')
                     && str_contains($credential->body(), '/v/' . self::SLUG),
-                'no_public_products_route' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'public_products_route_present' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos'),
             ];
 
             $during = $this->counts($pdo);

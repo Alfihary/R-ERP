@@ -214,8 +214,8 @@ return new class implements DatabaseTest {
                     && str_contains($vcf->body(), 'BEGIN:VCARD'),
                 'photo_still_controlled' => $photo->status() === 404
                     && $photo->body() === '',
-                'no_product_public_route' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'public_products_route_declared' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos'),
                 'no_credential_verify_route' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar'),
             ];

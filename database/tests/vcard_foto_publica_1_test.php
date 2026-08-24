@@ -160,9 +160,10 @@ return new class implements DatabaseTest {
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcfController.php'),
                 'no_public_credential_verification' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar'),
-                'no_vcard_products' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos')
-                    && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),
+                'public_products_route_controlled' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos')
+                    && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php')
+                    && !$this->fileContains('routes/web.php', '/api/vcard/productos'),
             ];
 
             $during = $this->counts($pdo);

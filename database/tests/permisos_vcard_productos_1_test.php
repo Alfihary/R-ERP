@@ -136,7 +136,12 @@ return new class implements DatabaseTest {
                 $this->request('GET', '/v/' . self::ADMIN_SLUG),
                 ['slug' => self::ADMIN_SLUG]
             );
+            $publicProducts = $this->publicController()->products(
+                $this->request('GET', '/v/' . self::ADMIN_SLUG . '/productos'),
+                ['slug' => self::ADMIN_SLUG]
+            );
             $publicBody = $public->body();
+            $publicProductsBody = $publicProducts->body();
             $csrf = new CsrfTokenService($this->session(), 7200);
             $csrfStatus = (new CsrfMiddleware($csrf))->process(
                 $this->request('POST', '/perfil/vcard/productos/agregar'),
@@ -198,8 +203,12 @@ return new class implements DatabaseTest {
                     && str_contains($publicBody, self::PRODUCT_ID)
                     && str_contains($publicBody, 'Producto permisos vCard')
                     && str_contains($publicBody, 'Texto permisos &lt;b&gt;seguro&lt;/b&gt;'),
-                'no_public_routes_created' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos')
+                'public_products_route_controlled' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos')
+                    && $publicProducts->status() === 200
+                    && str_contains($publicProductsBody, self::PRODUCT_ID)
+                    && str_contains($publicProductsBody, 'Producto permisos vCard')
+                    && str_contains($publicProductsBody, 'Texto permisos &lt;b&gt;seguro&lt;/b&gt;')
                     && !$this->fileContains('routes/web.php', '/api/vcard/productos'),
                 'no_forbidden_fields' => !$this->containsAny($publicBody, [
                     'precio',
@@ -213,6 +222,19 @@ return new class implements DatabaseTest {
                     'token_hash',
                     'password_hash',
                     'storage/uploads',
+                ]) && !$this->containsAny($publicProductsBody, [
+                    'precio',
+                    'stock',
+                    'existencia',
+                    'costo',
+                    'proveedor',
+                    'almacén',
+                    'vcard_id',
+                    'usuario_id',
+                    'token_hash',
+                    'password_hash',
+                    'storage/uploads',
+                    '/credencial/verificar/',
                 ]),
             ];
             $results['guardrails'] = [

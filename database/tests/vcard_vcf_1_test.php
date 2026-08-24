@@ -176,8 +176,8 @@ return new class implements DatabaseTest {
 
             $results['guardrails'] = [
                 'no_qr_route' => !$this->fileContains('routes/web.php', '/v/{slug}/qr'),
-                'no_products_route' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'public_products_route_declared' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos'),
                 'no_credential_verify_route' =>
                     !$this->fileContains('routes/web.php', '/credencial/verificar'),
                 'no_physical_vcf_file_created' => $this->vcfFileCount() === $vcfFilesBefore,

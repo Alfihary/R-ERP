@@ -97,7 +97,8 @@ return new class implements DatabaseTest {
                         'function qr('
                     ),
                 'no_qr_route' => !$this->fileContains('routes/web.php', '/v/{slug}/qr'),
-                'no_products_route' => !$this->fileContains('routes/web.php', '/v/{slug}/productos'),
+                'public_products_route_declared' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos'),
                 'no_credential_verify_route' => !$this->fileContains('routes/web.php', '/credencial/verificar'),
             ];
 
@@ -206,8 +207,8 @@ return new class implements DatabaseTest {
                     !file_exists(BASE_PATH . '/app/Http/Controllers/QrController.php')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcfController.php')
                     && !$this->fileContains('routes/web.php', '/credencial/verificar'),
-                'no_products_vcard_functional' =>
-                    !$this->fileContains('routes/web.php', '/v/{slug}/productos')
+                'public_products_route_declared_without_legacy_controller' =>
+                    $this->fileContains('routes/web.php', '/v/{slug}/productos')
                     && !file_exists(BASE_PATH . '/app/Http/Controllers/VcardProductController.php'),
                 'no_legacy_qr_vcf_services' =>
                     !file_exists(BASE_PATH . '/app/Domain/Vcards/QrService.php')

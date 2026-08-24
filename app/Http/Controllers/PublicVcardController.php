@@ -15,6 +15,8 @@ use App\Domain\Vcards\VcardVcfService;
 
 final class PublicVcardController
 {
+    private const PRODUCTS_PREVIEW_LIMIT = 4;
+
     private readonly VcardQrService $qr;
     private readonly VcardVcfService $vcf;
 
@@ -46,17 +48,59 @@ final class PublicVcardController
             return $this->notFound();
         }
 
+        $publicProducts = $this->publicProducts($slug, $vcard);
+        $previewProducts = array_slice($publicProducts, 0, self::PRODUCTS_PREVIEW_LIMIT);
+        $productsTotal = count($publicProducts);
+
         return $this->withPublicHeaders(Response::html(View::render('vcards/public', [
             'appName' => $this->appName(),
             'canonicalUrl' => $this->canonicalUrl($request),
             'contactAction' => $this->contactAction($vcard['canal_contacto'] ?? null),
             'metaDescription' => $this->metaDescription($vcard),
             'pageTitle' => $this->pageTitle($vcard),
-            'publicProducts' => $this->publicProducts($slug, $vcard),
+            'productsTotal' => $productsTotal,
+            'productsUrl' => $productsTotal > count($previewProducts)
+                ? '/v/' . rawurlencode($slug) . '/productos'
+                : null,
+            'publicProducts' => $previewProducts,
             'qrUrl' => $slug !== '' ? '/v/' . rawurlencode($slug) . '/' . 'qr' : null,
             'vcfUrl' => $this->vcf->hasMinimumData($vcard) && $slug !== ''
                 ? '/v/' . rawurlencode($slug) . '/vcf'
                 : null,
+            'vcard' => $vcard,
+        ])));
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function products(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->notFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null || ($vcard['productos_habilitados'] ?? false) !== true) {
+            return $this->notFound();
+        }
+
+        $publicProducts = $this->publicProducts($slug, $vcard);
+
+        if ($publicProducts === []) {
+            return $this->notFound();
+        }
+
+        return $this->withPublicHeaders(Response::html(View::render('vcards/products', [
+            'appName' => $this->appName(),
+            'backUrl' => '/v/' . rawurlencode($slug),
+            'canonicalUrl' => $this->canonicalUrl($request),
+            'metaDescription' => 'Productos públicos relacionados con ' . $this->pageTitle($vcard),
+            'pageTitle' => 'Productos de ' . $this->pageTitle($vcard),
+            'publicProducts' => $publicProducts,
             'vcard' => $vcard,
         ])));
     }

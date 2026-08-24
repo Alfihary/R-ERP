@@ -72,6 +72,11 @@ return static function (
             $publicVcardController->show($request, $params)
     );
     $router->get(
+        '/v/{slug}/productos',
+        static fn (Request $request, array $params): Response =>
+            $publicVcardController->products($request, $params)
+    );
+    $router->get(
         '/v/{slug}/foto',
         static fn (Request $request, array $params): Response =>
             $publicVcardController->photo($request, $params)
