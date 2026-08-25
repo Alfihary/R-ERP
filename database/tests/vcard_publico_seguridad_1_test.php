@@ -120,7 +120,9 @@ return new class implements DatabaseTest {
                     && str_contains($publishedBody, 'Ventas públicas')
                     && str_contains($publishedBody, '5555552222')
                     && str_contains($publishedBody, 'https://example.test/publico')
-                    && str_contains($publishedBody, 'Monterrey público'),
+                    && str_contains($publishedBody, 'Redes y enlaces')
+                    && !str_contains($publishedBody, 'Perfil público')
+                    && !str_contains($publishedBody, 'No hay datos adicionales publicados.'),
                 'private_fields_absent' =>
                     !str_contains($publishedBody, self::USERNAME . '@example.test')
                     && !str_contains($publishedBody, '5555550000')

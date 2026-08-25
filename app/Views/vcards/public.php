@@ -30,14 +30,6 @@ $role = isset($vcard['puesto']) && is_string($vcard['puesto'])
 $introTitle = $headline !== '' && $headline !== $displayName && $headline !== $role
     ? $headline
     : '';
-$details = [
-    'puesto' => 'Puesto',
-    'empresa' => 'Empresa',
-    'ubicacion' => 'Ubicación',
-    'correo' => 'Correo',
-    'telefono_movil' => 'Móvil',
-    'telefono_fijo' => 'Teléfono',
-];
 $links = [
     'sitio_web' => 'Sitio web',
     'linkedin' => 'LinkedIn',
@@ -94,12 +86,7 @@ $contactCards = [
     'telefono_fijo' => ['label' => 'Teléfono', 'icon' => '☎'],
     'correo' => ['label' => 'Email', 'icon' => '✉'],
 ];
-$secondaryDetails = [
-    'empresa' => 'Empresa',
-    'ubicacion' => 'Ubicación',
-];
 $visibleContactCards = 0;
-$visibleSecondaryDetails = 0;
 $visibleLinks = 0;
 
 $initial = $displayName !== '' ? $displayName : 'C';
@@ -243,27 +230,6 @@ $initial = function_exists('mb_substr')
                         </p>
                     </section>
                 <?php endif; ?>
-
-                <section class="vcard-public__section vcard-public__section--compact" aria-labelledby="vcard-public-details">
-                    <h2 id="vcard-public-details">Perfil público</h2>
-                    <dl class="vcard-public__details">
-                        <?php foreach ($secondaryDetails as $field => $label): ?>
-                            <?php if (isset($vcard[$field]) && is_string($vcard[$field]) && trim($vcard[$field]) !== ''): ?>
-                                <?php $visibleSecondaryDetails++; ?>
-                                <div>
-                                    <dt><?= e($label) ?></dt>
-                                    <dd><?= e((string) $vcard[$field]) ?></dd>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </dl>
-
-                    <?php if ($visibleSecondaryDetails === 0): ?>
-                        <p class="vcard-public__empty">
-                            No hay datos adicionales publicados.
-                        </p>
-                    <?php endif; ?>
-                </section>
 
                 <section class="vcard-public__section" aria-labelledby="vcard-public-links">
                     <h2 id="vcard-public-links">Redes y enlaces</h2>
