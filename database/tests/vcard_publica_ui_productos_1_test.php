@@ -181,7 +181,7 @@ return new class implements DatabaseTest {
                     && str_contains($body, 'vcard-public__content'),
                 'corporate_content_present' =>
                     str_contains($body, 'Grupo Refrigerantes')
-                    && str_contains($body, 'Sistemas de Refrigeración y Climatización')
+                    && str_contains($body, '/img/vcard/grupo-refrigerantes-logo-vcard.png')
                     && str_contains($body, 'Innovación • Eficiencia • Confianza'),
                 'public_name_and_role_present' =>
                     str_contains($body, 'QA &lt;script&gt; Pública')
@@ -202,7 +202,7 @@ return new class implements DatabaseTest {
 
             $results['products'] = [
                 'shown_when_privacy_enabled' =>
-                    str_contains($body, 'Productos relacionados')
+                    str_contains($body, 'Productos')
                     && str_contains($body, 'QAVPUBUI1')
                     && str_contains($body, 'Refrigerante Público A')
                     && str_contains($body, 'Filtro Público B')
@@ -211,9 +211,10 @@ return new class implements DatabaseTest {
                     str_contains($body, 'Condensadora Pública C')
                     && str_contains($body, 'Control Público D')
                     && !str_contains($body, 'Evaporador Público E'),
-                'all_products_link_when_more_than_four' =>
+                'all_products_action_when_more_than_four' =>
                     str_contains($body, '/v/' . self::SLUG . '/productos')
-                    && str_contains($body, 'Ver todos los productos'),
+                    && str_contains($body, 'Ver todos los productos')
+                    && str_contains($body, 'vcard-public__action--products-mobile'),
                 'all_products_route_lists_full_public_set' =>
                     $allProducts->status() === 200
                     && str_contains($allProductsBody, 'Productos públicos')

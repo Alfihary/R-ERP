@@ -17,14 +17,14 @@ use App\Infrastructure\Repositories\VcardPrivacyRepository;
 use App\Infrastructure\Repositories\VcardProductRepository;
 
 return new class implements DatabaseTest {
-    private const PASSWORD = 'VcardQuitarPerfilPublicoQa123!';
-    private const USERNAME = 'qa_vcard_quitar_perfil_publico';
-    private const SLUG = 'qa-vcard-quitar-perfil-publico';
-    private const IMAGE_ID = 'QAQPP001';
-    private const SECOND_ID = 'QAQPP002';
-    private const THIRD_ID = 'QAQPP003';
-    private const FOURTH_ID = 'QAQPP004';
-    private const FIFTH_ID = 'QAQPP005';
+    private const PASSWORD = 'VcardRedistribucionLayoutQa123!';
+    private const USERNAME = 'qa_vcard_redistribucion_layout';
+    private const SLUG = 'qa-vcard-redistribucion-layout';
+    private const PRODUCT_ONE = 'QARLAY001';
+    private const PRODUCT_TWO = 'QARLAY002';
+    private const PRODUCT_THREE = 'QARLAY003';
+    private const PRODUCT_FOUR = 'QARLAY004';
+    private const PRODUCT_FIVE = 'QARLAY005';
 
     /** @var list<string> */
     private array $createdFiles = [];
@@ -47,7 +47,7 @@ return new class implements DatabaseTest {
         ] as $table) {
             if (!$this->tableExists($pdo, $table)) {
                 throw new RuntimeException(
-                    'VCARD-PUBLICA-QUITAR-PERFIL-PUBLICO-1 requires table: ' . $table
+                    'VCARD-PUBLICA-REDISTRIBUCION-LAYOUT-1 requires table: ' . $table
                 );
             }
         }
@@ -64,27 +64,27 @@ return new class implements DatabaseTest {
             $this->insertProfile($pdo, $userId);
 
             foreach ([
-                self::IMAGE_ID => 'Refrigerante Público con Imagen',
-                self::SECOND_ID => 'Filtro Público',
-                self::THIRD_ID => 'Control Público',
-                self::FOURTH_ID => 'Condensadora Pública',
-                self::FIFTH_ID => 'Evaporador Público',
+                self::PRODUCT_ONE => 'Mini Split Público',
+                self::PRODUCT_TWO => 'Compresor Público',
+                self::PRODUCT_THREE => 'Condensadora Pública',
+                self::PRODUCT_FOUR => 'Controlador Público',
+                self::PRODUCT_FIVE => 'Evaporador Público',
             ] as $productId => $description) {
                 $this->insertProduct($pdo, $productId, $description, $unitId);
             }
 
             $this->publishVcard($userId, self::SLUG);
             $this->productService()->sincronizarProductos($userId, [
-                ['id_producto' => self::IMAGE_ID, 'activo' => 1, 'destacado' => 1, 'orden' => 10, 'texto_publico' => 'Producto público con imagen.'],
-                ['id_producto' => self::SECOND_ID, 'activo' => 1, 'destacado' => 0, 'orden' => 20, 'texto_publico' => 'Producto público seguro.'],
-                ['id_producto' => self::THIRD_ID, 'activo' => 1, 'destacado' => 0, 'orden' => 30, 'texto_publico' => 'Producto público seguro.'],
-                ['id_producto' => self::FOURTH_ID, 'activo' => 1, 'destacado' => 0, 'orden' => 40, 'texto_publico' => 'Producto público seguro.'],
-                ['id_producto' => self::FIFTH_ID, 'activo' => 1, 'destacado' => 0, 'orden' => 50, 'texto_publico' => 'Producto visible en listado completo.'],
+                ['id_producto' => self::PRODUCT_ONE, 'activo' => 1, 'destacado' => 1, 'orden' => 10, 'texto_publico' => 'Equipo público destacado.'],
+                ['id_producto' => self::PRODUCT_TWO, 'activo' => 1, 'destacado' => 0, 'orden' => 20, 'texto_publico' => 'Equipo público seguro.'],
+                ['id_producto' => self::PRODUCT_THREE, 'activo' => 1, 'destacado' => 0, 'orden' => 30, 'texto_publico' => 'Equipo público seguro.'],
+                ['id_producto' => self::PRODUCT_FOUR, 'activo' => 1, 'destacado' => 0, 'orden' => 40, 'texto_publico' => 'Equipo público seguro.'],
+                ['id_producto' => self::PRODUCT_FIVE, 'activo' => 1, 'destacado' => 0, 'orden' => 50, 'texto_publico' => 'Equipo visible en listado completo.'],
             ]);
 
             $imageBytes = $this->pngBytes();
-            $relativePath = $this->writeImage(self::IMAGE_ID, 'public.png', $imageBytes);
-            $this->insertPhoto($pdo, $userId, self::IMAGE_ID, $relativePath, 'image/png', strlen($imageBytes));
+            $relativePath = $this->writeImage(self::PRODUCT_ONE, 'layout.png', $imageBytes);
+            $this->insertPhoto($pdo, $userId, self::PRODUCT_ONE, $relativePath, 'image/png', strlen($imageBytes));
 
             $controller = $this->controller();
             $public = $controller->show($this->request('/v/' . self::SLUG), ['slug' => self::SLUG]);
@@ -95,79 +95,108 @@ return new class implements DatabaseTest {
             );
             $fullBody = $full->body();
             $image = $controller->productImage(
-                $this->request('/v/' . self::SLUG . '/productos/' . self::IMAGE_ID . '/imagen'),
-                ['slug' => self::SLUG, 'id_producto' => self::IMAGE_ID]
+                $this->request('/v/' . self::SLUG . '/productos/' . self::PRODUCT_ONE . '/imagen'),
+                ['slug' => self::SLUG, 'id_producto' => self::PRODUCT_ONE]
             );
             $qr = $controller->qr($this->request('/v/' . self::SLUG . '/qr'), ['slug' => self::SLUG]);
             $vcf = $controller->vcf($this->request('/v/' . self::SLUG . '/vcf'), ['slug' => self::SLUG]);
             $photo = $controller->photo($this->request('/v/' . self::SLUG . '/foto'), ['slug' => self::SLUG]);
-
             $combinedHtml = $publicBody . $fullBody;
 
-            $results['public_profile_removed'] = [
-                'published_public_vcard_200' => $public->status() === 200,
-                'profile_public_heading_absent' => !str_contains($publicBody, 'Perfil público'),
-                'company_detail_block_absent' =>
-                    !str_contains($publicBody, '<dt>Empresa</dt>')
-                    && !str_contains($publicBody, '<dt>Ubicación</dt>'),
-                'empty_public_profile_message_absent' =>
-                    !str_contains($publicBody, 'No hay datos adicionales publicados.'),
+            $results['layout_distribution'] = [
+                'public_route_200' => $public->status() === 200,
+                'headline_visible' =>
+                    str_contains($publicBody, 'QA Perfil Redistribuido')
+                    && str_contains($publicBody, 'Systems'),
+                'top_panel_present' =>
+                    str_contains($publicBody, 'vcard-public__top-panel')
+                    && str_contains($publicBody, 'vcard-public__contact-panel')
+                    && str_contains($publicBody, 'vcard-public__actions'),
+                'contact_cards_left_visible' =>
+                    str_contains($publicBody, 'Móvil')
+                    && str_contains($publicBody, 'Teléfono')
+                    && str_contains($publicBody, 'Email')
+                    && str_contains($publicBody, '5512345678')
+                    && str_contains($publicBody, '8181000000')
+                    && str_contains($publicBody, self::USERNAME . '@example.test'),
+                'primary_actions_right_visible' =>
+                    str_contains($publicBody, 'Llamar ahora')
+                    && str_contains($publicBody, 'Enviar correo')
+                    && str_contains($publicBody, 'Enviar WhatsApp')
+                    && str_contains($publicBody, 'vcard-public__action--products-mobile')
+                    && !str_contains($publicBody, '>Ver productos públicos<'),
+                'products_action_mobile_only' =>
+                    $this->fileContains('public/css/modules/vcard-public.css', '.vcard-public__action--products-mobile')
+                    && $this->fileContains('public/css/modules/vcard-public.css', 'display: none;')
+                    && $this->fileContains('public/css/modules/vcard-public.css', 'display: inline-flex;'),
+                'footer_distribution_present' =>
+                    str_contains($publicBody, 'vcard-public__footer')
+                    && str_contains($publicBody, 'Redes y enlaces')
+                    && str_contains($publicBody, 'Agregar a contactos')
+                    && str_contains($publicBody, '/v/' . self::SLUG . '/vcf'),
+                'public_profile_not_restored' =>
+                    !str_contains($publicBody, 'Perfil público')
+                    && !str_contains($publicBody, 'No hay datos adicionales publicados.'),
             ];
 
-            $results['preserved_sections'] = [
-                'social_section_visible' => str_contains($publicBody, 'Redes y enlaces'),
-                'social_links_work' =>
-                    str_contains($publicBody, 'https://gruporefrigerantes.example.test')
-                    && str_contains($publicBody, 'https://linkedin.example.test/grupo-refrigerantes')
-                    && str_contains($publicBody, 'https://maps.example.test/grupo-refrigerantes'),
-                'products_related_visible' =>
-                    str_contains($publicBody, 'Productos')
-                    && str_contains($publicBody, self::IMAGE_ID)
-                    && str_contains($publicBody, self::FOURTH_ID)
-                    && !str_contains($publicBody, self::FIFTH_ID),
-                'all_products_action_visible' =>
-                    str_contains($publicBody, '/v/' . self::SLUG . '/productos')
+            $results['products_preview'] = [
+                'products_section_visible' =>
+                    str_contains($publicBody, '<h2>Productos</h2>')
+                    && str_contains($publicBody, 'aria-label="Productos"'),
+                'products_section_hidden_on_mobile' =>
+                    str_contains($publicBody, 'vcard-public__section--products-preview')
+                    && $this->fileContains('public/css/modules/vcard-public.css', '.vcard-public__section--products-preview')
+                    && $this->fileContains('public/css/modules/vcard-public.css', 'display: none;'),
+                'preview_first_four_visible' =>
+                    str_contains($publicBody, self::PRODUCT_ONE)
+                    && str_contains($publicBody, self::PRODUCT_TWO)
+                    && str_contains($publicBody, self::PRODUCT_THREE)
+                    && str_contains($publicBody, self::PRODUCT_FOUR),
+                'preview_limited_to_four' => !str_contains($publicBody, self::PRODUCT_FIVE),
+                'full_link_available' =>
+                    substr_count($publicBody, 'href="/v/' . self::SLUG . '/productos"') === 2
                     && str_contains($publicBody, 'Ver todos los productos'),
-                'whatsapp_cta_visible' =>
+                'full_listing_shows_fifth' =>
+                    $full->status() === 200
+                    && str_contains($fullBody, self::PRODUCT_FIVE),
+                'whatsapp_cta_preserved' =>
                     substr_count($publicBody, 'Solicitar información') === 4
                     && str_contains($publicBody, 'https://wa.me/5215512345678?text='),
+                'product_image_route_preserved' =>
+                    str_contains($publicBody, '/v/' . self::SLUG . '/productos/' . self::PRODUCT_ONE . '/imagen')
+                    && $image->status() === 200
+                    && $image->body() === $imageBytes,
             ];
 
-            $results['public_routes'] = [
-                'full_products_route_works' =>
-                    $full->status() === 200
-                    && str_contains($fullBody, self::FIFTH_ID),
-                'image_route_controlled' =>
-                    $image->status() === 200
-                    && $image->body() === $imageBytes
-                    && str_contains($publicBody, '/v/' . self::SLUG . '/productos/' . self::IMAGE_ID . '/imagen'),
-                'qr_png' => $qr->status() === 200 && str_starts_with($qr->body(), "\x89PNG\r\n\x1A\n"),
+            $results['related_public_routes'] = [
+                'qr_png_works' => $qr->status() === 200 && str_starts_with($qr->body(), "\x89PNG\r\n\x1A\n"),
                 'vcf_works' => $vcf->status() === 200 && str_contains($vcf->body(), 'BEGIN:VCARD'),
                 'photo_endpoint_controlled' => in_array($photo->status(), [200, 404], true),
                 'credential_qr_route_unchanged' =>
                     $this->fileContains('routes/web.php', "'/perfil/credencial/' . 'qr'"),
             ];
 
-            $results['security'] = [
+            $results['privacy_and_scope'] = [
                 'html_has_no_storage_uploads' => !str_contains($combinedHtml, 'storage/uploads'),
-                'no_forbidden_product_data' => !$this->containsAny($combinedHtml, [
-                    'precio',
-                    'precio_minimo',
-                    'lista de precio',
-                    'costo',
-                    'margen',
-                    'stock',
-                    'existencia',
-                    'almacén',
-                    'proveedor',
-                    'movimientos',
-                    'auditoría',
+                'html_has_no_sensitive_paths' =>
+                    !str_contains($combinedHtml, 'C:\\')
+                    && !str_contains($combinedHtml, 'C:/'),
+                'html_has_no_forbidden_fields' => !$this->containsAny($combinedHtml, [
                     'token_hash',
                     'password_hash',
                     'ruta_relativa',
+                    'storage_path',
+                    '/credencial/verificar/',
+                    'precio',
+                    'precio_minimo',
+                    'stock',
+                    'existencia',
+                    'costo',
+                    'proveedor',
+                    'almacén',
                 ]),
                 'products_not_functionally_modified' =>
-                    $this->productDescription($pdo, self::IMAGE_ID) === 'Refrigerante Público con Imagen',
+                    $this->productDescription($pdo, self::PRODUCT_ONE) === 'Mini Split Público',
                 'inventory_not_modified' =>
                     $this->optionalTableCount($pdo, 'inventario_existencias') === $inventoryBefore,
                 'prices_not_modified' =>
@@ -187,13 +216,13 @@ return new class implements DatabaseTest {
 
         if (!$this->allTrue($results)) {
             throw new RuntimeException(
-                'VCARD-PUBLICA-QUITAR-PERFIL-PUBLICO-1 assertions failed: '
+                'VCARD-PUBLICA-REDISTRIBUCION-LAYOUT-1 assertions failed: '
                 . json_encode($results, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
             );
         }
 
         if ($after !== $before) {
-            throw new RuntimeException('VCARD-PUBLICA-QUITAR-PERFIL-PUBLICO-1 transient data was not rolled back.');
+            throw new RuntimeException('VCARD-PUBLICA-REDISTRIBUCION-LAYOUT-1 transient data was not rolled back.');
         }
 
         return [
@@ -241,17 +270,17 @@ return new class implements DatabaseTest {
 
     private function connection(): ConnectionProvider
     {
-        return $GLOBALS['vcard_publica_quitar_perfil_publico_connection'];
+        return $GLOBALS['vcard_publica_redistribucion_layout_connection'];
     }
 
     private function config(): Config
     {
-        return $GLOBALS['vcard_publica_quitar_perfil_publico_config'];
+        return $GLOBALS['vcard_publica_redistribucion_layout_config'];
     }
 
     private function request(string $path): Request
     {
-        return new Request('GET', $path, [], [], ['host' => 'vcard-quitar-perfil.example.test']);
+        return new Request('GET', $path, [], [], ['host' => 'vcard-redistribucion-layout.example.test']);
     }
 
     private function publishVcard(int $userId, string $slug): array
@@ -276,8 +305,8 @@ return new class implements DatabaseTest {
             'ubicacion' => true,
             'sitio_web' => true,
             'linkedin' => true,
-            'facebook' => false,
-            'instagram' => false,
+            'facebook' => true,
+            'instagram' => true,
             'whatsapp' => true,
             'google_maps' => true,
             'productos' => true,
@@ -314,18 +343,22 @@ return new class implements DatabaseTest {
                 whatsapp,
                 sitio_web,
                 linkedin_url,
+                facebook_url,
+                instagram_url,
                 google_maps_url,
                 ubicacion_publica
              ) VALUES (
                 :usuario_id,
                 \'QA Perfil\',
-                \'Removido\',
+                \'Redistribuido\',
                 \'Systems\',
                 \'8181000000\',
                 \'5512345678\',
                 \'5215512345678\',
                 \'https://gruporefrigerantes.example.test\',
                 \'https://linkedin.example.test/grupo-refrigerantes\',
+                \'https://facebook.example.test/grupo-refrigerantes\',
+                \'https://instagram.example.test/grupo-refrigerantes\',
                 \'https://maps.example.test/grupo-refrigerantes\',
                 \'Monterrey, NL\'
              )'
@@ -514,20 +547,20 @@ return new class implements DatabaseTest {
     private function counts(PDO $pdo): array
     {
         return [
-            'usuarios_qa' => $this->countWhere($pdo, 'usuarios', "username LIKE 'qa_vcard_quitar_perfil_publico%'"),
+            'usuarios_qa' => $this->countWhere($pdo, 'usuarios', "username LIKE 'qa_vcard_redistribucion_layout%'"),
             'perfiles_qa' => $this->countWhere(
                 $pdo,
                 'perfiles_usuario p INNER JOIN usuarios u ON u.id = p.usuario_id',
-                "u.username LIKE 'qa_vcard_quitar_perfil_publico%'"
+                "u.username LIKE 'qa_vcard_redistribucion_layout%'"
             ),
-            'productos_qa' => $this->countWhere($pdo, 'productos', "id_producto LIKE 'QAQPP%'"),
-            'documentos_qa' => $this->countWhere($pdo, 'producto_documentos', "id_producto LIKE 'QAQPP%'"),
+            'productos_qa' => $this->countWhere($pdo, 'productos', "id_producto LIKE 'QARLAY%'"),
+            'documentos_qa' => $this->countWhere($pdo, 'producto_documentos', "id_producto LIKE 'QARLAY%'"),
             'vcards_qa' => $this->countWhere(
                 $pdo,
                 'vcards_usuario v INNER JOIN usuarios u ON u.id = v.usuario_id',
-                "u.username LIKE 'qa_vcard_quitar_perfil_publico%'"
+                "u.username LIKE 'qa_vcard_redistribucion_layout%'"
             ),
-            'vcard_productos_qa' => $this->countWhere($pdo, 'vcard_productos', "id_producto LIKE 'QAQPP%'"),
+            'vcard_productos_qa' => $this->countWhere($pdo, 'vcard_productos', "id_producto LIKE 'QARLAY%'"),
         ];
     }
 

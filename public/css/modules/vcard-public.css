@@ -46,12 +46,12 @@
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
     color: var(--vcard-ink);
     display: grid;
-    grid-template-columns: minmax(20rem, 0.9fr) minmax(26rem, 1.35fr);
+    grid-template-columns: minmax(18rem, 0.72fr) minmax(32rem, 1.68fr);
     isolation: isolate;
-    max-width: 86rem;
+    max-width: 92rem;
     overflow: hidden;
     position: relative;
-    width: min(100%, 86rem);
+    width: min(100%, 92rem);
 }
 
 .vcard-public__card::before {
@@ -76,10 +76,20 @@
 }
 
 .vcard-public__brand {
-    background:
-        radial-gradient(circle at -8% 0%, rgba(68, 169, 255, 0.32), transparent 13rem),
-        radial-gradient(circle at 78% 34%, rgba(53, 212, 255, 0.12), transparent 17rem),
+    background-color: #073660;
+    background-image:
+        linear-gradient(180deg, rgba(4, 32, 56, 0.02), rgba(3, 19, 36, 0.12)),
+        url("/img/vcard/fondo-hvac-vectorial.webp"),
         linear-gradient(155deg, #0a4d83 0%, #073660 44%, #062038 100%);
+    background-position:
+        center,
+        center top,
+        center;
+    background-repeat: no-repeat;
+    background-size:
+        cover,
+        cover,
+        cover;
     border-right: 1px solid var(--vcard-line);
     color: var(--vcard-ink);
     display: grid;
@@ -121,12 +131,20 @@
     align-items: flex-start;
     display: flex;
     gap: var(--vcard-space-4);
-    justify-content: space-between;
+    justify-content: flex-start;
+    min-height: 4rem;
 }
 
 .vcard-public__logo {
     display: grid;
     gap: var(--vcard-space-2);
+}
+
+.vcard-public__logo img {
+    display: block;
+    height: auto;
+    max-width: 6.6rem;
+    width: min(6.6rem, 32vw);
 }
 
 .vcard-public__logo span {
@@ -202,31 +220,101 @@
 }
 
 .vcard-public__brand-identity span {
-    border-block: 1px solid rgba(53, 212, 255, 0.42);
+    align-items: center;
     color: #66dcff;
+    display: inline-grid;
     font-size: 0.88rem;
-    font-weight: 850;
-    letter-spacing: 0.22em;
-    padding: var(--vcard-space-1) var(--vcard-space-4);
+    font-weight: 900;
+    gap: var(--vcard-space-3);
+    grid-template-columns: 4.25rem auto 4.25rem;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.vcard-public__brand-identity span::before,
+.vcard-public__brand-identity span::after {
+    content: "";
+    display: block;
+    height: 2px;
+    width: 4.25rem;
+}
+
+.vcard-public__brand-identity span::before {
+    background: linear-gradient(90deg, rgba(53, 212, 255, 0), rgba(53, 212, 255, 0.95));
+    box-shadow: 0 0 10px rgba(53, 212, 255, 0.35);
+}
+
+.vcard-public__brand-identity span::after {
+    background: linear-gradient(90deg, rgba(53, 212, 255, 0.95), rgba(53, 212, 255, 0));
+    box-shadow: 0 0 10px rgba(53, 212, 255, 0.35);
 }
 
 .vcard-public__service-strip {
-    border: 1px solid rgba(199, 230, 255, 0.18);
-    border-radius: 14px;
-    display: grid;
-    gap: var(--vcard-space-3);
-    grid-template-columns: repeat(3, 1fr);
-    padding: var(--vcard-space-4);
+    background:
+        linear-gradient(90deg, rgba(53, 212, 255, 0), rgba(53, 212, 255, 0.16), rgba(53, 212, 255, 0)),
+        rgba(2, 24, 45, 0.08);
+    border-block: 1px solid rgba(125, 215, 255, 0.12);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--vcard-space-5);
+    justify-content: center;
+    padding: 0.58rem var(--vcard-space-2);
 }
 
-.vcard-public__service-strip span {
-    color: rgba(247, 251, 255, 0.9);
-    font-size: 0.72rem;
-    font-weight: 800;
+.vcard-public__service-strip > a,
+.vcard-public__service-strip > span {
+    align-items: center;
+    color: rgba(247, 251, 255, 0.94);
+    display: inline-flex;
+    font-size: 0.76rem;
+    font-weight: 900;
+    gap: 0;
+    justify-content: center;
     line-height: 1.25;
+    min-height: 1rem;
+    padding: 0;
     text-align: center;
+    text-decoration: none;
     text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(53, 212, 255, 0.18);
+    transition:
+        color 160ms ease,
+        text-shadow 160ms ease;
+}
+
+.vcard-public__service-strip > a:hover,
+.vcard-public__service-strip > a:focus-visible {
+    color: #66dcff;
+    outline: none;
+    text-shadow: 0 0 14px rgba(53, 212, 255, 0.54);
+}
+
+.vcard-public__service-word {
+    display: inline-flex;
+    gap: 0.02em;
+    letter-spacing: 0.09em;
+}
+
+.vcard-public__service-word > span {
+    animation: vcard-service-letter-fade 2.8s ease-in-out infinite;
+    animation-delay: calc(var(--letter-index) * 85ms);
+}
+
+@keyframes vcard-service-letter-fade {
+    0%,
+    72%,
+    100% {
+        color: rgba(247, 251, 255, 0.94);
+        text-shadow: 0 0 8px rgba(53, 212, 255, 0.14);
+    }
+
+    36% {
+        color: #66dcff;
+        text-shadow:
+            0 0 10px rgba(53, 212, 255, 0.5),
+            0 0 18px rgba(53, 212, 255, 0.28);
+    }
 }
 
 .vcard-public__brand-copy {
@@ -242,22 +330,28 @@
     justify-self: center;
     letter-spacing: 0.16em;
     margin: 0;
-    max-width: 32ch;
+    max-width: 100%;
     overflow-wrap: anywhere;
     text-align: center;
     text-transform: uppercase;
-    text-wrap: balance;
+    white-space: nowrap;
 }
 
 .vcard-public__content {
     display: grid;
+    align-content: start;
     gap: var(--vcard-space-5);
     padding: var(--vcard-space-6);
 }
 
 .vcard-public__header {
     display: grid;
-    gap: var(--vcard-space-4);
+    gap: var(--vcard-space-3);
+}
+
+.vcard-public__headline {
+    display: grid;
+    gap: var(--vcard-space-2);
 }
 
 .vcard-public h1 {
@@ -280,9 +374,22 @@
 
 .vcard-public__name {
     color: var(--vcard-cyan);
+    display: block;
     font-size: 1rem;
     font-weight: 850;
     margin: -0.25rem 0 0;
+    width: fit-content;
+}
+
+.vcard-public__name::after {
+    background: linear-gradient(90deg, var(--vcard-cyan), rgba(53, 212, 255, 0));
+    border-radius: 999px;
+    content: "";
+    display: block;
+    height: 2px;
+    margin-block-start: var(--vcard-space-1);
+    opacity: 0.95;
+    width: 3.4rem;
 }
 
 .vcard-public__intro {
@@ -304,10 +411,22 @@
     text-wrap: pretty;
 }
 
+.vcard-public__top-panel {
+    align-items: stretch;
+    display: grid;
+    gap: var(--vcard-space-4);
+    grid-template-columns: minmax(15rem, 0.92fr) minmax(16rem, 1.08fr);
+}
+
+.vcard-public__contact-panel {
+    display: grid;
+    gap: var(--vcard-space-3);
+}
+
 .vcard-public__contact-grid {
     display: grid;
     gap: var(--vcard-space-3);
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: 1fr;
 }
 
 .vcard-public__contact-card {
@@ -319,6 +438,12 @@
     gap: var(--vcard-space-3);
     min-width: 0;
     padding: var(--vcard-space-3);
+}
+
+.vcard-public__contact-card--empty strong {
+    color: var(--vcard-soft);
+    font-weight: 720;
+    line-height: 1.45;
 }
 
 .vcard-public__contact-card > span {
@@ -352,8 +477,9 @@
 }
 
 .vcard-public__actions {
+    align-content: stretch;
     display: grid;
-    gap: var(--vcard-space-3);
+    gap: var(--vcard-space-2);
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -361,13 +487,15 @@
     align-items: center;
     background: linear-gradient(180deg, #25aaf6 0%, var(--vcard-blue-strong) 100%);
     border: 1px solid rgba(120, 213, 255, 0.22);
-    border-radius: 12px;
+    border-radius: 10px;
     color: #ffffff;
     display: inline-flex;
+    font-size: 0.94rem;
     font-weight: 850;
     justify-content: center;
-    min-height: 3.25rem;
-    padding: var(--vcard-space-3) var(--vcard-space-4);
+    line-height: 1.2;
+    min-height: 2.85rem;
+    padding: 0.68rem var(--vcard-space-4);
     text-decoration: none;
     transition:
         background-color 160ms ease,
@@ -389,9 +517,48 @@
     background: linear-gradient(180deg, rgba(29, 155, 240, 0.84), rgba(8, 103, 160, 0.86));
 }
 
+.vcard-public__action--products-mobile {
+    display: none;
+}
+
+.vcard-public__action--download {
+    align-self: end;
+    justify-self: end;
+    min-height: 3.25rem;
+    min-width: min(100%, 15rem);
+    padding: var(--vcard-space-3) var(--vcard-space-5);
+}
+
 .vcard-public__section {
     display: grid;
     gap: var(--vcard-space-3);
+}
+
+.vcard-public__footer {
+    align-items: end;
+    border-top: 1px solid var(--vcard-line);
+    display: grid;
+    gap: var(--vcard-space-4);
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-top: var(--vcard-space-4);
+}
+
+.vcard-public__footer-brand {
+    align-items: center;
+    border-top: 1px solid rgba(125, 190, 230, 0.12);
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    min-width: 0;
+    padding-block: var(--vcard-space-5) 0;
+}
+
+.vcard-public__footer-brand img {
+    display: block;
+    height: auto;
+    max-width: min(100%, 13.25rem);
+    opacity: 0.92;
+    width: 100%;
 }
 
 .vcard-public__section--compact {
@@ -497,11 +664,11 @@
     display: inline-flex;
     font-weight: 850;
     gap: var(--vcard-space-2);
-    height: 2.65rem;
+    height: 2.85rem;
     justify-content: center;
     padding: 0;
     text-decoration: none;
-    width: 2.65rem;
+    width: 2.85rem;
 }
 
 .vcard-public__links a span {
@@ -511,6 +678,13 @@
     font-weight: 900;
     justify-content: center;
     min-width: 1rem;
+}
+
+.vcard-public__link-icon svg {
+    display: block;
+    fill: currentColor;
+    height: 1.35rem;
+    width: 1.35rem;
 }
 
 .vcard-public__links a:hover,
@@ -644,7 +818,7 @@
 @media (max-width: 64rem) {
     .vcard-public__card {
         grid-template-columns: 1fr;
-        max-width: 44rem;
+        max-width: 48rem;
     }
 
     .vcard-public__brand {
@@ -654,6 +828,14 @@
 
     .vcard-public__content {
         padding: var(--vcard-space-5);
+    }
+
+    .vcard-public__top-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .vcard-public__contact-grid {
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
     }
 }
 
@@ -677,18 +859,37 @@
     .vcard-public__service-strip,
     .vcard-public__contact-grid,
     .vcard-public__details,
-    .vcard-public__actions {
+    .vcard-public__actions,
+    .vcard-public__footer {
         grid-template-columns: 1fr;
+    }
+
+    .vcard-public__action--download {
+        justify-self: stretch;
+        width: 100%;
+    }
+
+    .vcard-public__action--products-mobile {
+        display: inline-flex;
     }
 
     .vcard-public__brand-copy > p {
         font-size: 0.72rem;
         letter-spacing: 0.1em;
-        max-width: 26ch;
+        max-width: 100%;
+        white-space: normal;
     }
 
     .vcard-public__products {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vcard-public__card:not(.vcard-public__card--products) .vcard-public__products {
+        display: none;
+    }
+
+    .vcard-public__card:not(.vcard-public__card--products) .vcard-public__section--products-preview {
+        display: none;
     }
 
     .vcard-public__products--full {
@@ -724,7 +925,9 @@
     .vcard-public__back-link,
     .vcard-public__section-link,
     .vcard-public__links a,
+    .vcard-public__service-word > span,
     .vcard-public__product-cta {
+        animation: none !important;
         transition-duration: 0.01ms !important;
     }
 
