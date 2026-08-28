@@ -50,17 +50,18 @@ Esta fase consolida:
 | GET | `/v/{slug}/foto` | Público, condicionado por publicación, privacidad y validación de archivo |
 | GET | `/v/{slug}/vcf` | Público, condicionado por publicación y privacidad |
 | GET | `/v/{slug}/qr` | Público, PNG dinámico no persistido |
+| GET | `/v/{slug}/productos` | Público, condicionado por publicación, privacidad de productos y vínculos activos |
+| GET | `/v/{slug}/productos/{id_producto}/imagen` | Público, condicionado por publicación, privacidad, vínculo activo, producto activo e imagen válida |
 
 ## Rutas explícitamente no existentes
 
 ```text
 GET /credencial/verificar/{token}/foto
-GET /v/{slug}/productos
 GET /api/credencial/*
 GET /api/vcard/*
 ```
 
-La foto pública de credencial no está implementada. Los productos de vCard se integran dentro de `/v/{slug}` cuando la privacidad lo permite; no existe ruta independiente `/v/{slug}/productos`.
+La foto pública de credencial no está implementada. Las rutas públicas de productos de vCard sí existen en el contrato actual y quedan controladas por publicación, privacidad, vínculos activos, producto activo, validación de imagen y 404 seguro cuando no corresponde mostrar.
 
 ## Matriz final de permisos
 

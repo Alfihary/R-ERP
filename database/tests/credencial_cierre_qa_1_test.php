@@ -51,6 +51,7 @@ return new class implements DatabaseTest {
         $vcardVcfTest = $this->contents('database/tests/vcard_vcf_1_test.php');
         $vcardQrTest = $this->contents('database/tests/vcard_qr_1_test.php');
         $vcardProductosTest = $this->contents('database/tests/vcard_productos_1_test.php');
+        $vcardProductosImagenTest = $this->contents('database/tests/vcard_productos_imagen_publica_ui_1_test.php');
         $credencialTokenQrTest = $this->contents('database/tests/credencial_token_qr_1_test.php');
         $credencialVerificationTest = $this->contents('database/tests/credencial_verificacion_publica_1_test.php');
 
@@ -74,12 +75,31 @@ return new class implements DatabaseTest {
                 'vcard_photo_declared' => $this->contains($routes, "'/v/{slug}/foto'"),
                 'vcard_vcf_declared' => $this->contains($routes, "'/v/{slug}/' . 'vcf'"),
                 'vcard_qr_declared' => $this->contains($routes, "'/v/{slug}/' . 'qr'"),
+                'vcard_products_declared' => $this->contains($routes, "'/v/{slug}/productos'"),
+                'vcard_product_image_declared' => $this->contains($routes, "'/v/{slug}/productos/{id_producto}/imagen'"),
             ],
             'routes_forbidden' => [
                 'no_public_credential_photo' =>
                     !$this->contains($routes, '/credencial/verificar/{token}/foto')
                     && !$this->contains($routes, "'/credencial/' . 'verificar/{token}/foto'"),
-                'no_vcard_products_route' => !$this->contains($routes, "'/v/{slug}/productos'"),
+                'public_vcard_products_routes_controlled' =>
+                    $this->contains($routes, "'/v/{slug}/productos'")
+                    && $this->contains($routes, "'/v/{slug}/productos/{id_producto}/imagen'")
+                    && $this->contains($vcardProductosTest, 'products_false_hides_section')
+                    && $this->contains($vcardProductosTest, 'unpublished_hides_all')
+                    && $this->contains($vcardProductosTest, 'inactive_user_hides_all')
+                    && $this->contains($vcardProductosTest, 'inactive_product_hidden')
+                    && $this->contains($vcardProductosImagenTest, 'privacy_false_404')
+                    && $this->contains($vcardProductosImagenTest, 'unlinked_product_404')
+                    && $this->contains($vcardProductosImagenTest, 'inactive_link_404')
+                    && $this->contains($vcardProductosImagenTest, 'inactive_product_404')
+                    && $this->contains($vcardProductosImagenTest, 'missing_file_404')
+                    && $this->contains($vcardProductosImagenTest, 'traversal_404')
+                    && $this->contains($vcardProductosImagenTest, 'svg_rejected')
+                    && $this->contains($vcardProductosImagenTest, 'gif_rejected')
+                    && $this->contains($vcardProductosImagenTest, 'php_rejected')
+                    && $this->contains($vcardProductosTest, 'no_price_min_cost_stock')
+                    && $this->contains($vcardProductosTest, 'no_internal_ids_or_sensitive'),
                 'no_public_credential_api' => !$this->contains($routes, "'/api/credencial"),
                 'no_public_vcard_api' => !$this->contains($routes, "'/api/vcard"),
             ],
@@ -231,10 +251,11 @@ return new class implements DatabaseTest {
                 'GET /v/{slug}/foto',
                 'GET /v/{slug}/vcf',
                 'GET /v/{slug}/qr',
+                'GET /v/{slug}/productos',
+                'GET /v/{slug}/productos/{id_producto}/imagen',
             ],
             'forbidden_routes' => [
                 'GET /credencial/verificar/{token}/foto',
-                'GET /v/{slug}/productos',
                 'GET /api/credencial/*',
                 'GET /api/vcard/*',
             ],
