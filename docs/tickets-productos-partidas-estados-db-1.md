@@ -259,13 +259,31 @@ El DB-TEST valida que no cambian conteos de:
 La migración no incluye `INSERT` hacia tablas operativas y no crea triggers ni
 procedures.
 
+## Evolución de guardrails
+
+`TP-PARTIDAS-ESTADOS-DB-1` fue la fase de persistencia documental. En esa fase
+era correcto exigir que no existieran servicios ni repositorios funcionales.
+
+Después, `TP-PARTIDAS-ESTADOS-SERVICE-1` autorizó únicamente:
+
+- `app/Domain/Tickets/ProductRequestTicketService.php`
+- `app/Domain/Tickets/ProductRequestTicketValidationException.php`
+- `app/Infrastructure/Repositories/ProductRequestTicketRepository.php`
+
+Por lo tanto, el guardrail heredado queda evolucionado: se permite solo ese
+service/repositorio exacto, pero siguen prohibidos rutas, controladores, vistas,
+CSS/JS, correos runtime, seeds y cualquier escritura operativa en productos,
+precios, inventario, compras o proveedores.
+
 ## Qué NO hace esta fase
 
 - No crea rutas funcionales.
 - No crea controladores.
 - No crea vistas.
-- No crea servicios.
-- No crea repositorios.
+- No crea servicios durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-SERVICE-1` solo se permite el servicio autorizado.
+- No crea repositorios durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-SERVICE-1` solo se permite el repositorio autorizado.
 - No crea seeds.
 - No crea permisos.
 - No implementa correos.

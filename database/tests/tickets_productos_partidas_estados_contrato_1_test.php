@@ -87,9 +87,18 @@ return new class implements DatabaseTest {
             'test_is_database_tests_only' => $this->fileExists('database/tests/tickets_productos_partidas_estados_contrato_1_test.php'),
             'contract_doc_exists' => $this->fileExists('docs/tickets-productos-partidas-estados-contrato-1.md'),
             'no_ticket_controller_created' => !$this->hasFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i'),
-            'no_ticket_service_created' => !$this->hasFiles('app/Domain/Tickets', '/\\.php$/i'),
-            'no_ticket_repository_created' => !$this->hasFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i'),
+            'ticket_service_files_are_authorized' => $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
+                'app/Domain/Tickets/ProductRequestTicketService.php',
+                'app/Domain/Tickets/ProductRequestTicketValidationException.php',
+            ]),
+            'ticket_repository_files_are_authorized' => $this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
+                'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
+            ]),
             'no_ticket_view_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+            'no_ticket_seed_created' => !$this->hasFiles('database/seeds', '/ticket|solicitud|alta/i'),
+            'no_ticket_mail_runtime_created' =>
+                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
+                && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
         ];
     }
 
@@ -304,8 +313,13 @@ return new class implements DatabaseTest {
         return [
             'ticket_product_routes_missing' => $surface['routes_count'] === 0,
             'controller_missing' => $surface['controllers_related'] === [],
-            'service_missing' => $surface['domain_related'] === ['app/Domain/Tickets/.gitkeep'],
-            'repository_missing' => $surface['repositories_related'] === [],
+            'service_missing' => !$this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
+                'app/Domain/Tickets/ProductRequestTicketService.php',
+                'app/Domain/Tickets/ProductRequestTicketValidationException.php',
+            ]),
+            'repository_missing' => !$this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
+                'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
+            ]),
             'views_missing' => $surface['views_related'] === ['app/Views/tickets/.gitkeep'],
             'ticket_tables_missing' => $db['ticket_tables_existing'] === [],
             'line_status_missing' => $db['ticket_status_columns']['ticket_partidas'] === [],
@@ -453,6 +467,21 @@ return new class implements DatabaseTest {
     private function hasFiles(string $relativeDirectory, string $pattern): bool
     {
         return $this->relativeFiles($relativeDirectory, $pattern) !== [];
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    private function onlyExpectedFiles(
+        string $relativeDirectory,
+        string $pattern,
+        array $expected
+    ): bool {
+        $files = $this->relativeFiles($relativeDirectory, $pattern);
+        sort($files);
+        sort($expected);
+
+        return $files === $expected;
     }
 
     private function repositoryHas(string $relativeDirectory, string $pattern, string $excludedFile = ''): bool

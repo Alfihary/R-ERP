@@ -357,12 +357,22 @@ return new class implements DatabaseTest {
                 $countsBefore['movimientos_inventario'] === $countsAfter['movimientos_inventario'],
             'purchases_count_unchanged' => $countsBefore['compras'] === $countsAfter['compras'],
             'suppliers_count_unchanged' => $countsBefore['proveedores'] === $countsAfter['proveedores'],
-            'no_routes_controllers_views_services_repositories' =>
+            'no_routes_controllers_views_or_mail_runtime' =>
                 !$this->hasFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i')
-                && !$this->hasFiles('app/Domain/Tickets', '/\\.php$/i')
-                && !$this->hasFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i')
                 && !$this->hasFiles('app/Views/tickets', '/\\.php$/i')
                 && !$this->fileContains('routes/web.php', '/tickets-productos'),
+            'service_repository_allowed_after_service_phase' =>
+                $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
+                    'app/Domain/Tickets/ProductRequestTicketService.php',
+                    'app/Domain/Tickets/ProductRequestTicketValidationException.php',
+                ])
+                && $this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
+                    'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
+                ]),
+            'no_ticket_seeds_created' => !$this->hasFiles('database/seeds', '/ticket|solicitud|alta/i'),
+            'no_ticket_mail_runtime_created' =>
+                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
+                && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
         ];
     }
 
@@ -1038,6 +1048,47 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    private function onlyExpectedFiles(
+        string $relativeDirectory,
+        string $pattern,
+        array $expected
+    ): bool {
+        $directory = BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDirectory);
+
+        if (!is_dir($directory)) {
+            return $expected === [];
+        }
+
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $relative = str_replace(
+                [BASE_PATH . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR],
+                ['', '/'],
+                $file->getPathname()
+            );
+
+            if (preg_match($pattern, $relative) === 1) {
+                $files[] = $relative;
+            }
+        }
+
+        sort($files);
+        sort($expected);
+
+        return $files === $expected;
     }
 
     /**

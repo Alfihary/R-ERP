@@ -346,7 +346,33 @@ Queda explícitamente fuera:
 - controladores;
 - rutas;
 - vistas funcionales;
-- servicios funcionales.
+- servicios funcionales durante la fase documental inicial.
+
+## Evolución de guardrails
+
+`TP-PARTIDAS-ESTADOS-CONTRATO-1` fue la fase documental inicial. En ese momento
+era correcto auditar que todavía no existieran servicio ni repositorio.
+
+Después se cerró `TP-PARTIDAS-ESTADOS-DB-1` para crear tablas documentales, y la
+fase abierta `TP-PARTIDAS-ESTADOS-SERVICE-1` autorizó únicamente:
+
+- `app/Domain/Tickets/ProductRequestTicketService.php`
+- `app/Domain/Tickets/ProductRequestTicketValidationException.php`
+- `app/Infrastructure/Repositories/ProductRequestTicketRepository.php`
+
+El guardrail vigente ya no es “no servicio/repositorio”, sino:
+
+- no rutas;
+- no controladores;
+- no vistas;
+- no CSS/JS;
+- no correos runtime;
+- no seeds;
+- no creación funcional de producto;
+- no creación de precio;
+- no creación de inventario;
+- no creación de compra;
+- no creación de proveedor real.
 
 ## Validación de esta fase
 
