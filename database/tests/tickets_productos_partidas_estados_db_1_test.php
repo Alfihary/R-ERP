@@ -369,7 +369,13 @@ return new class implements DatabaseTest {
                 && $this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
                     'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
                 ]),
-            'no_ticket_seeds_created' => !$this->hasFiles('database/seeds', '/ticket|solicitud|alta/i'),
+            'permission_seed_allowed' => $this->fileExists(
+                'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'
+            ),
+            'no_functional_ticket_seeds_created' =>
+                $this->onlyExpectedFiles('database/seeds', '/ticket|solicitud|alta/i', [
+                    'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php',
+                ]),
             'no_ticket_mail_runtime_created' =>
                 !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
@@ -1017,6 +1023,11 @@ return new class implements DatabaseTest {
     private function fileContains(string $relativePath, string $needle): bool
     {
         return str_contains($this->read($relativePath), $needle);
+    }
+
+    private function fileExists(string $relativePath): bool
+    {
+        return is_file(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
     }
 
     private function hasFiles(string $relativeDirectory, string $pattern): bool

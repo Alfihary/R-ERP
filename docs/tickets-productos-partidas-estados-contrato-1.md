@@ -360,6 +360,10 @@ fase abierta `TP-PARTIDAS-ESTADOS-SERVICE-1` autorizó únicamente:
 - `app/Domain/Tickets/ProductRequestTicketValidationException.php`
 - `app/Infrastructure/Repositories/ProductRequestTicketRepository.php`
 
+Después, `TP-PARTIDAS-ESTADOS-PERMISOS-1` autorizó exclusivamente:
+
+- `database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php`
+
 El guardrail vigente ya no es “no servicio/repositorio”, sino:
 
 - no rutas;
@@ -367,7 +371,8 @@ El guardrail vigente ya no es “no servicio/repositorio”, sino:
 - no vistas;
 - no CSS/JS;
 - no correos runtime;
-- no seeds;
+- no seeds funcionales de tickets;
+- solo seed exacto de permisos autorizado;
 - no creación funcional de producto;
 - no creación de precio;
 - no creación de inventario;

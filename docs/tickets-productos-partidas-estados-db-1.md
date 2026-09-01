@@ -270,10 +270,15 @@ Después, `TP-PARTIDAS-ESTADOS-SERVICE-1` autorizó únicamente:
 - `app/Domain/Tickets/ProductRequestTicketValidationException.php`
 - `app/Infrastructure/Repositories/ProductRequestTicketRepository.php`
 
+Después, `TP-PARTIDAS-ESTADOS-PERMISOS-1` autorizó exclusivamente:
+
+- `database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php`
+
 Por lo tanto, el guardrail heredado queda evolucionado: se permite solo ese
-service/repositorio exacto, pero siguen prohibidos rutas, controladores, vistas,
-CSS/JS, correos runtime, seeds y cualquier escritura operativa en productos,
-precios, inventario, compras o proveedores.
+service/repositorio exacto y solo ese seed exacto de permisos. Siguen prohibidos
+rutas, controladores, vistas, CSS/JS, correos runtime, seeds funcionales de
+tickets y cualquier escritura operativa en productos, precios, inventario,
+compras o proveedores.
 
 ## Qué NO hace esta fase
 
@@ -284,8 +289,10 @@ precios, inventario, compras o proveedores.
   `TP-PARTIDAS-ESTADOS-SERVICE-1` solo se permite el servicio autorizado.
 - No crea repositorios durante la fase DB original; en la fase posterior
   `TP-PARTIDAS-ESTADOS-SERVICE-1` solo se permite el repositorio autorizado.
-- No crea seeds.
-- No crea permisos.
+- No crea seeds durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-PERMISOS-1` solo se permite el seed exacto de permisos.
+- No crea permisos durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-PERMISOS-1` solo se permiten permisos documentales.
 - No implementa correos.
 - No implementa aprobación funcional.
 - No convierte partidas aprobadas en productos reales.

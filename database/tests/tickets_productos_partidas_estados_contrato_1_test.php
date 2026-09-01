@@ -95,7 +95,13 @@ return new class implements DatabaseTest {
                 'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
             ]),
             'no_ticket_view_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
-            'no_ticket_seed_created' => !$this->hasFiles('database/seeds', '/ticket|solicitud|alta/i'),
+            'permission_seed_is_authorized' => $this->fileExists(
+                'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'
+            ),
+            'no_functional_ticket_seed_created' =>
+                $this->onlyExpectedFiles('database/seeds', '/ticket|solicitud|alta/i', [
+                    'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php',
+                ]),
             'no_ticket_mail_runtime_created' =>
                 !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
