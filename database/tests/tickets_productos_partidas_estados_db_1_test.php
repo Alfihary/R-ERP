@@ -357,10 +357,19 @@ return new class implements DatabaseTest {
                 $countsBefore['movimientos_inventario'] === $countsAfter['movimientos_inventario'],
             'purchases_count_unchanged' => $countsBefore['compras'] === $countsAfter['compras'],
             'suppliers_count_unchanged' => $countsBefore['proveedores'] === $countsAfter['proveedores'],
-            'no_routes_controllers_views_or_mail_runtime' =>
-                !$this->hasFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i')
-                && !$this->hasFiles('app/Views/tickets', '/\\.php$/i')
-                && !$this->fileContains('routes/web.php', '/tickets-productos'),
+            'allowed_private_routes_controller_for_ticket_products' =>
+                $this->allowedTicketProductRoutes()
+                && $this->fileExists('app/Http/Controllers/ProductRequestTicketController.php')
+                && str_contains($this->read('bootstrap/app.php'), 'ProductRequestTicketController'),
+            'no_unexpected_ticket_routes_or_controllers' =>
+                $this->onlyExpectedFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i', [
+                    'app/Http/Controllers/ProductRequestTicketController.php',
+                ])
+                && $this->allowedTicketProductRoutes(),
+            'no_views_css_js_or_mail_runtime' =>
+                !$this->hasFiles('app/Views/tickets', '/\\.php$/i')
+                && !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
+                && !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
             'service_repository_allowed_after_service_phase' =>
                 $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
                     'app/Domain/Tickets/ProductRequestTicketService.php',
@@ -1028,6 +1037,33 @@ return new class implements DatabaseTest {
     private function fileExists(string $relativePath): bool
     {
         return is_file(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
+    }
+
+    private function allowedTicketProductRoutes(): bool
+    {
+        $routes = $this->read('routes/web.php');
+
+        return $this->containsAll($routes, [
+            "'/tickets/productos'",
+            "'/tickets/productos/crear'",
+            "'/tickets/productos/{id}'",
+            "'/tickets/productos/{id}/partidas/{partidaId}/aprobar'",
+            "'/tickets/productos/{id}/partidas/{partidaId}/rechazar'",
+            "'/tickets/productos/{id}/cancelar'",
+            "tickets_productos.ver",
+            "tickets_productos.crear",
+            "tickets_productos.resolver",
+            "tickets_productos.cancelar",
+            "AuthMiddleware",
+            "PermissionMiddleware",
+        ])
+            && substr_count($routes, "'/tickets/productos'") === 2
+            && substr_count($routes, "'/tickets/productos/crear'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/partidas/{partidaId}/aprobar'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/partidas/{partidaId}/rechazar'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/cancelar'") === 1
+            && !str_contains($routes, '/tickets-productos');
     }
 
     private function hasFiles(string $relativeDirectory, string $pattern): bool

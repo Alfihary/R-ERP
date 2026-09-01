@@ -86,7 +86,15 @@ return new class implements DatabaseTest {
             'runner_is_database_only' => $this->fileExists('database/tickets-productos-partidas-estados-contrato.php'),
             'test_is_database_tests_only' => $this->fileExists('database/tests/tickets_productos_partidas_estados_contrato_1_test.php'),
             'contract_doc_exists' => $this->fileExists('docs/tickets-productos-partidas-estados-contrato-1.md'),
-            'no_ticket_controller_created' => !$this->hasFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i'),
+            'allowed_private_routes_controller_for_ticket_products' =>
+                $this->allowedTicketProductRoutes()
+                && $this->fileExists('app/Http/Controllers/ProductRequestTicketController.php')
+                && str_contains($this->read('bootstrap/app.php'), 'ProductRequestTicketController'),
+            'no_unexpected_ticket_routes_or_controllers' =>
+                $this->onlyExpectedFiles('app/Http/Controllers', '/Ticket|Solicitud|AltaProducto/i', [
+                    'app/Http/Controllers/ProductRequestTicketController.php',
+                ])
+                && $this->allowedTicketProductRoutes(),
             'ticket_service_files_are_authorized' => $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
                 'app/Domain/Tickets/ProductRequestTicketService.php',
                 'app/Domain/Tickets/ProductRequestTicketValidationException.php',
@@ -95,6 +103,9 @@ return new class implements DatabaseTest {
                 'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
             ]),
             'no_ticket_view_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+            'no_ticket_css_or_js_created' =>
+                !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
+                && !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
             'permission_seed_is_authorized' => $this->fileExists(
                 'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'
             ),
@@ -317,8 +328,10 @@ return new class implements DatabaseTest {
         $db = $this->databaseSurface($pdo, $database);
 
         return [
-            'ticket_product_routes_missing' => $surface['routes_count'] === 0,
-            'controller_missing' => $surface['controllers_related'] === [],
+            'ticket_product_routes_missing' => !$this->allowedTicketProductRoutes(),
+            'controller_missing' => $surface['controllers_related'] !== [
+                'app/Http/Controllers/ProductRequestTicketController.php',
+            ],
             'service_missing' => !$this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
                 'app/Domain/Tickets/ProductRequestTicketService.php',
                 'app/Domain/Tickets/ProductRequestTicketValidationException.php',
@@ -431,6 +444,33 @@ return new class implements DatabaseTest {
     private function fileExists(string $relativePath): bool
     {
         return is_file(BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
+    }
+
+    private function allowedTicketProductRoutes(): bool
+    {
+        $routes = $this->read('routes/web.php');
+
+        return $this->containsAll($routes, [
+            "'/tickets/productos'",
+            "'/tickets/productos/crear'",
+            "'/tickets/productos/{id}'",
+            "'/tickets/productos/{id}/partidas/{partidaId}/aprobar'",
+            "'/tickets/productos/{id}/partidas/{partidaId}/rechazar'",
+            "'/tickets/productos/{id}/cancelar'",
+            "tickets_productos.ver",
+            "tickets_productos.crear",
+            "tickets_productos.resolver",
+            "tickets_productos.cancelar",
+            "AuthMiddleware",
+            "PermissionMiddleware",
+        ])
+            && substr_count($routes, "'/tickets/productos'") === 2
+            && substr_count($routes, "'/tickets/productos/crear'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/partidas/{partidaId}/aprobar'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/partidas/{partidaId}/rechazar'") === 1
+            && substr_count($routes, "'/tickets/productos/{id}/cancelar'") === 1
+            && !str_contains($routes, '/tickets-productos');
     }
 
     /**

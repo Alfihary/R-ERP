@@ -25,6 +25,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
@@ -54,7 +55,8 @@ return static function (
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController,
-    AuditController $auditController
+    AuditController $auditController,
+    ProductRequestTicketController $productRequestTicketController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -420,6 +422,60 @@ return static function (
 
         return Response::redirect('/login');
     }, [$authMiddleware]);
+
+    $productTicketMiddleware = static function (string $permission) use (
+        $authMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ];
+    };
+
+    $router->get(
+        '/tickets/productos',
+        static fn (Request $request): Response =>
+            $productRequestTicketController->index($request),
+        $productTicketMiddleware('tickets_productos.ver')
+    );
+    $router->get(
+        '/tickets/productos/crear',
+        static fn (Request $request): Response =>
+            $productRequestTicketController->create($request),
+        $productTicketMiddleware('tickets_productos.crear')
+    );
+    $router->post(
+        '/tickets/productos',
+        static fn (Request $request): Response =>
+            $productRequestTicketController->store($request),
+        $productTicketMiddleware('tickets_productos.crear')
+    );
+    $router->get(
+        '/tickets/productos/{id}',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->show($request, $params),
+        $productTicketMiddleware('tickets_productos.ver')
+    );
+    $router->post(
+        '/tickets/productos/{id}/partidas/{partidaId}/aprobar',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->approveLine($request, $params),
+        $productTicketMiddleware('tickets_productos.resolver')
+    );
+    $router->post(
+        '/tickets/productos/{id}/partidas/{partidaId}/rechazar',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->rejectLine($request, $params),
+        $productTicketMiddleware('tickets_productos.resolver')
+    );
+    $router->post(
+        '/tickets/productos/{id}/cancelar',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->cancel($request, $params),
+        $productTicketMiddleware('tickets_productos.cancelar')
+    );
 
     $auditBaseMiddleware = [
         $authMiddleware,

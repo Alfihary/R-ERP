@@ -31,6 +31,7 @@ use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
+use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Vcards\VcardPrivacyService;
 use App\Domain\Vcards\VcardProductService;
 use App\Domain\Vcards\VcardQrService;
@@ -52,6 +53,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
@@ -74,6 +76,7 @@ use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
+use App\Infrastructure\Repositories\ProductRequestTicketRepository;
 use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
@@ -211,6 +214,9 @@ $inventoryRepository = new InventoryRepository($connection);
 $inventory = new InventoryService($inventoryRepository, $folioService);
 $inventoryTransfers = new InventoryTransferService($inventoryRepository, $folioService);
 $inventoryQueries = new InventoryQueryRepository($connection);
+$productRequestTickets = new ProductRequestTicketService(
+    new ProductRequestTicketRepository($connection)
+);
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
 $catalogController = new CatalogController(
@@ -360,6 +366,10 @@ $auditController = new AuditController(
     $csrf,
     new AuditQueryRepository($connection)
 );
+$productRequestTicketController = new ProductRequestTicketController(
+    $auth,
+    $productRequestTickets
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -390,7 +400,8 @@ $registerRoutes(
     $productPriceController,
     $inventoryController,
     $inventoryTransferController,
-    $auditController
+    $auditController,
+    $productRequestTicketController
 );
 
 return new App($router, $config, $debug, $errorHandler);

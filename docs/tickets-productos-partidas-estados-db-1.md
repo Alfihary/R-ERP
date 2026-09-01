@@ -274,16 +274,26 @@ Después, `TP-PARTIDAS-ESTADOS-PERMISOS-1` autorizó exclusivamente:
 
 - `database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php`
 
+Después, `TP-PARTIDAS-ESTADOS-ROUTES-CONTROLLER-1` autorizó únicamente:
+
+- las 7 rutas privadas exactas de `tickets_productos` en `routes/web.php`;
+- `app/Http/Controllers/ProductRequestTicketController.php`;
+- la integración mínima del controlador en `bootstrap/app.php`.
+
 Por lo tanto, el guardrail heredado queda evolucionado: se permite solo ese
-service/repositorio exacto y solo ese seed exacto de permisos. Siguen prohibidos
-rutas, controladores, vistas, CSS/JS, correos runtime, seeds funcionales de
-tickets y cualquier escritura operativa en productos, precios, inventario,
-compras o proveedores.
+service/repositorio exacto, solo ese seed exacto de permisos, solo esas rutas
+privadas exactas y solo ese controlador. Siguen prohibidos rutas no autorizadas,
+controladores adicionales, vistas, CSS/JS, correos runtime, seeds funcionales de
+tickets, migraciones nuevas y cualquier escritura operativa en productos,
+precios, inventario, compras o proveedores.
 
 ## Qué NO hace esta fase
 
-- No crea rutas funcionales.
-- No crea controladores.
+- No crea rutas durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-ROUTES-CONTROLLER-1` solo se permiten las 7 rutas privadas exactas.
+- No crea controladores durante la fase DB original; en la fase posterior
+  `TP-PARTIDAS-ESTADOS-ROUTES-CONTROLLER-1` solo se permite
+  `ProductRequestTicketController`.
 - No crea vistas.
 - No crea servicios durante la fase DB original; en la fase posterior
   `TP-PARTIDAS-ESTADOS-SERVICE-1` solo se permite el servicio autorizado.
