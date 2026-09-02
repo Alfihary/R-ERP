@@ -141,7 +141,15 @@ return new class implements DatabaseTest {
             ),
             'no_routes_created' => !$this->hasFiles('routes', '/ticket.*producto/i'),
             'no_controllers_created' => !$this->hasFiles('app/Http/Controllers', '/Ticket.*Product/i'),
-            'no_views_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+            'only_expected_ticket_ui_views_created' => $this->onlyExpectedFiles(
+                'app/Views/tickets',
+                '/\\.php$/i',
+                [
+                    'app/Views/tickets/productos/index.php',
+                    'app/Views/tickets/productos/create.php',
+                    'app/Views/tickets/productos/show.php',
+                ]
+            ),
             'no_mail_implemented' => !preg_match('/mail|smtp|correo/i', $service . $repository),
             'no_operational_writes' => !preg_match(
                 '/\\b(INSERT|UPDATE|DELETE)\\s+(?:INTO\\s+)?(?:productos|producto_precios|existencias_producto|movimientos_inventario|compras|proveedores)\\b/i',
@@ -858,6 +866,44 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    /**
+     * @param array<int, string> $expected
+     */
+    private function onlyExpectedFiles(string $relativeDirectory, string $pattern, array $expected): bool
+    {
+        $directory = BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDirectory);
+
+        if (!is_dir($directory)) {
+            return $expected === [];
+        }
+
+        $actual = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $relative = str_replace(
+                [BASE_PATH . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR],
+                ['', '/'],
+                $file->getPathname()
+            );
+
+            if (preg_match($pattern, $relative) === 1) {
+                $actual[] = $relative;
+            }
+        }
+
+        sort($actual);
+        sort($expected);
+
+        return $actual === $expected;
     }
 
     private function allTrue(mixed $value): bool

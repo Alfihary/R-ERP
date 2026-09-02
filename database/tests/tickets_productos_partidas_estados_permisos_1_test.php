@@ -94,7 +94,11 @@ return new class implements DatabaseTest {
             $results['static_guardrails'] = [
                 'no_routes_created' => !$this->hasFiles('routes', '/ticket.*producto/i'),
                 'no_controllers_created' => !$this->hasFiles('app/Http/Controllers', '/Ticket.*Product/i'),
-                'no_views_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+                'only_expected_ticket_ui_views_created' => $this->onlyExpectedFiles('app/Views/tickets', '/\\.php$/i', [
+                    'app/Views/tickets/productos/create.php',
+                    'app/Views/tickets/productos/index.php',
+                    'app/Views/tickets/productos/show.php',
+                ]),
                 'no_mail_runtime_created' =>
                     !$this->hasFiles('app/Domain/Mail', '/Ticket.*Product|Product.*Ticket/i')
                     && !$this->hasFiles('app/Support/Mail', '/Ticket.*Product|Product.*Ticket/i'),
@@ -411,6 +415,25 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    private function onlyExpectedFiles(string $relativeDir, string $pattern, array $expected): bool
+    {
+        $files = [];
+
+        foreach ($this->files($relativeDir) as $path) {
+            if (preg_match($pattern, basename($path)) === 1) {
+                $files[] = $path;
+            }
+        }
+
+        sort($files);
+        sort($expected);
+
+        return $files === $expected;
     }
 
     /**

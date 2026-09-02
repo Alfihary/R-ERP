@@ -366,9 +366,14 @@ return new class implements DatabaseTest {
                     'app/Http/Controllers/ProductRequestTicketController.php',
                 ])
                 && $this->allowedTicketProductRoutes(),
-            'no_views_css_js_or_mail_runtime' =>
-                !$this->hasFiles('app/Views/tickets', '/\\.php$/i')
-                && !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
+            'only_expected_ticket_ui_views_created' =>
+                $this->onlyExpectedFiles('app/Views/tickets', '/\\.php$/i', [
+                    'app/Views/tickets/productos/create.php',
+                    'app/Views/tickets/productos/index.php',
+                    'app/Views/tickets/productos/show.php',
+                ]),
+            'no_css_js_or_mail_runtime' =>
+                !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
             'service_repository_allowed_after_service_phase' =>
                 $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [

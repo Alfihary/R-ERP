@@ -6,9 +6,12 @@ namespace App\Http\Controllers;
 
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\Session;
+use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
+use App\Support\Security\CsrfTokenService;
 
 final class ProductRequestTicketController
 {
@@ -20,25 +23,17 @@ final class ProductRequestTicketController
 
     public function index(Request $request): Response
     {
-        return $this->html(
-            '<h1>Tickets de productos</h1>'
-            . '<p>Solicitud de alta de productos</p>'
-            . '<p><a href="/tickets/productos/crear">Crear solicitud</a></p>'
-        );
+        return $this->render('tickets/productos/index', [
+            'tickets' => [],
+        ]);
     }
 
     public function create(Request $request): Response
     {
-        return $this->html(
-            '<h1>Crear ticket de productos</h1>'
-            . '<p>Formulario mínimo para solicitud documental de alta de productos.</p>'
-            . '<form method="post" action="/tickets/productos">'
-            . '<label>Empresa <input name="empresa_id"></label>'
-            . '<label>Almacén <input name="almacen_id"></label>'
-            . '<label>Descripción <textarea name="partidas[0][descripcion]"></textarea></label>'
-            . '<button type="submit">Crear ticket documental</button>'
-            . '</form>'
-        );
+        return $this->render('tickets/productos/create', [
+            'errors' => [],
+            'values' => [],
+        ]);
     }
 
     public function store(Request $request): Response
@@ -66,40 +61,10 @@ final class ProductRequestTicketController
             return $this->notFound();
         }
 
-        $body = '<h1>Ticket ' . self::escape((string) $ticket['folio']) . '</h1>'
-            . '<p>Estado: ' . self::escape((string) $ticket['estado']) . '</p>'
-            . '<h2>Partidas</h2><ul>';
-
-        foreach ($ticket['partidas'] ?? [] as $partida) {
-            if (!is_array($partida)) {
-                continue;
-            }
-
-            $body .= '<li>'
-                . self::escape((string) ($partida['numero_partida'] ?? ''))
-                . '. '
-                . self::escape((string) ($partida['descripcion'] ?? ''))
-                . ' — '
-                . self::escape((string) ($partida['estado'] ?? ''));
-
-            if (isset($partida['motivo_rechazo']) && $partida['motivo_rechazo'] !== null) {
-                $body .= ' — Motivo: ' . self::escape((string) $partida['motivo_rechazo']);
-            }
-
-            $body .= '</li>';
-        }
-
-        $body .= '</ul><h2>Eventos</h2><ul>';
-
-        foreach ($ticket['eventos'] ?? [] as $evento) {
-            if (!is_array($evento)) {
-                continue;
-            }
-
-            $body .= '<li>' . self::escape((string) ($evento['tipo_evento'] ?? '')) . '</li>';
-        }
-
-        return $this->html($body . '</ul>');
+        return $this->render('tickets/productos/show', [
+            'errors' => [],
+            'ticket' => $ticket,
+        ]);
     }
 
     /**
@@ -116,7 +81,7 @@ final class ProductRequestTicketController
                 $this->userId()
             );
         } catch (ProductRequestTicketValidationException $exception) {
-            return $this->validationResponse($exception);
+            return $this->actionValidationResponse($exception, $params);
         }
 
         return Response::redirect('/tickets/productos/' . $this->id($params['id'] ?? null));
@@ -139,7 +104,7 @@ final class ProductRequestTicketController
                 $this->userId()
             );
         } catch (ProductRequestTicketValidationException $exception) {
-            return $this->validationResponse($exception);
+            return $this->actionValidationResponse($exception, $params);
         }
 
         return Response::redirect('/tickets/productos/' . $this->id($params['id'] ?? null));
@@ -157,7 +122,7 @@ final class ProductRequestTicketController
                 $this->userId()
             );
         } catch (ProductRequestTicketValidationException $exception) {
-            return $this->validationResponse($exception);
+            return $this->actionValidationResponse($exception, $params);
         }
 
         return Response::redirect('/tickets/productos/' . $this->id($params['id'] ?? null));
@@ -230,18 +195,64 @@ final class ProductRequestTicketController
 
     private function validationResponse(ProductRequestTicketValidationException $exception): Response
     {
-        $body = '<h1>Solicitud inválida</h1><ul>';
+        return $this->render('tickets/productos/create', [
+            'errors' => $exception->errors(),
+            'values' => [],
+        ], 422);
+    }
 
-        foreach ($exception->errors() as $field => $message) {
-            $body .= '<li>' . self::escape((string) $field) . ': ' . self::escape((string) $message) . '</li>';
+    /**
+     * @param array<string, string> $params
+     */
+    private function actionValidationResponse(
+        ProductRequestTicketValidationException $exception,
+        array $params
+    ): Response {
+        try {
+            $ticket = $this->tickets->obtenerTicket($this->id($params['id'] ?? null));
+        } catch (ProductRequestTicketValidationException) {
+            $ticket = null;
         }
 
-        return $this->html($body . '</ul>', 422);
+        if ($ticket === null) {
+            return $this->validationResponse($exception);
+        }
+
+        return $this->render('tickets/productos/show', [
+            'errors' => $exception->errors(),
+            'ticket' => $ticket,
+        ], 422);
     }
 
     private function notFound(): Response
     {
         return $this->html('<h1>Ticket no encontrado</h1>', 404);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function render(string $view, array $data, int $status = 200): Response
+    {
+        $this->ensureViewHelpers();
+
+        return Response::html(View::render($view, [
+            'csrf' => $this->csrf(),
+        ] + $data), $status);
+    }
+
+    private function ensureViewHelpers(): void
+    {
+        if (function_exists('csrf_field')) {
+            return;
+        }
+
+        require_once BASE_PATH . '/app/Support/Security/helpers.php';
+    }
+
+    private function csrf(): CsrfTokenService
+    {
+        return new CsrfTokenService(new Session([]));
     }
 
     private static function escape(string $value): string

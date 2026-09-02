@@ -587,7 +587,11 @@ return new class implements DatabaseTest {
     private function guardrailCases(array $before, array $during): array
     {
         return [
-            'no_complete_ticket_views_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+            'only_expected_ticket_ui_views_created' => $this->onlyExpectedFiles('app/Views/tickets', '/\\.php$/i', [
+                'app/Views/tickets/productos/create.php',
+                'app/Views/tickets/productos/index.php',
+                'app/Views/tickets/productos/show.php',
+            ]),
             'no_css_or_js_created' =>
                 !$this->hasFiles('public/css', '/tickets.*productos|productos.*tickets/i')
                 && !$this->hasFiles('public/js', '/tickets.*productos|productos.*tickets/i'),
@@ -709,6 +713,44 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    private function onlyExpectedFiles(string $relativeDirectory, string $pattern, array $expected): bool
+    {
+        $directory = BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDirectory);
+
+        if (!is_dir($directory)) {
+            return $expected === [];
+        }
+
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $relative = str_replace(
+                [BASE_PATH . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR],
+                ['', '/'],
+                $file->getPathname()
+            );
+
+            if (preg_match($pattern, $relative) === 1) {
+                $files[] = $relative;
+            }
+        }
+
+        sort($files);
+        sort($expected);
+
+        return $files === $expected;
     }
 
     private function allTrue(mixed $value): bool

@@ -102,7 +102,12 @@ return new class implements DatabaseTest {
             'ticket_repository_files_are_authorized' => $this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
                 'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
             ]),
-            'no_ticket_view_created' => !$this->hasFiles('app/Views/tickets', '/\\.php$/i'),
+            'only_expected_ticket_ui_views_created' =>
+                $this->onlyExpectedFiles('app/Views/tickets', '/\\.php$/i', [
+                    'app/Views/tickets/productos/create.php',
+                    'app/Views/tickets/productos/index.php',
+                    'app/Views/tickets/productos/show.php',
+                ]),
             'no_ticket_css_or_js_created' =>
                 !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
