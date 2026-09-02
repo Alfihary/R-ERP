@@ -592,9 +592,11 @@ return new class implements DatabaseTest {
                 'app/Views/tickets/productos/index.php',
                 'app/Views/tickets/productos/show.php',
             ]),
-            'no_css_or_js_created' =>
-                !$this->hasFiles('public/css', '/tickets.*productos|productos.*tickets/i')
-                && !$this->hasFiles('public/js', '/tickets.*productos|productos.*tickets/i'),
+            'only_expected_ticket_css_created' =>
+                $this->onlyExpectedFiles('public/css/modules', '/tickets.*productos|productos.*tickets/i', [
+                    'public/css/modules/tickets-productos.css',
+                ]),
+            'no_ticket_js_created' => !$this->hasFiles('public/js', '/tickets.*productos|productos.*tickets/i'),
             'no_mail_runtime_created' =>
                 !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),

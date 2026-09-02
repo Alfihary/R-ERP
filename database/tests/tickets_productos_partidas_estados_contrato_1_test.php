@@ -108,9 +108,11 @@ return new class implements DatabaseTest {
                     'app/Views/tickets/productos/index.php',
                     'app/Views/tickets/productos/show.php',
                 ]),
-            'no_ticket_css_or_js_created' =>
-                !$this->hasFiles('public/css', '/ticket|solicitud|alta/i')
-                && !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
+            'only_expected_ticket_css_created' =>
+                $this->onlyExpectedFiles('public/css/modules', '/tickets.*productos|productos.*tickets/i', [
+                    'public/css/modules/tickets-productos.css',
+                ]),
+            'no_ticket_js_created' => !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
             'permission_seed_is_authorized' => $this->fileExists(
                 'database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'
             ),

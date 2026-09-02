@@ -294,7 +294,11 @@ return new class implements DatabaseTest {
         $countsAfter = $this->operationalCounts();
 
         return [
-            'no_css_created' => !$this->hasFiles('public/css', '/ticket|solicitud|alta/i'),
+            'only_expected_ticket_css_created' => $this->onlyExpectedFiles(
+                'public/css/modules',
+                '/tickets.*productos|productos.*tickets/i',
+                ['public/css/modules/tickets-productos.css']
+            ),
             'no_js_created' => !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
             'no_mail_runtime_created' =>
                 !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
@@ -509,6 +513,44 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    /**
+     * @param array<int, string> $expected
+     */
+    private function onlyExpectedFiles(string $relativeDirectory, string $pattern, array $expected): bool
+    {
+        $directory = BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDirectory);
+
+        if (!is_dir($directory)) {
+            return $expected === [];
+        }
+
+        $actual = [];
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $relative = str_replace(
+                [BASE_PATH . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR],
+                ['', '/'],
+                $file->getPathname()
+            );
+
+            if (preg_match($pattern, $relative) === 1) {
+                $actual[] = $relative;
+            }
+        }
+
+        sort($actual);
+        sort($expected);
+
+        return $actual === $expected;
     }
 
     /**
