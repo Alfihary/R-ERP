@@ -9,15 +9,28 @@ use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Security\PermissionService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
 use App\Support\Security\CsrfTokenService;
 
 final class ProductRequestTicketController
 {
+    private const VISUAL_PERMISSIONS = [
+        'canView' => 'tickets_productos.ver',
+        'canCreate' => 'tickets_productos.crear',
+        'canResolve' => 'tickets_productos.resolver',
+        'canCancel' => 'tickets_productos.cancelar',
+        'canViewAttachments' => 'tickets_productos.adjuntos.ver',
+        'canCreateComments' => 'tickets_productos.comentarios.crear',
+        'canResendEmail' => 'tickets_productos.correo.reenviar',
+        'canViewEvents' => 'tickets_productos.eventos.ver',
+    ];
+
     public function __construct(
         private readonly AuthService $auth,
-        private readonly ProductRequestTicketService $tickets
+        private readonly ProductRequestTicketService $tickets,
+        private readonly ?PermissionService $permissions = null
     ) {
     }
 
@@ -238,7 +251,37 @@ final class ProductRequestTicketController
 
         return Response::html(View::render($view, [
             'csrf' => $this->csrf(),
+            'permissions' => $this->visualPermissions(),
         ] + $data), $status);
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function visualPermissions(): array
+    {
+        $user = $this->auth->user();
+        $permissionService = $this->permissionService();
+        $permissions = [];
+
+        foreach (self::VISUAL_PERMISSIONS as $key => $code) {
+            $permissions[$key] = $user !== null
+                && $permissionService !== null
+                && $permissionService->allows($user['user_id'], $code);
+        }
+
+        return $permissions;
+    }
+
+    private function permissionService(): ?PermissionService
+    {
+        if ($this->permissions instanceof PermissionService) {
+            return $this->permissions;
+        }
+
+        return ($GLOBALS['permissions'] ?? null) instanceof PermissionService
+            ? $GLOBALS['permissions']
+            : null;
     }
 
     private function ensureViewHelpers(): void

@@ -5,6 +5,10 @@ declare(strict_types=1);
 if (!is_array($tickets ?? null)) {
     throw new RuntimeException('Product ticket index data is incomplete.');
 }
+
+$permissions = is_array($permissions ?? null) ? $permissions : [];
+$canView = ($permissions['canView'] ?? false) === true;
+$canCreate = ($permissions['canCreate'] ?? false) === true;
 ?>
 <!doctype html>
 <html lang="es">
@@ -20,7 +24,11 @@ if (!is_array($tickets ?? null)) {
         <header class="page-heading ticket-products__hero">
             <div class="page-heading__eyebrow">
                 <p class="page-heading__path">Solicitudes de alta de productos</p>
-                <a class="button" href="/tickets/productos/crear">Nuevo ticket</a>
+                <?php if ($canCreate): ?>
+                    <a class="button" href="/tickets/productos/crear">Nuevo ticket</a>
+                <?php else: ?>
+                    <span class="ticket-products__permission-note">No tienes permiso para crear tickets.</span>
+                <?php endif; ?>
             </div>
             <h1>Tickets de productos</h1>
             <p>
@@ -81,9 +89,13 @@ if (!is_array($tickets ?? null)) {
                                     <td><?= e($ticket['partidas_aprobadas'] ?? '0') ?></td>
                                     <td><?= e($ticket['partidas_rechazadas'] ?? '0') ?></td>
                                     <td>
-                                        <a class="button button--sm button--secondary" href="/tickets/productos/<?= e((string) ($ticket['id'] ?? '')) ?>">
-                                            Ver detalle
-                                        </a>
+                                        <?php if ($canView): ?>
+                                            <a class="button button--sm button--secondary" href="/tickets/productos/<?= e((string) ($ticket['id'] ?? '')) ?>">
+                                                Ver detalle
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="ticket-products__permission-note">Sin permiso de detalle</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

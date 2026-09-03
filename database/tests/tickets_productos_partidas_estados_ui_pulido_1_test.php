@@ -151,15 +151,18 @@ return new class implements DatabaseTest {
                     'partidas_aprobadas' => 0,
                     'partidas_rechazadas' => 0,
                 ]],
+                'permissions' => $this->allVisualPermissions(),
             ]),
             'create' => $this->render('app/Views/tickets/productos/create.php', [
                 'csrf' => $csrf,
                 'errors' => [],
                 'values' => [],
+                'permissions' => $this->allVisualPermissions(),
             ]),
             'show' => $this->render('app/Views/tickets/productos/show.php', [
                 'csrf' => $csrf,
                 'errors' => [],
+                'permissions' => $this->allVisualPermissions(),
                 'ticket' => [
                     'id' => 10,
                     'folio' => 'GU-000010',
@@ -195,6 +198,23 @@ return new class implements DatabaseTest {
                     ]],
                 ],
             ]),
+        ];
+    }
+
+    /**
+     * @return array<string, bool>
+     */
+    private function allVisualPermissions(): array
+    {
+        return [
+            'canView' => true,
+            'canCreate' => true,
+            'canResolve' => true,
+            'canCancel' => true,
+            'canViewAttachments' => true,
+            'canCreateComments' => true,
+            'canResendEmail' => true,
+            'canViewEvents' => true,
         ];
     }
 

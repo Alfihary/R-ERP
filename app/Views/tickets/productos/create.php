@@ -7,6 +7,9 @@ use App\Support\Security\CsrfTokenService;
 if (!$csrf instanceof CsrfTokenService || !is_array($errors ?? null) || !is_array($values ?? null)) {
     throw new RuntimeException('Product ticket create data is incomplete.');
 }
+
+$permissions = is_array($permissions ?? null) ? $permissions : [];
+$canCreate = ($permissions['canCreate'] ?? false) === true;
 ?>
 <!doctype html>
 <html lang="es">
@@ -42,6 +45,12 @@ if (!$csrf instanceof CsrfTokenService || !is_array($errors ?? null) || !is_arra
             </section>
         <?php endif; ?>
 
+        <?php if (!$canCreate): ?>
+            <section class="alert alert--warning ticket-products__permission-alert" role="alert">
+                <strong>No tienes permiso para crear tickets.</strong>
+                <p>La ruta conserva el control principal de seguridad mediante middleware.</p>
+            </section>
+        <?php else: ?>
         <form class="ticket-products__form" method="post" action="/tickets/productos">
             <?= csrf_field($csrf) ?>
 
@@ -144,6 +153,7 @@ if (!$csrf instanceof CsrfTokenService || !is_array($errors ?? null) || !is_arra
                 <a class="button button--secondary" href="/tickets/productos">Cancelar</a>
             </div>
         </form>
+        <?php endif; ?>
     </main>
 </body>
 </html>

@@ -378,7 +378,7 @@ return new class implements DatabaseTest {
             new PermissionRepository($GLOBALS['tp_product_ticket_routes_controller_connection'])
         );
         $csrf = new CsrfTokenService($session, 7200);
-        $controller = new ProductRequestTicketController($auth, $this->service);
+        $controller = new ProductRequestTicketController($auth, $this->service, $permissions);
         $router = new Router();
         $router->middleware(new CsrfMiddleware($csrf));
         $authMiddleware = new AuthMiddleware($auth);

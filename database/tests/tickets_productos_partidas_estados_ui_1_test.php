@@ -5,12 +5,15 @@ declare(strict_types=1);
 use App\Core\Request;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
+use App\Domain\Security\PermissionService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
+use App\Infrastructure\Database\Seed;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
 return new class implements DatabaseTest {
@@ -31,8 +34,10 @@ return new class implements DatabaseTest {
 
         $migration = require BASE_PATH
             . '/database/migrations/tp_partidas_estados_db_1_001_create_ticket_product_tables.php';
+        $seed = require BASE_PATH
+            . '/database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php';
 
-        if (!$migration instanceof Migration) {
+        if (!$migration instanceof Migration || !$seed instanceof Seed) {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-UI-1 migration dependency is invalid.');
         }
 
@@ -46,6 +51,7 @@ return new class implements DatabaseTest {
         $pdo->beginTransaction();
 
         try {
+            $seed->run($pdo);
             $fixture = $this->fixture();
             $controller = $this->controllerFor($fixture['user_id']);
 
@@ -208,6 +214,7 @@ return new class implements DatabaseTest {
     private function fixture(): array
     {
         $userId = $this->createUser();
+        $this->assignAdminRole($userId);
         $companyId = $this->createCompany($userId);
         $warehouseId = $this->createWarehouse($companyId, $userId);
 
@@ -240,7 +247,11 @@ return new class implements DatabaseTest {
             $session
         );
 
-        return new ProductRequestTicketController($auth, $this->service());
+        return new ProductRequestTicketController(
+            $auth,
+            $this->service(),
+            new PermissionService(new PermissionRepository($GLOBALS['tp_product_ticket_ui_connection']))
+        );
     }
 
     private function service(): ProductRequestTicketService
@@ -382,6 +393,38 @@ return new class implements DatabaseTest {
         ]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function assignAdminRole(int $userId): void
+    {
+        $roleId = $this->activeAdminRoleId();
+
+        if ($roleId < 1) {
+            throw new RuntimeException('ADMIN role is required for TP-PARTIDAS-ESTADOS-UI-1 visual permissions.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO usuario_roles (usuario_id, rol_id, activo)
+             VALUES (:usuario_id, :rol_id, 1)'
+        );
+        $statement->execute([
+            'usuario_id' => $userId,
+            'rol_id' => $roleId,
+        ]);
+    }
+
+    private function activeAdminRoleId(): int
+    {
+        if (!$this->tableExists('roles')) {
+            return 0;
+        }
+
+        $statement = $this->pdo->prepare(
+            "SELECT id FROM roles WHERE codigo = 'ADMIN' AND activo = 1 AND eliminado_en IS NULL LIMIT 1"
+        );
+        $statement->execute();
+
+        return (int) ($statement->fetchColumn() ?: 0);
     }
 
     private function createCompany(int $userId): int

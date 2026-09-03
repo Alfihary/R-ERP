@@ -12,6 +12,13 @@ $ticketId = (string) ($ticket['id'] ?? '');
 $partidas = is_array($ticket['partidas'] ?? null) ? $ticket['partidas'] : [];
 $eventos = is_array($ticket['eventos'] ?? null) ? $ticket['eventos'] : [];
 $estadoTicket = (string) ($ticket['estado'] ?? '');
+$permissions = is_array($permissions ?? null) ? $permissions : [];
+$canResolve = ($permissions['canResolve'] ?? false) === true;
+$canCancel = ($permissions['canCancel'] ?? false) === true;
+$canViewAttachments = ($permissions['canViewAttachments'] ?? false) === true;
+$canCreateComments = ($permissions['canCreateComments'] ?? false) === true;
+$canResendEmail = ($permissions['canResendEmail'] ?? false) === true;
+$canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
 ?>
 <!doctype html>
 <html lang="es">
@@ -102,67 +109,92 @@ $estadoTicket = (string) ($ticket['estado'] ?? '');
                             <div><dt>Comentario de resolución</dt><dd><?= e($partida['comentario_resolucion'] ?? '—') ?></dd></div>
                         </dl>
 
-                        <div class="ticket-products__line-actions">
-                            <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
-                                <?= csrf_field($csrf) ?>
-                                <label class="field">
-                                    <span>Comentario de resolución</span>
-                                    <textarea name="comentario_resolucion"></textarea>
-                                </label>
-                                <button class="button" type="submit">Aprobar partida</button>
-                            </form>
+                        <?php if ($canResolve): ?>
+                            <div class="ticket-products__line-actions">
+                                <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
+                                    <?= csrf_field($csrf) ?>
+                                    <label class="field">
+                                        <span>Comentario de resolución</span>
+                                        <textarea name="comentario_resolucion"></textarea>
+                                    </label>
+                                    <button class="button" type="submit">Aprobar partida</button>
+                                </form>
 
-                            <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/rechazar">
-                                <?= csrf_field($csrf) ?>
-                                <label class="field">
-                                    <span>Motivo de rechazo</span>
-                                    <textarea name="motivo_rechazo" required></textarea>
-                                </label>
-                                <label class="field">
-                                    <span>Comentario de resolución</span>
-                                    <textarea name="comentario_resolucion"></textarea>
-                                </label>
-                                <button class="button button--secondary" type="submit">Rechazar partida</button>
-                            </form>
-                        </div>
+                                <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/rechazar">
+                                    <?= csrf_field($csrf) ?>
+                                    <label class="field">
+                                        <span>Motivo de rechazo</span>
+                                        <textarea name="motivo_rechazo" required></textarea>
+                                    </label>
+                                    <label class="field">
+                                        <span>Comentario de resolución</span>
+                                        <textarea name="comentario_resolucion"></textarea>
+                                    </label>
+                                    <button class="button button--secondary" type="submit">Rechazar partida</button>
+                                </form>
+                            </div>
+                        <?php else: ?>
+                            <p class="ticket-products__permission-note">No tienes permiso para aprobar o rechazar partidas.</p>
+                        <?php endif; ?>
                     </article>
                 <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </section>
 
-        <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-cancelar">
-            <h2 id="ticket-producto-cancelar">Cancelar ticket</h2>
-            <form class="ticket-products__action-form ticket-products__cancel-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/cancelar">
-                <?= csrf_field($csrf) ?>
-                <label class="field">
-                    <span>Motivo de cancelación</span>
-                    <textarea name="motivo" required></textarea>
-                </label>
-                <button class="button button--secondary" type="submit">Cancelar ticket</button>
-            </form>
-        </section>
+        <?php if ($canCancel): ?>
+            <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-cancelar">
+                <h2 id="ticket-producto-cancelar">Cancelar ticket</h2>
+                <form class="ticket-products__action-form ticket-products__cancel-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/cancelar">
+                    <?= csrf_field($csrf) ?>
+                    <label class="field">
+                        <span>Motivo de cancelación</span>
+                        <textarea name="motivo" required></textarea>
+                    </label>
+                    <button class="button button--secondary" type="submit">Cancelar ticket</button>
+                </form>
+            </section>
+        <?php endif; ?>
 
-        <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-eventos">
-            <h2 id="ticket-producto-eventos">Eventos</h2>
-            <?php if ($eventos === []): ?>
-                <p class="ticket-products__hint">Sin eventos visibles.</p>
-            <?php else: ?>
-                <ul class="ticket-products__events">
-                    <?php foreach ($eventos as $evento): ?>
-                        <?php if (!is_array($evento)) {
-                            continue;
-                        } ?>
-                        <li>
-                            <?= e($evento['evento'] ?? '') ?>
-                            <?php if (($evento['descripcion'] ?? null) !== null): ?>
-                                — <?= e($evento['descripcion']) ?>
-                            <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            <?php endif; ?>
-        </section>
+        <?php if ($canViewAttachments || $canCreateComments || $canResendEmail): ?>
+            <section class="home-section ticket-products__section ticket-products__placeholders" aria-labelledby="ticket-producto-acciones-documentales">
+                <h2 id="ticket-producto-acciones-documentales">Acciones documentales</h2>
+                <?php if ($canViewAttachments): ?>
+                    <p class="ticket-products__placeholder">Adjuntos documentales pendientes de fase posterior.</p>
+                <?php endif; ?>
+                <?php if ($canCreateComments): ?>
+                    <p class="ticket-products__placeholder">Comentarios documentales pendientes de fase posterior.</p>
+                <?php endif; ?>
+                <?php if ($canResendEmail): ?>
+                    <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>
+                        Reenvío de correo pendiente de fase posterior.
+                    </button>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
+
+        <?php if ($canViewEvents): ?>
+            <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-eventos">
+                <h2 id="ticket-producto-eventos">Eventos</h2>
+                <?php if ($eventos === []): ?>
+                    <p class="ticket-products__hint">Sin eventos visibles.</p>
+                <?php else: ?>
+                    <ul class="ticket-products__events">
+                        <?php foreach ($eventos as $evento): ?>
+                            <?php if (!is_array($evento)) {
+                                continue;
+                            } ?>
+                            <li>
+                                <?= e($evento['evento'] ?? '') ?>
+                                <?php if (($evento['descripcion'] ?? null) !== null): ?>
+                                    — <?= e($evento['descripcion']) ?>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
 
         <p><a class="button button--secondary" href="/tickets/productos">Volver a tickets</a></p>
     </main>
