@@ -12,6 +12,8 @@ use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
+use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\ProductRequestTicketRepository;
 use App\Support\Security\CsrfTokenService;
 
 final class ProductRequestTicketController
@@ -30,14 +32,18 @@ final class ProductRequestTicketController
     public function __construct(
         private readonly AuthService $auth,
         private readonly ProductRequestTicketService $tickets,
-        private readonly ?PermissionService $permissions = null
+        private readonly ?PermissionService $permissions = null,
+        private readonly ?ProductRequestTicketRepository $ticketRepository = null
     ) {
     }
 
     public function index(Request $request): Response
     {
+        $listing = $this->listing($request);
+
         return $this->render('tickets/productos/index', [
-            'tickets' => [],
+            'tickets' => $listing['items'],
+            'listing' => $listing,
         ]);
     }
 
@@ -282,6 +288,87 @@ final class ProductRequestTicketController
         return ($GLOBALS['permissions'] ?? null) instanceof PermissionService
             ? $GLOBALS['permissions']
             : null;
+    }
+
+    /**
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     pagination: array{page: int, perPage: int, total: int, totalPages: int},
+     *     filters: array<string, mixed>
+     * }
+     */
+    private function listing(Request $request): array
+    {
+        $repository = $this->repository();
+
+        if ($repository === null) {
+            return [
+                'items' => [],
+                'pagination' => [
+                    'page' => 1,
+                    'perPage' => 20,
+                    'total' => 0,
+                    'totalPages' => 1,
+                ],
+                'filters' => [
+                    'folio' => '',
+                    'estado' => '',
+                    'empresa_id' => null,
+                    'almacen_id' => null,
+                    'fecha_desde' => '',
+                    'fecha_hasta' => '',
+                ],
+            ];
+        }
+
+        $query = $request->query();
+
+        return $repository->listar(
+            [
+                'folio' => $query['folio'] ?? '',
+                'estado' => $query['estado'] ?? '',
+                'empresa_id' => $query['empresa_id'] ?? null,
+                'almacen_id' => $query['almacen_id'] ?? null,
+                'fecha_desde' => $query['fecha_desde'] ?? '',
+                'fecha_hasta' => $query['fecha_hasta'] ?? '',
+            ],
+            $this->positiveInteger($query['page'] ?? null, 1),
+            $this->perPage($query['per_page'] ?? null)
+        );
+    }
+
+    private function repository(): ?ProductRequestTicketRepository
+    {
+        if ($this->ticketRepository instanceof ProductRequestTicketRepository) {
+            return $this->ticketRepository;
+        }
+
+        if (($GLOBALS['connection'] ?? null) instanceof ConnectionProvider) {
+            return new ProductRequestTicketRepository($GLOBALS['connection']);
+        }
+
+        $config = require BASE_PATH . '/bootstrap/database.php';
+        $databaseConfig = $config->get('database', []);
+
+        return is_array($databaseConfig)
+            ? new ProductRequestTicketRepository(new ConnectionProvider($databaseConfig))
+            : null;
+    }
+
+    private function positiveInteger(mixed $value, int $default): int
+    {
+        if ((!is_string($value) && !is_int($value)) || preg_match('/^[1-9]\d*$/', (string) $value) !== 1) {
+            return $default;
+        }
+
+        return (int) $value;
+    }
+
+    private function perPage(mixed $value): int
+    {
+        $perPage = $this->positiveInteger($value, 20);
+
+        return in_array($perPage, [10, 20, 50], true) ? $perPage : 20;
     }
 
     private function ensureViewHelpers(): void

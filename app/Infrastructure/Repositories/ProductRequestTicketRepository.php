@@ -47,6 +47,117 @@ final class ProductRequestTicketRepository
     }
 
     /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     pagination: array{page: int, perPage: int, total: int, totalPages: int},
+     *     filters: array<string, mixed>
+     * }
+     */
+    public function listar(array $filters, int $page = 1, int $perPage = 20): array
+    {
+        $filters = $this->normalizeListFilters($filters);
+        $page = max(1, $page);
+        $perPage = in_array($perPage, [10, 20, 50], true) ? $perPage : 20;
+        $where = ['tp.deleted_at IS NULL'];
+        $params = [];
+
+        if ($filters['folio'] !== '') {
+            $where[] = "tp.folio LIKE :folio ESCAPE '\\\\'";
+            $params['folio'] = '%' . $this->escapeLike($filters['folio']) . '%';
+        }
+
+        if ($filters['estado'] !== '') {
+            $where[] = 'tp.estado = :estado';
+            $params['estado'] = $filters['estado'];
+        }
+
+        if ($filters['empresa_id'] !== null) {
+            $where[] = 'tp.empresa_id = :empresa_id';
+            $params['empresa_id'] = $filters['empresa_id'];
+        }
+
+        if ($filters['almacen_id'] !== null) {
+            $where[] = 'tp.almacen_id = :almacen_id';
+            $params['almacen_id'] = $filters['almacen_id'];
+        }
+
+        if ($filters['fecha_desde'] !== '') {
+            $where[] = 'tp.created_at >= :fecha_desde';
+            $params['fecha_desde'] = $filters['fecha_desde'] . ' 00:00:00';
+        }
+
+        if ($filters['fecha_hasta'] !== '') {
+            $where[] = 'tp.created_at <= :fecha_hasta';
+            $params['fecha_hasta'] = $filters['fecha_hasta'] . ' 23:59:59';
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM tickets_productos tp
+             WHERE ' . $whereSql
+        );
+        $count->execute($params);
+        $total = (int) $count->fetchColumn();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                tp.id,
+                tp.folio,
+                tp.estado,
+                tp.empresa_id,
+                e.nombre AS empresa_nombre,
+                tp.almacen_id,
+                a.nombre AS almacen_nombre,
+                a.codigo AS almacen_codigo,
+                tp.solicitante_usuario_id AS solicitante_id,
+                u.username AS solicitante_nombre,
+                tp.total_partidas,
+                tp.partidas_en_revision,
+                tp.partidas_aprobadas,
+                tp.partidas_rechazadas,
+                tp.created_at,
+                tp.updated_at
+             FROM tickets_productos tp
+             LEFT JOIN empresas e
+                ON e.id = tp.empresa_id
+               AND e.eliminado_en IS NULL
+             LEFT JOIN almacenes a
+                ON a.id = tp.almacen_id
+               AND a.eliminado_en IS NULL
+             LEFT JOIN usuarios u
+                ON u.id = tp.solicitante_usuario_id
+               AND u.eliminado_en IS NULL
+             WHERE ' . $whereSql . '
+             ORDER BY tp.created_at DESC, tp.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+
+        foreach ($params as $key => $value) {
+            $statement->bindValue(':' . $key, $value);
+        }
+
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        return [
+            'items' => $statement->fetchAll(),
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $total,
+                'totalPages' => $totalPages,
+            ],
+            'filters' => $filters,
+        ];
+    }
+
+    /**
      * @template T
      * @param callable(): T $operation
      * @return T
@@ -64,6 +175,65 @@ final class ProductRequestTicketRepository
             $this->rollBack($ownsTransaction);
             throw $exception;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{
+     *     folio: string,
+     *     estado: string,
+     *     empresa_id: int|null,
+     *     almacen_id: int|null,
+     *     fecha_desde: string,
+     *     fecha_hasta: string
+     * }
+     */
+    private function normalizeListFilters(array $filters): array
+    {
+        $estado = strtoupper(trim((string) ($filters['estado'] ?? '')));
+        $allowedStates = [
+            'EN_REVISION',
+            'RESUELTO_PARCIAL',
+            'APROBADO',
+            'RECHAZADO',
+            'CANCELADO',
+        ];
+
+        return [
+            'folio' => trim((string) ($filters['folio'] ?? '')),
+            'estado' => in_array($estado, $allowedStates, true) ? $estado : '',
+            'empresa_id' => $this->positiveIntegerOrNull($filters['empresa_id'] ?? null),
+            'almacen_id' => $this->positiveIntegerOrNull($filters['almacen_id'] ?? null),
+            'fecha_desde' => $this->dateOrEmpty($filters['fecha_desde'] ?? null),
+            'fecha_hasta' => $this->dateOrEmpty($filters['fecha_hasta'] ?? null),
+        ];
+    }
+
+    private function positiveIntegerOrNull(mixed $value): ?int
+    {
+        if ((!is_string($value) && !is_int($value)) || preg_match('/^[1-9]\d*$/', (string) $value) !== 1) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    private function dateOrEmpty(mixed $value): string
+    {
+        $date = trim((string) $value);
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            return '';
+        }
+
+        [$year, $month, $day] = array_map('intval', explode('-', $date));
+
+        return checkdate($month, $day, $year) ? $date : '';
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     public function activeUserExists(int $userId): bool
