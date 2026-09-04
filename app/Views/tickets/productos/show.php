@@ -19,6 +19,23 @@ $canViewAttachments = ($permissions['canViewAttachments'] ?? false) === true;
 $canCreateComments = ($permissions['canCreateComments'] ?? false) === true;
 $canResendEmail = ($permissions['canResendEmail'] ?? false) === true;
 $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
+$isCancelled = $estadoTicket === 'CANCELADO';
+$formatValue = static fn (mixed $value): string => trim((string) ($value ?? '')) !== '' ? (string) $value : '—';
+$countByState = static function (array $items, string $state): int {
+    $count = 0;
+
+    foreach ($items as $item) {
+        if (is_array($item) && (string) ($item['estado'] ?? '') === $state) {
+            $count++;
+        }
+    }
+
+    return $count;
+};
+$totalPartidas = (int) ($ticket['total_partidas'] ?? count($partidas));
+$partidasEnRevision = (int) ($ticket['partidas_en_revision'] ?? $countByState($partidas, 'EN_REVISION'));
+$partidasAprobadas = (int) ($ticket['partidas_aprobadas'] ?? $countByState($partidas, 'APROBADA'));
+$partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($partidas, 'RECHAZADA'));
 ?>
 <!doctype html>
 <html lang="es">
@@ -36,11 +53,21 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
                 <p class="page-heading__path">Solicitud documental de alta de productos</p>
                 <a class="button button--secondary" href="/tickets/productos">Volver a tickets</a>
             </div>
-            <h1>Ticket <?= e($ticket['folio'] ?? '') ?></h1>
-            <p>Estado: <span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estadoTicket)) ?>"><?= e($estadoTicket) ?></span></p>
-            <p class="alert alert--warning ticket-products__note" role="note">
-                Autorizar una partida no crea el producto en el catálogo.
-            </p>
+            <div class="ticket-products__detail-head">
+                <div>
+                    <span class="ticket-products__overline">Folio</span>
+                    <h1>Ticket <?= e($ticket['folio'] ?? '') ?></h1>
+                </div>
+                <span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estadoTicket)) ?>"><?= e($estadoTicket) ?></span>
+            </div>
+            <div class="ticket-products__warnings" role="note">
+                <p class="alert alert--warning ticket-products__note">
+                    Este ticket es documental y no crea productos reales.
+                </p>
+                <p class="alert alert--warning ticket-products__note">
+                    Autorizar una partida no crea el producto en el catálogo.
+                </p>
+            </div>
         </header>
 
         <?php if ($errors !== []): ?>
@@ -62,14 +89,30 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
                 </div>
             </div>
             <dl class="ticket-products__summary">
-                <div><dt>Empresa</dt><dd><?= e($ticket['empresa_id'] ?? '') ?></dd></div>
-                <div><dt>Almacén</dt><dd><?= e($ticket['almacen_id'] ?? '') ?></dd></div>
-                <div><dt>Solicitante</dt><dd><?= e($ticket['solicitante_usuario_id'] ?? '') ?></dd></div>
-                <div><dt>Total partidas</dt><dd><?= e($ticket['total_partidas'] ?? '0') ?></dd></div>
-                <div><dt>En revisión</dt><dd><?= e($ticket['partidas_en_revision'] ?? '0') ?></dd></div>
-                <div><dt>Aprobadas</dt><dd><?= e($ticket['partidas_aprobadas'] ?? '0') ?></dd></div>
-                <div><dt>Rechazadas</dt><dd><?= e($ticket['partidas_rechazadas'] ?? '0') ?></dd></div>
-                <div class="ticket-products__summary-full"><dt>Observaciones generales</dt><dd><?= e($ticket['observaciones_generales'] ?? '—') ?></dd></div>
+                <div><dt>Empresa</dt><dd><?= e($formatValue($ticket['empresa_nombre'] ?? $ticket['empresa_id'] ?? null)) ?></dd></div>
+                <div><dt>Almacén</dt><dd><?= e($formatValue($ticket['almacen_nombre'] ?? $ticket['almacen_id'] ?? null)) ?></dd></div>
+                <div><dt>Solicitante</dt><dd><?= e($formatValue($ticket['solicitante_nombre'] ?? $ticket['solicitante_usuario_id'] ?? null)) ?></dd></div>
+                <div><dt>Fecha de creación</dt><dd><?= e($formatValue($ticket['created_at'] ?? null)) ?></dd></div>
+                <div><dt>Última actualización</dt><dd><?= e($formatValue($ticket['updated_at'] ?? null)) ?></dd></div>
+                <?php if (($ticket['motivo_cancelacion'] ?? null) !== null): ?>
+                    <div><dt>Motivo de cancelación</dt><dd><?= e($formatValue($ticket['motivo_cancelacion'])) ?></dd></div>
+                <?php endif; ?>
+                <div class="ticket-products__summary-full"><dt>Observaciones generales</dt><dd><?= e($formatValue($ticket['observaciones_generales'] ?? null)) ?></dd></div>
+            </dl>
+        </section>
+
+        <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-resumen-partidas">
+            <div class="home-section__heading">
+                <div>
+                    <p class="section-kicker">Resumen de partidas</p>
+                    <h2 id="ticket-producto-resumen-partidas">Estado documental</h2>
+                </div>
+            </div>
+            <dl class="ticket-products__metrics">
+                <div><dt>Total</dt><dd><?= e((string) $totalPartidas) ?></dd></div>
+                <div><dt>En revisión</dt><dd><?= e((string) $partidasEnRevision) ?></dd></div>
+                <div><dt>Aprobadas</dt><dd><?= e((string) $partidasAprobadas) ?></dd></div>
+                <div><dt>Rechazadas</dt><dd><?= e((string) $partidasRechazadas) ?></dd></div>
             </dl>
         </section>
 
@@ -96,20 +139,24 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
                             <span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estadoPartida)) ?>"><?= e($estadoPartida) ?></span>
                         </div>
                         <dl class="ticket-products__line-data">
-                            <div class="ticket-products__line-full"><dt>Descripción</dt><dd><?= e($partida['descripcion'] ?? '') ?></dd></div>
-                            <div><dt>Modelo</dt><dd><?= e($partida['modelo'] ?? '—') ?></dd></div>
-                            <div><dt>Marca</dt><dd><?= e($partida['marca_texto'] ?? '—') ?></dd></div>
-                            <div><dt>Proveedor documental</dt><dd><?= e($partida['proveedor_texto'] ?? '—') ?></dd></div>
-                            <div><dt>Unidad SAT / clave SAT</dt><dd><?= e($partida['unidad_sat_id'] ?? '—') ?> / <?= e($partida['clave_sat_id'] ?? '—') ?></dd></div>
-                            <div><dt>Costo sugerido documental</dt><dd><?= e($partida['costo_sugerido'] ?? '—') ?></dd></div>
-                            <div><dt>Peso</dt><dd><?= e($partida['peso'] ?? '—') ?></dd></div>
+                            <div class="ticket-products__line-full"><dt>Descripción</dt><dd><?= e($formatValue($partida['descripcion'] ?? null)) ?></dd></div>
+                            <div><dt>Modelo</dt><dd><?= e($formatValue($partida['modelo'] ?? null)) ?></dd></div>
+                            <div><dt>Marca documental</dt><dd><?= e($formatValue($partida['marca_texto'] ?? null)) ?></dd></div>
+                            <div><dt>Proveedor documental</dt><dd><?= e($formatValue($partida['proveedor_texto'] ?? null)) ?></dd></div>
+                            <div><dt>Unidad SAT</dt><dd><?= e($formatValue($partida['unidad_sat_id'] ?? null)) ?></dd></div>
+                            <div><dt>Clave SAT</dt><dd><?= e($formatValue($partida['clave_sat_id'] ?? null)) ?></dd></div>
+                            <div><dt>Moneda</dt><dd><?= e($formatValue($partida['moneda_id'] ?? null)) ?></dd></div>
+                            <div><dt>Costo sugerido <span class="ticket-products__muted-inline">documental</span></dt><dd><?= e($formatValue($partida['costo_sugerido'] ?? null)) ?></dd></div>
+                            <div><dt>Peso</dt><dd><?= e($formatValue($partida['peso'] ?? null)) ?></dd></div>
                             <div><dt>Lleva serie</dt><dd><?= ((int) ($partida['lleva_serie'] ?? 0)) === 1 ? 'Sí' : 'No' ?></dd></div>
-                            <div class="ticket-products__line-full"><dt>Observaciones</dt><dd><?= e($partida['observaciones'] ?? '—') ?></dd></div>
-                            <div><dt>Motivo de rechazo</dt><dd><?= e($partida['motivo_rechazo'] ?? '—') ?></dd></div>
-                            <div><dt>Comentario de resolución</dt><dd><?= e($partida['comentario_resolucion'] ?? '—') ?></dd></div>
+                            <div><dt>Resuelto por</dt><dd><?= e($formatValue($partida['resuelto_por_usuario_id'] ?? null)) ?></dd></div>
+                            <div><dt>Fecha de resolución</dt><dd><?= e($formatValue($partida['resuelto_at'] ?? null)) ?></dd></div>
+                            <div class="ticket-products__line-full"><dt>Observaciones</dt><dd><?= e($formatValue($partida['observaciones'] ?? null)) ?></dd></div>
+                            <div class="ticket-products__line-full"><dt>Motivo de rechazo</dt><dd><?= e($formatValue($partida['motivo_rechazo'] ?? null)) ?></dd></div>
+                            <div class="ticket-products__line-full"><dt>Comentario de resolución</dt><dd><?= e($formatValue($partida['comentario_resolucion'] ?? null)) ?></dd></div>
                         </dl>
 
-                        <?php if ($canResolve): ?>
+                        <?php if ($canResolve && $estadoPartida === 'EN_REVISION'): ?>
                             <div class="ticket-products__line-actions">
                                 <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
                                     <?= csrf_field($csrf) ?>
@@ -133,6 +180,8 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
                                     <button class="button button--secondary" type="submit">Rechazar partida</button>
                                 </form>
                             </div>
+                        <?php elseif ($canResolve): ?>
+                            <p class="ticket-products__permission-note">Esta partida ya fue resuelta; las acciones de aprobación y rechazo están ocultas.</p>
                         <?php else: ?>
                             <p class="ticket-products__permission-note">No tienes permiso para aprobar o rechazar partidas.</p>
                         <?php endif; ?>
@@ -142,7 +191,7 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
             <?php endif; ?>
         </section>
 
-        <?php if ($canCancel): ?>
+        <?php if ($canCancel && !$isCancelled): ?>
             <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-cancelar">
                 <h2 id="ticket-producto-cancelar">Cancelar ticket</h2>
                 <form class="ticket-products__action-form ticket-products__cancel-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/cancelar">
@@ -185,10 +234,12 @@ $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
                                 continue;
                             } ?>
                             <li>
-                                <?= e($evento['evento'] ?? '') ?>
-                                <?php if (($evento['descripcion'] ?? null) !== null): ?>
-                                    — <?= e($evento['descripcion']) ?>
-                                <?php endif; ?>
+                                <span class="ticket-products__event-type"><?= e($formatValue($evento['evento'] ?? null)) ?></span>
+                                <span class="ticket-products__event-copy"><?= e($formatValue($evento['descripcion'] ?? null)) ?></span>
+                                <span class="ticket-products__event-meta">
+                                    Usuario <?= e($formatValue($evento['usuario_id'] ?? null)) ?>
+                                    · <?= e($formatValue($evento['created_at'] ?? null)) ?>
+                                </span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
