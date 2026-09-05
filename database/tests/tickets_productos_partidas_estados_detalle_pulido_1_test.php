@@ -78,9 +78,10 @@ return new class implements DatabaseTest {
                 'attachments_placeholder_only_with_permission' =>
                     str_contains($html['all'], 'Adjuntos documentales pendientes de fase posterior.')
                     && !str_contains($html['limited'], 'Adjuntos documentales pendientes de fase posterior.'),
-                'comments_placeholder_only_with_permission' =>
-                    str_contains($html['all'], 'Comentarios documentales pendientes de fase posterior.')
-                    && !str_contains($html['limited'], 'Comentarios documentales pendientes de fase posterior.'),
+                'comments_contract_only_with_permission' =>
+                    str_contains($html['all'], 'Los comentarios son documentales y no modifican el estado del ticket.')
+                    && str_contains($html['all'], 'Agregar comentario general')
+                    && !str_contains($html['limited'], 'Agregar comentario general'),
                 'email_placeholder_disabled_only_with_permission' =>
                     str_contains($html['all'], 'Reenvío de correo pendiente de fase posterior.')
                     && str_contains($html['all'], 'disabled')

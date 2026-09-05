@@ -634,6 +634,39 @@ final class ProductRequestTicketRepository
         ]);
     }
 
+    public function agregarComentario(
+        int $ticketId,
+        ?int $partidaId,
+        int $userId,
+        string $comment
+    ): int {
+        $statement = $this->connection->pdo()->prepare(
+            'INSERT INTO tickets_productos_comentarios (
+                ticket_producto_id,
+                partida_id,
+                usuario_id,
+                comentario,
+                visibilidad,
+                created_at
+             ) VALUES (
+                :ticket_producto_id,
+                :partida_id,
+                :usuario_id,
+                :comentario,
+                \'INTERNA\',
+                CURRENT_TIMESTAMP
+             )'
+        );
+        $statement->execute([
+            'ticket_producto_id' => $ticketId,
+            'partida_id' => $partidaId,
+            'usuario_id' => $userId,
+            'comentario' => $comment,
+        ]);
+
+        return (int) $this->connection->pdo()->lastInsertId();
+    }
+
     /**
      * @param array<string, mixed>|null $metadata
      */

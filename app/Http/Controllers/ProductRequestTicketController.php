@@ -132,6 +132,26 @@ final class ProductRequestTicketController
     /**
      * @param array<string, string> $params
      */
+    public function comment(Request $request, array $params): Response
+    {
+        try {
+            $ticketId = $this->id($params['id'] ?? null);
+            $this->tickets->agregarComentario(
+                $ticketId,
+                $this->optionalId($request->input('partida_id')),
+                (string) $request->input('comentario', ''),
+                $this->userId()
+            );
+        } catch (ProductRequestTicketValidationException $exception) {
+            return $this->actionValidationResponse($exception, $params);
+        }
+
+        return Response::redirect('/tickets/productos/' . $ticketId);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
     public function cancel(Request $request, array $params): Response
     {
         try {
@@ -190,6 +210,17 @@ final class ProductRequestTicketController
         }
 
         return (int) $value;
+    }
+
+    private function optionalId(mixed $value): ?int
+    {
+        $value = is_string($value) ? trim($value) : $value;
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $this->id($value);
     }
 
     private function userId(): int

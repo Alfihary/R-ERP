@@ -245,6 +245,68 @@ final class ProductRequestTicketService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function agregarComentario(
+        int $ticketId,
+        ?int $partidaId,
+        string $comentario,
+        int $usuarioId
+    ): array {
+        $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
+        $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
+        $partidaId = $partidaId === null
+            ? null
+            : $this->positiveIdValue($partidaId, 'partida_id');
+        $comentario = trim($comentario);
+
+        if ($comentario === '') {
+            throw new ProductRequestTicketValidationException([
+                'comentario' => 'El comentario es obligatorio.',
+            ]);
+        }
+
+        if ($this->length($comentario) > 2000) {
+            throw new ProductRequestTicketValidationException([
+                'comentario' => 'El comentario admite hasta 2000 caracteres.',
+            ]);
+        }
+
+        return $this->transactional(function () use (
+            $ticketId,
+            $partidaId,
+            $comentario,
+            $usuarioId
+        ): array {
+            $this->assertActiveUser($usuarioId);
+            $this->assertTicketForUpdate($ticketId);
+
+            if ($partidaId !== null) {
+                $this->assertPartidaForUpdate($ticketId, $partidaId);
+            }
+
+            $this->tickets->agregarComentario(
+                $ticketId,
+                $partidaId,
+                $usuarioId,
+                $comentario
+            );
+            $this->tickets->insertEvent(
+                $ticketId,
+                $partidaId,
+                $usuarioId,
+                'COMENTARIO_AGREGADO',
+                $partidaId === null
+                    ? 'Comentario documental agregado al ticket.'
+                    : 'Comentario documental agregado a la partida.',
+                ['alcance' => $partidaId === null ? 'ticket' : 'partida']
+            );
+
+            return $this->obtenerTicketOrFail($ticketId);
+        });
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function obtenerTicket(int $ticketId): ?array

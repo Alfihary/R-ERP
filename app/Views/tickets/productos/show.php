@@ -11,6 +11,7 @@ if (!$csrf instanceof CsrfTokenService || !is_array($ticket ?? null) || !is_arra
 $ticketId = (string) ($ticket['id'] ?? '');
 $partidas = is_array($ticket['partidas'] ?? null) ? $ticket['partidas'] : [];
 $eventos = is_array($ticket['eventos'] ?? null) ? $ticket['eventos'] : [];
+$comentarios = is_array($ticket['comentarios'] ?? null) ? $ticket['comentarios'] : [];
 $estadoTicket = (string) ($ticket['estado'] ?? '');
 $permissions = is_array($permissions ?? null) ? $permissions : [];
 $canResolve = ($permissions['canResolve'] ?? false) === true;
@@ -36,6 +37,23 @@ $totalPartidas = (int) ($ticket['total_partidas'] ?? count($partidas));
 $partidasEnRevision = (int) ($ticket['partidas_en_revision'] ?? $countByState($partidas, 'EN_REVISION'));
 $partidasAprobadas = (int) ($ticket['partidas_aprobadas'] ?? $countByState($partidas, 'APROBADA'));
 $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($partidas, 'RECHAZADA'));
+$comentariosPorPartida = [];
+$comentariosGenerales = [];
+
+foreach ($comentarios as $comentario) {
+    if (!is_array($comentario)) {
+        continue;
+    }
+
+    $comentarioPartidaId = (string) ($comentario['partida_id'] ?? '');
+
+    if ($comentarioPartidaId !== '' && $comentarioPartidaId !== '0') {
+        $comentariosPorPartida[$comentarioPartidaId][] = $comentario;
+        continue;
+    }
+
+    $comentariosGenerales[] = $comentario;
+}
 ?>
 <!doctype html>
 <html lang="es">
@@ -116,6 +134,44 @@ $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($pa
             </dl>
         </section>
 
+        <section class="home-section ticket-products__section ticket-products__comments" aria-labelledby="ticket-producto-comentarios">
+            <div class="home-section__heading">
+                <div>
+                    <p class="section-kicker">Bitácora documental</p>
+                    <h2 id="ticket-producto-comentarios">Comentarios</h2>
+                </div>
+            </div>
+            <p class="ticket-products__hint">
+                Los comentarios son documentales y no modifican el estado del ticket.
+            </p>
+            <?php if ($comentariosGenerales === []): ?>
+                <p class="ticket-products__placeholder">Sin comentarios generales registrados.</p>
+            <?php else: ?>
+                <ul class="ticket-products__comment-list">
+                    <?php foreach ($comentariosGenerales as $comentario): ?>
+                        <li>
+                            <span class="ticket-products__comment-scope">Comentario general</span>
+                            <p><?= e($formatValue($comentario['comentario'] ?? null)) ?></p>
+                            <span class="ticket-products__event-meta">
+                                Usuario <?= e($formatValue($comentario['usuario_id'] ?? null)) ?>
+                                · <?= e($formatValue($comentario['created_at'] ?? null)) ?>
+                            </span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <?php if ($canCreateComments): ?>
+                <form class="ticket-products__action-form ticket-products__comment-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/comentarios">
+                    <?= csrf_field($csrf) ?>
+                    <label class="field">
+                        <span>Agregar comentario general</span>
+                        <textarea name="comentario" required></textarea>
+                    </label>
+                    <button class="button" type="submit">Agregar comentario</button>
+                </form>
+            <?php endif; ?>
+        </section>
+
         <section class="ticket-products__section" aria-labelledby="ticket-producto-partidas">
             <div class="ticket-products__section-header">
                 <p class="section-kicker">Revisión documental</p>
@@ -133,6 +189,7 @@ $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($pa
                     } ?>
                     <?php $partidaId = (string) ($partida['id'] ?? ''); ?>
                     <?php $estadoPartida = (string) ($partida['estado'] ?? ''); ?>
+                    <?php $comentariosDePartida = $comentariosPorPartida[$partidaId] ?? []; ?>
                     <article class="home-section ticket-products__line-card">
                         <div class="ticket-products__line-heading">
                             <h3>Partida <?= e($partida['numero_partida'] ?? '') ?></h3>
@@ -155,6 +212,37 @@ $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($pa
                             <div class="ticket-products__line-full"><dt>Motivo de rechazo</dt><dd><?= e($formatValue($partida['motivo_rechazo'] ?? null)) ?></dd></div>
                             <div class="ticket-products__line-full"><dt>Comentario de resolución</dt><dd><?= e($formatValue($partida['comentario_resolucion'] ?? null)) ?></dd></div>
                         </dl>
+
+                        <div class="ticket-products__line-comments">
+                            <h4>Comentarios de partida</h4>
+                            <?php if ($comentariosDePartida === []): ?>
+                                <p class="ticket-products__hint">Sin comentarios registrados para esta partida.</p>
+                            <?php else: ?>
+                                <ul class="ticket-products__comment-list">
+                                    <?php foreach ($comentariosDePartida as $comentario): ?>
+                                        <li>
+                                            <span class="ticket-products__comment-scope">Partida <?= e($partida['numero_partida'] ?? '') ?></span>
+                                            <p><?= e($formatValue($comentario['comentario'] ?? null)) ?></p>
+                                            <span class="ticket-products__event-meta">
+                                                Usuario <?= e($formatValue($comentario['usuario_id'] ?? null)) ?>
+                                                · <?= e($formatValue($comentario['created_at'] ?? null)) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                            <?php if ($canCreateComments): ?>
+                                <form class="ticket-products__action-form ticket-products__comment-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/comentarios">
+                                    <?= csrf_field($csrf) ?>
+                                    <input type="hidden" name="partida_id" value="<?= e($partidaId) ?>">
+                                    <label class="field">
+                                        <span>Agregar comentario a esta partida</span>
+                                        <textarea name="comentario" required></textarea>
+                                    </label>
+                                    <button class="button button--secondary" type="submit">Comentar partida</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
 
                         <?php if ($canResolve && $estadoPartida === 'EN_REVISION'): ?>
                             <div class="ticket-products__line-actions">
@@ -205,14 +293,11 @@ $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($pa
             </section>
         <?php endif; ?>
 
-        <?php if ($canViewAttachments || $canCreateComments || $canResendEmail): ?>
+        <?php if ($canViewAttachments || $canResendEmail): ?>
             <section class="home-section ticket-products__section ticket-products__placeholders" aria-labelledby="ticket-producto-acciones-documentales">
                 <h2 id="ticket-producto-acciones-documentales">Acciones documentales</h2>
                 <?php if ($canViewAttachments): ?>
                     <p class="ticket-products__placeholder">Adjuntos documentales pendientes de fase posterior.</p>
-                <?php endif; ?>
-                <?php if ($canCreateComments): ?>
-                    <p class="ticket-products__placeholder">Comentarios documentales pendientes de fase posterior.</p>
                 <?php endif; ?>
                 <?php if ($canResendEmail): ?>
                     <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>

@@ -355,6 +355,46 @@
     font-weight: 700;
 }
 
+.ticket-products__comments {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.ticket-products__comment-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ticket-products__comment-list li,
+.ticket-products__line-comments {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.ticket-products__comment-list p,
+.ticket-products__line-comments h4 {
+    margin: 0;
+}
+
+.ticket-products__comment-scope {
+    color: var(--color-ink);
+    font-size: 0.75rem;
+    font-weight: 850;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ticket-products__comment-form {
+    margin-top: 0.25rem;
+}
+
 .ticket-products__placeholders {
     display: grid;
     gap: 0.75rem;
