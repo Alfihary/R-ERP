@@ -49,9 +49,12 @@ final class ProductRequestTicketController
 
     public function create(Request $request): Response
     {
+        $values = $this->createValues($request->query());
+
         return $this->render('tickets/productos/create', [
             'errors' => [],
-            'values' => [],
+            'values' => $values,
+            'catalogs' => $this->createCatalogs($values),
         ]);
     }
 
@@ -63,7 +66,7 @@ final class ProductRequestTicketController
                 $this->userId()
             );
         } catch (ProductRequestTicketValidationException $exception) {
-            return $this->validationResponse($exception);
+            return $this->validationResponse($exception, $request);
         }
 
         return Response::redirect('/tickets/productos/' . (int) $ticket['id']);
@@ -186,6 +189,12 @@ final class ProductRequestTicketController
             ]];
         }
 
+        if (is_array($partidas)) {
+            $partidas = $this->normalizeCatalogPartidas($partidas);
+        }
+
+        $this->assertCreateScope($request->input('empresa_id'), $request->input('almacen_id'));
+
         return [
             'empresa_id' => $request->input('empresa_id'),
             'almacen_id' => $request->input('almacen_id'),
@@ -243,11 +252,17 @@ final class ProductRequestTicketController
         );
     }
 
-    private function validationResponse(ProductRequestTicketValidationException $exception): Response
+    private function validationResponse(
+        ProductRequestTicketValidationException $exception,
+        ?Request $request = null
+    ): Response
     {
+        $values = $this->createValues($request?->body() ?? []);
+
         return $this->render('tickets/productos/create', [
             'errors' => $exception->errors(),
-            'values' => [],
+            'values' => $values,
+            'catalogs' => $this->createCatalogs($values),
         ], 422);
     }
 
@@ -293,6 +308,234 @@ final class ProductRequestTicketController
     }
 
     /**
+     * @param array<string, mixed> $source
+     * @return array<string, mixed>
+     */
+    private function createValues(array $source): array
+    {
+        $values = $source;
+        $repository = $this->repository();
+        $userId = $this->currentUserIdOrNull();
+
+        if ($repository === null || $userId === null) {
+            return $values;
+        }
+
+        $companies = $repository->availableCompaniesForUser($userId);
+        $companyId = $this->selectedCompanyId($source['empresa_id'] ?? null, $companies);
+        $warehouses = $repository->availableWarehousesForUser($userId, $companyId);
+        $warehouseId = $this->selectedWarehouseId($source['almacen_id'] ?? null, $warehouses);
+
+        if ($companyId !== null) {
+            $values['empresa_id'] = (string) $companyId;
+        }
+
+        if ($warehouseId !== null) {
+            $values['almacen_id'] = (string) $warehouseId;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function createCatalogs(array $values): array
+    {
+        $repository = $this->repository();
+        $userId = $this->currentUserIdOrNull();
+
+        if ($repository === null || $userId === null) {
+            return [
+                'companies' => [],
+                'warehouses' => [],
+                'brands' => [],
+                'currencies' => [],
+                'sat_units' => [],
+                'sat_keys' => [],
+            ];
+        }
+
+        $companyId = $this->positiveIntegerOrNull($values['empresa_id'] ?? null);
+
+        return [
+            'companies' => $repository->availableCompaniesForUser($userId),
+            'warehouses' => $repository->availableWarehousesForUser($userId, $companyId),
+            'all_warehouses' => $repository->availableWarehousesForUser($userId),
+            'brands' => $repository->activeBrands(),
+            'currencies' => $repository->activeCurrencies(),
+            'sat_units' => $repository->activeSatUnits(),
+            'sat_keys' => $repository->activeSatKeys(),
+        ];
+    }
+
+    /**
+     * @param list<mixed>|array<string, mixed> $partidas
+     * @return list<mixed>|array<string, mixed>
+     */
+    private function normalizeCatalogPartidas(array $partidas): array
+    {
+        $repository = $this->repository();
+        $errors = [];
+
+        if ($repository === null) {
+            return $partidas;
+        }
+
+        foreach ($partidas as $index => $partida) {
+            if (!is_array($partida)) {
+                continue;
+            }
+
+            $brandId = $this->positiveIntegerOrNull($partida['marca_id'] ?? null);
+
+            if ($brandId !== null) {
+                $brand = $repository->brandById($brandId);
+                $partida['marca_texto'] = $brand['nombre'] ?? null;
+            }
+
+            $unitSatId = $this->positiveIntegerOrNull($partida['unidad_sat_id'] ?? null);
+            $satKeyId = $this->positiveIntegerOrNull($partida['clave_sat_id'] ?? null);
+            $unitSatText = $this->catalogText($partida['unidad_sat_busqueda'] ?? null);
+            $satKeyText = $this->catalogText($partida['clave_sat_busqueda'] ?? null);
+
+            if ($unitSatText !== '') {
+                $resolved = $repository->resolveActiveSatUnit($unitSatText);
+
+                if ($resolved['status'] === 'found' && $resolved['id'] !== null) {
+                    $partida['unidad_sat_id'] = (string) $resolved['id'];
+                } elseif ($resolved['status'] === 'ambiguous') {
+                    $errors['partidas.' . $index . '.unidad_sat_busqueda'] =
+                        'La unidad SAT es ambigua; escribe una clave más específica.';
+                } else {
+                    $errors['partidas.' . $index . '.unidad_sat_busqueda'] =
+                        'Selecciona una unidad SAT válida del catálogo.';
+                }
+            } elseif ($unitSatId !== null && $repository->activeSatUnitById($unitSatId) === null) {
+                $errors['partidas.' . $index . '.unidad_sat_busqueda'] =
+                    'Selecciona una unidad SAT válida del catálogo.';
+            }
+
+            if ($satKeyText !== '') {
+                $resolved = $repository->resolveActiveSatKey($satKeyText);
+
+                if ($resolved['status'] === 'found' && $resolved['id'] !== null) {
+                    $partida['clave_sat_id'] = (string) $resolved['id'];
+                } elseif ($resolved['status'] === 'ambiguous') {
+                    $errors['partidas.' . $index . '.clave_sat_busqueda'] =
+                        'La clave SAT es ambigua; escribe una clave más específica.';
+                } else {
+                    $errors['partidas.' . $index . '.clave_sat_busqueda'] =
+                        'Selecciona una clave SAT válida del catálogo.';
+                }
+            } elseif ($satKeyId !== null && $repository->activeSatKeyById($satKeyId) === null) {
+                $errors['partidas.' . $index . '.clave_sat_busqueda'] =
+                    'Selecciona una clave SAT válida del catálogo.';
+            }
+
+            $partidas[$index] = $partida;
+        }
+
+        if ($errors !== []) {
+            throw new ProductRequestTicketValidationException($errors);
+        }
+
+        return $partidas;
+    }
+
+    private function assertCreateScope(mixed $companyValue, mixed $warehouseValue): void
+    {
+        $repository = $this->repository();
+        $userId = $this->currentUserIdOrNull();
+        $companyId = $this->positiveIntegerOrNull($companyValue);
+        $warehouseId = $this->positiveIntegerOrNull($warehouseValue);
+
+        if ($repository === null || $userId === null || $companyId === null || $warehouseId === null) {
+            return;
+        }
+
+        $allowedCompanyIds = array_map(
+            static fn (array $company): int => (int) $company['id'],
+            $repository->availableCompaniesForUser($userId)
+        );
+
+        if (!in_array($companyId, $allowedCompanyIds, true)) {
+            throw new ProductRequestTicketValidationException([
+                'empresa_id' => 'La empresa no está disponible para tu usuario.',
+            ]);
+        }
+
+        $allowedWarehouseIds = array_map(
+            static fn (array $warehouse): int => (int) $warehouse['id'],
+            $repository->availableWarehousesForUser($userId, $companyId)
+        );
+
+        if (!in_array($warehouseId, $allowedWarehouseIds, true)) {
+            throw new ProductRequestTicketValidationException([
+                'almacen_id' => 'El almacén no pertenece a la empresa seleccionada o no está disponible para tu usuario.',
+            ]);
+        }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $companies
+     */
+    private function selectedCompanyId(mixed $value, array $companies): ?int
+    {
+        $selected = $this->positiveIntegerOrNull($value);
+        $allowed = [];
+
+        foreach ($companies as $company) {
+            $allowed[(int) $company['id']] = true;
+        }
+
+        if ($selected !== null && isset($allowed[$selected])) {
+            return $selected;
+        }
+
+        $sessionCompany = $this->positiveIntegerOrNull($_SESSION['active_company_id'] ?? null);
+
+        if ($sessionCompany !== null && isset($allowed[$sessionCompany])) {
+            return $sessionCompany;
+        }
+
+        return count($companies) === 1 ? (int) $companies[0]['id'] : null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $warehouses
+     */
+    private function selectedWarehouseId(mixed $value, array $warehouses): ?int
+    {
+        $selected = $this->positiveIntegerOrNull($value);
+        $allowed = [];
+
+        foreach ($warehouses as $warehouse) {
+            $allowed[(int) $warehouse['id']] = true;
+        }
+
+        if ($selected !== null && isset($allowed[$selected])) {
+            return $selected;
+        }
+
+        $sessionWarehouse = $this->positiveIntegerOrNull($_SESSION['active_warehouse_id'] ?? null);
+
+        if ($sessionWarehouse !== null && isset($allowed[$sessionWarehouse])) {
+            return $sessionWarehouse;
+        }
+
+        return count($warehouses) === 1 ? (int) $warehouses[0]['id'] : null;
+    }
+
+    private function currentUserIdOrNull(): ?int
+    {
+        $user = $this->auth->user();
+
+        return is_array($user ?? null) ? $this->positiveIntegerOrNull($user['user_id'] ?? null) : null;
+    }
+
+    /**
      * @return array<string, bool>
      */
     private function visualPermissions(): array
@@ -316,8 +559,25 @@ final class ProductRequestTicketController
             return $this->permissions;
         }
 
-        return ($GLOBALS['permissions'] ?? null) instanceof PermissionService
-            ? $GLOBALS['permissions']
+        if (($GLOBALS['permissions'] ?? null) instanceof PermissionService) {
+            return $GLOBALS['permissions'];
+        }
+
+        if (($GLOBALS['connection'] ?? null) instanceof ConnectionProvider) {
+            return new PermissionService(
+                new \App\Infrastructure\Repositories\PermissionRepository($GLOBALS['connection'])
+            );
+        }
+
+        $config = require BASE_PATH . '/bootstrap/database.php';
+        $databaseConfig = $config->get('database', []);
+
+        return is_array($databaseConfig)
+            ? new PermissionService(
+                new \App\Infrastructure\Repositories\PermissionRepository(
+                    new ConnectionProvider($databaseConfig)
+                )
+            )
             : null;
     }
 
@@ -393,6 +653,24 @@ final class ProductRequestTicketController
         }
 
         return (int) $value;
+    }
+
+    private function positiveIntegerOrNull(mixed $value): ?int
+    {
+        if ((!is_string($value) && !is_int($value)) || preg_match('/^[1-9]\d*$/', (string) $value) !== 1) {
+            return null;
+        }
+
+        return (int) $value;
+    }
+
+    private function catalogText(mixed $value): string
+    {
+        if (!is_scalar($value)) {
+            return '';
+        }
+
+        return preg_replace('/\s+/', ' ', trim((string) $value)) ?? '';
     }
 
     private function perPage(mixed $value): int

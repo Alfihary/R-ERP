@@ -217,6 +217,7 @@ return new class implements DatabaseTest {
         $this->assignAdminRole($userId);
         $companyId = $this->createCompany($userId);
         $warehouseId = $this->createWarehouse($companyId, $userId);
+        $this->assignScope($userId, $companyId, $warehouseId);
 
         return [
             'user_id' => $userId,
@@ -250,7 +251,8 @@ return new class implements DatabaseTest {
         return new ProductRequestTicketController(
             $auth,
             $this->service(),
-            new PermissionService(new PermissionRepository($GLOBALS['tp_product_ticket_ui_connection']))
+            new PermissionService(new PermissionRepository($GLOBALS['tp_product_ticket_ui_connection'])),
+            new ProductRequestTicketRepository($GLOBALS['tp_product_ticket_ui_connection'])
         );
     }
 
@@ -456,6 +458,30 @@ return new class implements DatabaseTest {
         ]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function assignScope(int $userId, int $companyId, int $warehouseId): void
+    {
+        $company = $this->pdo->prepare(
+            'INSERT INTO usuario_empresas (usuario_id, empresa_id, activo, creado_por)
+             VALUES (:usuario_id, :empresa_id, 1, :creado_por)'
+        );
+        $company->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'creado_por' => $userId,
+        ]);
+
+        $warehouse = $this->pdo->prepare(
+            'INSERT INTO usuario_almacenes (usuario_id, empresa_id, almacen_id, activo, creado_por)
+             VALUES (:usuario_id, :empresa_id, :almacen_id, 1, :creado_por)'
+        );
+        $warehouse->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'creado_por' => $userId,
+        ]);
     }
 
     /**

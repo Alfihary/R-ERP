@@ -272,6 +272,399 @@ final class ProductRequestTicketRepository
     }
 
     /**
+     * @return list<array{id: int, codigo: string, nombre: string}>
+     */
+    public function availableCompaniesForUser(int $userId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT e.id, e.codigo, e.nombre
+             FROM usuario_empresas ue
+             INNER JOIN empresas e
+                ON e.id = ue.empresa_id
+               AND e.activo = 1
+               AND e.eliminado_en IS NULL
+             INNER JOIN usuarios u
+                ON u.id = ue.usuario_id
+               AND u.activo = 1
+               AND u.eliminado_en IS NULL
+             WHERE ue.usuario_id = :usuario_id
+               AND ue.activo = 1
+               AND ue.eliminado_en IS NULL
+             ORDER BY e.nombre ASC, e.id ASC'
+        );
+        $statement->execute(['usuario_id' => $userId]);
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'nombre' => (string) $row['nombre'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return list<array{id: int, empresa_id: int, codigo: string, nombre: string}>
+     */
+    public function availableWarehousesForUser(int $userId, ?int $companyId = null): array
+    {
+        $where = [
+            'ua.usuario_id = :usuario_id',
+            'ua.activo = 1',
+            'ua.eliminado_en IS NULL',
+        ];
+        $params = ['usuario_id' => $userId];
+
+        if ($companyId !== null) {
+            $where[] = 'ua.empresa_id = :empresa_id';
+            $params['empresa_id'] = $companyId;
+        }
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT a.id, a.empresa_id, a.codigo, a.nombre
+             FROM usuario_almacenes ua
+             INNER JOIN usuario_empresas ue
+                ON ue.usuario_id = ua.usuario_id
+               AND ue.empresa_id = ua.empresa_id
+               AND ue.activo = 1
+               AND ue.eliminado_en IS NULL
+             INNER JOIN empresas e
+                ON e.id = ua.empresa_id
+               AND e.activo = 1
+               AND e.eliminado_en IS NULL
+             INNER JOIN almacenes a
+                ON a.id = ua.almacen_id
+               AND a.empresa_id = ua.empresa_id
+               AND a.activo = 1
+               AND a.eliminado_en IS NULL
+             WHERE ' . implode(' AND ', $where) . '
+             ORDER BY e.nombre ASC, a.nombre ASC, a.id ASC'
+        );
+        $statement->execute($params);
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'empresa_id' => (int) $row['empresa_id'],
+                'codigo' => (string) $row['codigo'],
+                'nombre' => (string) $row['nombre'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nombre: string}>
+     */
+    public function activeBrands(): array
+    {
+        $statement = $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre
+             FROM marcas
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY nombre ASC, id ASC'
+        );
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'nombre' => (string) $row['nombre'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return array{id: int, codigo: string, nombre: string}|null
+     */
+    public function brandById(int $brandId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, codigo, nombre
+             FROM marcas
+             WHERE id = :id
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $brandId]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? [
+            'id' => (int) $row['id'],
+            'codigo' => (string) $row['codigo'],
+            'nombre' => (string) $row['nombre'],
+        ] : null;
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nombre: string, es_base: int}>
+     */
+    public function activeCurrencies(): array
+    {
+        $statement = $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre, es_base
+             FROM monedas
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY es_base DESC, codigo ASC, id ASC'
+        );
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'nombre' => (string) $row['nombre'],
+                'es_base' => (int) $row['es_base'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, nombre: string, descripcion: string|null}>
+     */
+    public function activeSatUnits(): array
+    {
+        $statement = $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre, descripcion
+             FROM unidades_sat
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY codigo ASC, id ASC
+             LIMIT 200'
+        );
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'nombre' => (string) $row['nombre'],
+                'descripcion' => $row['descripcion'] === null ? null : (string) $row['descripcion'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return array{id: int, codigo: string, nombre: string, descripcion: string|null}|null
+     */
+    public function activeSatUnitById(int $unitId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, codigo, nombre, descripcion
+             FROM unidades_sat
+             WHERE id = :id
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $unitId]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? [
+            'id' => (int) $row['id'],
+            'codigo' => (string) $row['codigo'],
+            'nombre' => (string) $row['nombre'],
+            'descripcion' => $row['descripcion'] === null ? null : (string) $row['descripcion'],
+        ] : null;
+    }
+
+    /**
+     * @return array{status: 'found'|'not_found'|'ambiguous', id: int|null}
+     */
+    public function resolveActiveSatUnit(string $value): array
+    {
+        $value = $this->normalizeCatalogInput($value);
+
+        if ($value === '') {
+            return ['status' => 'not_found', 'id' => null];
+        }
+
+        if (preg_match('/^[1-9]\d*$/', $value) === 1) {
+            $row = $this->activeSatUnitById((int) $value);
+
+            if ($row !== null) {
+                return ['status' => 'found', 'id' => (int) $row['id']];
+            }
+        }
+
+        $code = $this->catalogInputCode($value);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id
+             FROM unidades_sat
+             WHERE CAST(codigo AS CHAR CHARACTER SET utf8mb4) = :codigo
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 2'
+        );
+        $statement->execute(['codigo' => $code]);
+        $rows = $statement->fetchAll();
+
+        if (count($rows) === 1) {
+            return ['status' => 'found', 'id' => (int) $rows[0]['id']];
+        }
+        if (count($rows) > 1) {
+            return ['status' => 'ambiguous', 'id' => null];
+        }
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id
+             FROM unidades_sat
+             WHERE (
+                    CAST(nombre AS CHAR CHARACTER SET utf8mb4) = :nombre
+                    OR CAST(descripcion AS CHAR CHARACTER SET utf8mb4) = :descripcion
+               )
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 2'
+        );
+        $statement->execute([
+            'nombre' => $value,
+            'descripcion' => $value,
+        ]);
+        $rows = $statement->fetchAll();
+
+        if (count($rows) === 1) {
+            return ['status' => 'found', 'id' => (int) $rows[0]['id']];
+        }
+
+        return [
+            'status' => count($rows) > 1 ? 'ambiguous' : 'not_found',
+            'id' => null,
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, codigo: string, descripcion: string}>
+     */
+    public function activeSatKeys(): array
+    {
+        $statement = $this->connection->pdo()->query(
+            'SELECT id, codigo, descripcion
+             FROM claves_sat
+             WHERE activo = 1
+               AND eliminado_en IS NULL
+             ORDER BY codigo ASC, id ASC
+             LIMIT 200'
+        );
+
+        return array_map(
+            static fn (array $row): array => [
+                'id' => (int) $row['id'],
+                'codigo' => (string) $row['codigo'],
+                'descripcion' => (string) $row['descripcion'],
+            ],
+            $statement->fetchAll()
+        );
+    }
+
+    /**
+     * @return array{id: int, codigo: string, descripcion: string}|null
+     */
+    public function activeSatKeyById(int $satKeyId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, codigo, descripcion
+             FROM claves_sat
+             WHERE id = :id
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $satKeyId]);
+        $row = $statement->fetch();
+
+        return is_array($row) ? [
+            'id' => (int) $row['id'],
+            'codigo' => (string) $row['codigo'],
+            'descripcion' => (string) $row['descripcion'],
+        ] : null;
+    }
+
+    /**
+     * @return array{status: 'found'|'not_found'|'ambiguous', id: int|null}
+     */
+    public function resolveActiveSatKey(string $value): array
+    {
+        $value = $this->normalizeCatalogInput($value);
+
+        if ($value === '') {
+            return ['status' => 'not_found', 'id' => null];
+        }
+
+        if (preg_match('/^[1-9]\d*$/', $value) === 1) {
+            $row = $this->activeSatKeyById((int) $value);
+
+            if ($row !== null) {
+                return ['status' => 'found', 'id' => (int) $row['id']];
+            }
+        }
+
+        $code = $this->catalogInputCode($value);
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id
+             FROM claves_sat
+             WHERE CAST(codigo AS CHAR CHARACTER SET utf8mb4) = :codigo
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 2'
+        );
+        $statement->execute(['codigo' => $code]);
+        $rows = $statement->fetchAll();
+
+        if (count($rows) === 1) {
+            return ['status' => 'found', 'id' => (int) $rows[0]['id']];
+        }
+        if (count($rows) > 1) {
+            return ['status' => 'ambiguous', 'id' => null];
+        }
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id
+             FROM claves_sat
+             WHERE CAST(descripcion AS CHAR CHARACTER SET utf8mb4) = :descripcion
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 2'
+        );
+        $statement->execute(['descripcion' => $value]);
+        $rows = $statement->fetchAll();
+
+        if (count($rows) === 1) {
+            return ['status' => 'found', 'id' => (int) $rows[0]['id']];
+        }
+
+        return [
+            'status' => count($rows) > 1 ? 'ambiguous' : 'not_found',
+            'id' => null,
+        ];
+    }
+
+    private function normalizeCatalogInput(string $value): string
+    {
+        return preg_replace('/\s+/', ' ', trim($value)) ?? '';
+    }
+
+    private function catalogInputCode(string $value): string
+    {
+        $normalized = $this->normalizeCatalogInput($value);
+
+        if (str_contains($normalized, ' - ')) {
+            return trim(explode(' - ', $normalized, 2)[0]);
+        }
+
+        if (str_contains($normalized, ' · ')) {
+            return trim(explode(' · ', $normalized, 2)[0]);
+        }
+
+        return $normalized;
+    }
+
+    /**
      * @return array{id: int, empresa_id: int, codigo: string}|null
      */
     public function warehouseById(int $companyId, int $warehouseId): ?array

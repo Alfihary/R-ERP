@@ -355,6 +355,8 @@ return new class implements DatabaseTest {
         $this->assignPermissionToRole($limitedRoleId, 'tickets_productos.ver');
         $companyId = $this->createCompany($adminUserId);
         $warehouseId = $this->createWarehouse($companyId, $adminUserId);
+        $this->assignScope($adminUserId, $companyId, $warehouseId);
+        $this->assignScope($limitedUserId, $companyId, $warehouseId);
 
         return [
             'admin_user_id' => $adminUserId,
@@ -377,8 +379,9 @@ return new class implements DatabaseTest {
         $permissions = new PermissionService(
             new PermissionRepository($GLOBALS['tp_product_ticket_routes_controller_connection'])
         );
+        $repository = new ProductRequestTicketRepository($GLOBALS['tp_product_ticket_routes_controller_connection']);
         $csrf = new CsrfTokenService($session, 7200);
-        $controller = new ProductRequestTicketController($auth, $this->service, $permissions);
+        $controller = new ProductRequestTicketController($auth, $this->service, $permissions, $repository);
         $router = new Router();
         $router->middleware(new CsrfMiddleware($csrf));
         $authMiddleware = new AuthMiddleware($auth);
@@ -472,6 +475,30 @@ return new class implements DatabaseTest {
         ]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function assignScope(int $userId, int $companyId, int $warehouseId): void
+    {
+        $company = $this->pdo->prepare(
+            'INSERT INTO usuario_empresas (usuario_id, empresa_id, activo, creado_por)
+             VALUES (:usuario_id, :empresa_id, 1, :creado_por)'
+        );
+        $company->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'creado_por' => $userId,
+        ]);
+
+        $warehouse = $this->pdo->prepare(
+            'INSERT INTO usuario_almacenes (usuario_id, empresa_id, almacen_id, activo, creado_por)
+             VALUES (:usuario_id, :empresa_id, :almacen_id, 1, :creado_por)'
+        );
+        $warehouse->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'creado_por' => $userId,
+        ]);
     }
 
     private function createRole(string $code): int
