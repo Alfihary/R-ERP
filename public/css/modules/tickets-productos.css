@@ -415,6 +415,55 @@
     margin-top: 0.25rem;
 }
 
+.ticket-products__attachments,
+.ticket-products__line-attachments {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.ticket-products__line-attachments {
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.ticket-products__line-attachments h4 {
+    margin: 0;
+}
+
+.ticket-products__attachment-form input[type="file"] {
+    width: 100%;
+}
+
+.ticket-products__attachment-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ticket-products__attachment-list li {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.ticket-products__attachment-list strong {
+    color: var(--color-ink);
+    font-size: 0.9rem;
+}
+
+.ticket-products__attachment-list span {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 650;
+}
+
 .ticket-products__placeholders {
     display: grid;
     gap: 0.75rem;

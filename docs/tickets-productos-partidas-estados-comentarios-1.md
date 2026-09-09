@@ -109,7 +109,6 @@ Esta fase no crea ni modifica:
 - compras;
 - proveedores reales;
 - claves definitivas;
-- adjuntos reales;
 - correos runtime.
 
 También mantiene sin cambios:
@@ -120,7 +119,7 @@ También mantiene sin cambios:
 - rutas públicas;
 - JavaScript;
 - correo;
-- adjuntos.
+- adjuntos, salvo el runtime autorizado posterior `POST /tickets/productos/{id}/adjuntos` de `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1`.
 
 ## Pruebas esperadas
 

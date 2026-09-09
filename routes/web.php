@@ -477,6 +477,12 @@ return static function (
         $productTicketMiddleware('tickets_productos.comentarios.crear')
     );
     $router->post(
+        '/tickets/productos/{id}/adjuntos',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->attachment($request, $params),
+        $productTicketMiddleware('tickets_productos.adjuntos.ver')
+    );
+    $router->post(
         '/tickets/productos/{id}/cancelar',
         static fn (Request $request, array $params): Response =>
             $productRequestTicketController->cancel($request, $params),

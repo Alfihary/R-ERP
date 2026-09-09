@@ -31,7 +31,7 @@ return new class implements DatabaseTest {
         try {
             $audit = [
                 'schema' => $this->schemaCases($pdo, $expectedDatabase),
-                'runtime_absence' => $this->runtimeAbsenceCases(),
+                'runtime_contract' => $this->runtimeContractCases(),
                 'documentation' => $this->documentationCases(),
                 'scope_guardrails' => $this->scopeGuardrails(),
                 'operational_guardrails' => $this->operationalGuardrails($pdo, $beforeCounts),
@@ -63,7 +63,7 @@ return new class implements DatabaseTest {
         return [
             'database' => $expectedDatabase,
             'phase' => 'TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1',
-            'audit_mode' => 'read_only_attachment_contract_no_runtime_upload_or_download',
+            'audit_mode' => 'read_only_attachment_contract_with_authorized_runtime_upload',
             'migration_state' => $migrationState,
             'table' => 'tickets_productos_adjuntos',
             'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
@@ -138,23 +138,43 @@ return new class implements DatabaseTest {
     /**
      * @return array<string, bool>
      */
-    private function runtimeAbsenceCases(): array
+    private function runtimeContractCases(): array
     {
         $routes = $this->read('routes/web.php');
         $controller = $this->read('app/Http/Controllers/ProductRequestTicketController.php');
         $service = $this->read('app/Domain/Tickets/ProductRequestTicketService.php');
         $repository = $this->read('app/Infrastructure/Repositories/ProductRequestTicketRepository.php');
+        $safeUpload = $this->read('app/Support/SafeUpload.php');
         $show = $this->read('app/Views/tickets/productos/show.php');
         $index = $this->read('app/Views/tickets/productos/index.php');
         $create = $this->read('app/Views/tickets/productos/create.php');
         $ticketRuntime = $routes . "\n" . $controller . "\n" . $service . "\n" . $repository . "\n"
-            . $show . "\n" . $index . "\n" . $create;
+            . $safeUpload . "\n" . $show . "\n" . $index . "\n" . $create;
 
         return [
-            'no_attachment_upload_route' => !preg_match(
-                '#/tickets/productos/\{id\}/(?:adjuntos|archivos|attachments)(?:/|\'|")#i',
-                $routes
+            'authorized_attachment_upload_route_exists' => str_contains($routes, "'/tickets/productos/{id}/adjuntos'")
+                && str_contains($routes, '->attachment($request, $params)')
+                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
+            'authorized_attachment_upload_uses_private_stack' => str_contains(
+                $routes,
+                'new PermissionMiddleware($auth, $permissions, $permission)'
+            ) && (
+                str_contains($routes, 'CsrfMiddleware')
+                || str_contains($this->read('bootstrap/app.php'), 'CsrfMiddleware')
             ),
+            'authorized_attachment_controller_service_repository_exists' =>
+                str_contains($controller, 'function attachment(Request $request, array $params): Response')
+                && str_contains($controller, '->agregarAdjunto(')
+                && str_contains($service, 'function agregarAdjunto(')
+                && str_contains($repository, 'function agregarAdjunto('),
+            'safe_upload_runtime_validates_contract' => $this->textContainsAll($safeUpload, [
+                'finfo',
+                'MAX_BYTES = 5 * 1024 * 1024',
+                'hasDangerousDoubleExtension',
+                'move_uploaded_file',
+                'storage/private/tickets_productos',
+                'random_bytes',
+            ]),
             'no_attachment_download_or_preview_route' => !preg_match(
                 '#/tickets/productos/\{id\}/(?:adjuntos|archivos|attachments)/\{[^}]+\}/(?:descargar|download|preview|ver)#i',
                 $routes
@@ -164,15 +184,24 @@ return new class implements DatabaseTest {
                 'app/Http/Controllers',
                 '/Adjunto|Adjuntos|Attachment|Attachments|Archivo|Archivos/i'
             ) === [],
-            'no_upload_runtime_in_ticket_surface' => !preg_match(
-                '/\b(move_uploaded_file|is_uploaded_file|finfo_open|finfo_file|mime_content_type|files|file_put_contents|mkdir|copy|rename)\s*\(/i',
-                $ticketRuntime
+            'no_upload_runtime_in_index_or_create' => !preg_match(
+                '/type=["\']file["\']|enctype=["\']multipart\/form-data/i',
+                $index . $create
             ),
-            'no_file_input_in_ticket_views' => !preg_match('/type=["\']file["\']|enctype=["\']multipart\/form-data/i', $show . $index . $create),
+            'show_has_authorized_upload_form' => str_contains($show, 'action="/tickets/productos/<?= e($ticketId) ?>/adjuntos"')
+                && str_contains($show, 'enctype="multipart/form-data"')
+                && str_contains($show, 'name="adjunto"')
+                && str_contains($show, 'name="partida_id"'),
             'no_direct_download_headers' => !preg_match('/Content-Disposition|application\/octet-stream|X-Accel-Redirect/i', $ticketRuntime),
-            'attachments_remain_placeholder' => str_contains($show, 'Adjuntos documentales pendientes de fase posterior.'),
+            'attachments_runtime_replaces_placeholder' => str_contains($show, 'Los adjuntos sirven como soporte para revisar la solicitud.')
+                && !str_contains($show, 'Adjuntos documentales pendientes de fase posterior.'),
             'comments_route_is_not_attachment_route' => str_contains($routes, '/tickets/productos/{id}/comentarios')
-                && !str_contains($routes, '/tickets/productos/{id}/adjuntos'),
+                && str_contains($routes, '/tickets/productos/{id}/adjuntos'),
+            'internal_names_and_paths_not_displayed' =>
+                !str_contains($show, "ruta_relativa")
+                && !str_contains($show, "nombre_guardado")
+                && !str_contains($show, "storage/private")
+                && !str_contains($show, "storage/uploads"),
         ];
     }
 
@@ -187,7 +216,7 @@ return new class implements DatabaseTest {
             'documents_phase_and_objective' => $this->textContainsAll($doc, [
                 'TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1',
                 'adjuntos documentales',
-                'no implementa subida real',
+                'runtime autorizado',
                 'no crea endpoints de descarga',
             ]),
             'documents_base_table_and_scope' => $this->textContainsAll($doc, [
@@ -240,7 +269,8 @@ return new class implements DatabaseTest {
                 'No se crea permiso nuevo',
                 'futura fase deberá decidir',
             ]),
-            'documents_future_event' => str_contains($doc, 'ADJUNTO_AGREGADO'),
+            'documents_event_check_constraint' => str_contains($doc, 'ADJUNTO_CARGADO')
+                && str_contains($doc, 'ADJUNTO_AGREGADO'),
             'documents_operational_guardrails' => $this->textContainsAll($doc, [
                 'nunca debe crear productos reales',
                 'nunca debe crear precios',
@@ -334,10 +364,7 @@ return new class implements DatabaseTest {
     {
         return [
             'no_storage_files_created_by_audit' => $before === $during,
-            'no_private_ticket_storage_created' => !is_dir(
-                BASE_PATH . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'private'
-                . DIRECTORY_SEPARATOR . 'tickets_productos'
-            ),
+            'private_ticket_storage_has_no_audit_files_created' => $before === $during,
         ];
     }
 

@@ -12,6 +12,7 @@ $ticketId = (string) ($ticket['id'] ?? '');
 $partidas = is_array($ticket['partidas'] ?? null) ? $ticket['partidas'] : [];
 $eventos = is_array($ticket['eventos'] ?? null) ? $ticket['eventos'] : [];
 $comentarios = is_array($ticket['comentarios'] ?? null) ? $ticket['comentarios'] : [];
+$adjuntos = is_array($ticket['adjuntos'] ?? null) ? $ticket['adjuntos'] : [];
 $estadoTicket = (string) ($ticket['estado'] ?? '');
 $permissions = is_array($permissions ?? null) ? $permissions : [];
 $canResolve = ($permissions['canResolve'] ?? false) === true;
@@ -39,6 +40,21 @@ $partidasAprobadas = (int) ($ticket['partidas_aprobadas'] ?? $countByState($part
 $partidasRechazadas = (int) ($ticket['partidas_rechazadas'] ?? $countByState($partidas, 'RECHAZADA'));
 $comentariosPorPartida = [];
 $comentariosGenerales = [];
+$adjuntosPorPartida = [];
+$adjuntosGenerales = [];
+$formatBytes = static function (mixed $bytes): string {
+    $size = is_numeric($bytes) ? (int) $bytes : 0;
+
+    if ($size >= 1048576) {
+        return number_format($size / 1048576, 2) . ' MB';
+    }
+
+    if ($size >= 1024) {
+        return number_format($size / 1024, 1) . ' KB';
+    }
+
+    return $size . ' bytes';
+};
 
 foreach ($comentarios as $comentario) {
     if (!is_array($comentario)) {
@@ -53,6 +69,21 @@ foreach ($comentarios as $comentario) {
     }
 
     $comentariosGenerales[] = $comentario;
+}
+
+foreach ($adjuntos as $adjunto) {
+    if (!is_array($adjunto)) {
+        continue;
+    }
+
+    $adjuntoPartidaId = (string) ($adjunto['partida_id'] ?? '');
+
+    if ($adjuntoPartidaId !== '' && $adjuntoPartidaId !== '0') {
+        $adjuntosPorPartida[$adjuntoPartidaId][] = $adjunto;
+        continue;
+    }
+
+    $adjuntosGenerales[] = $adjunto;
 }
 ?>
 <!doctype html>
@@ -172,6 +203,45 @@ foreach ($comentarios as $comentario) {
             <?php endif; ?>
         </section>
 
+        <?php if ($canViewAttachments): ?>
+            <section class="home-section ticket-products__section ticket-products__attachments" aria-labelledby="ticket-producto-adjuntos">
+                <div class="home-section__heading">
+                    <div>
+                        <p class="section-kicker">Soporte documental</p>
+                        <h2 id="ticket-producto-adjuntos">Adjuntos</h2>
+                    </div>
+                </div>
+                <p class="ticket-products__hint">
+                    Los adjuntos sirven como soporte para revisar la solicitud. La descarga se habilitará en una fase posterior.
+                </p>
+                <form class="ticket-products__action-form ticket-products__attachment-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/adjuntos" enctype="multipart/form-data">
+                    <?= csrf_field($csrf) ?>
+                    <label class="field">
+                        <span>Adjunto general</span>
+                        <input type="file" name="adjunto" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" required>
+                    </label>
+                    <p class="ticket-products__hint">Formatos: PDF, JPG, JPEG, PNG o WEBP. Máximo 5 MB.</p>
+                    <button class="button" type="submit">Subir adjunto</button>
+                </form>
+                <?php if ($adjuntosGenerales === []): ?>
+                    <p class="ticket-products__placeholder">Sin adjuntos generales registrados.</p>
+                <?php else: ?>
+                    <ul class="ticket-products__attachment-list">
+                        <?php foreach ($adjuntosGenerales as $adjunto): ?>
+                            <li>
+                                <strong><?= e($formatValue($adjunto['nombre_original'] ?? null)) ?></strong>
+                                <span><?= e(strtoupper($formatValue($adjunto['extension'] ?? null))) ?> · <?= e($formatValue($adjunto['mime'] ?? null)) ?> · <?= e($formatBytes($adjunto['tamano_bytes'] ?? null)) ?></span>
+                                <span class="ticket-products__event-meta">
+                                    Usuario <?= e($formatValue($adjunto['subido_por_usuario_id'] ?? null)) ?>
+                                    · <?= e($formatValue($adjunto['created_at'] ?? null)) ?>
+                                </span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
+
         <section class="ticket-products__section" aria-labelledby="ticket-producto-partidas">
             <div class="ticket-products__section-header">
                 <p class="section-kicker">Revisión documental</p>
@@ -190,6 +260,7 @@ foreach ($comentarios as $comentario) {
                     <?php $partidaId = (string) ($partida['id'] ?? ''); ?>
                     <?php $estadoPartida = (string) ($partida['estado'] ?? ''); ?>
                     <?php $comentariosDePartida = $comentariosPorPartida[$partidaId] ?? []; ?>
+                    <?php $adjuntosDePartida = $adjuntosPorPartida[$partidaId] ?? []; ?>
                     <article class="home-section ticket-products__line-card">
                         <div class="ticket-products__line-heading">
                             <h3>Partida <?= e($partida['numero_partida'] ?? '') ?></h3>
@@ -244,6 +315,37 @@ foreach ($comentarios as $comentario) {
                             <?php endif; ?>
                         </div>
 
+                        <?php if ($canViewAttachments): ?>
+                            <div class="ticket-products__line-attachments">
+                                <h4>Adjuntos de partida</h4>
+                                <form class="ticket-products__action-form ticket-products__attachment-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/adjuntos" enctype="multipart/form-data">
+                                    <?= csrf_field($csrf) ?>
+                                    <input type="hidden" name="partida_id" value="<?= e($partidaId) ?>">
+                                    <label class="field">
+                                        <span>Adjuntar soporte a esta partida</span>
+                                        <input type="file" name="adjunto" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" required>
+                                    </label>
+                                    <button class="button button--secondary" type="submit">Subir adjunto de partida</button>
+                                </form>
+                                <?php if ($adjuntosDePartida === []): ?>
+                                    <p class="ticket-products__hint">Sin adjuntos registrados para esta partida.</p>
+                                <?php else: ?>
+                                    <ul class="ticket-products__attachment-list">
+                                        <?php foreach ($adjuntosDePartida as $adjunto): ?>
+                                            <li>
+                                                <strong><?= e($formatValue($adjunto['nombre_original'] ?? null)) ?></strong>
+                                                <span><?= e(strtoupper($formatValue($adjunto['extension'] ?? null))) ?> · <?= e($formatValue($adjunto['mime'] ?? null)) ?> · <?= e($formatBytes($adjunto['tamano_bytes'] ?? null)) ?></span>
+                                                <span class="ticket-products__event-meta">
+                                                    Usuario <?= e($formatValue($adjunto['subido_por_usuario_id'] ?? null)) ?>
+                                                    · <?= e($formatValue($adjunto['created_at'] ?? null)) ?>
+                                                </span>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+
                         <?php if ($canResolve && $estadoPartida === 'EN_REVISION'): ?>
                             <div class="ticket-products__line-actions">
                                 <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
@@ -293,12 +395,9 @@ foreach ($comentarios as $comentario) {
             </section>
         <?php endif; ?>
 
-        <?php if ($canViewAttachments || $canResendEmail): ?>
+        <?php if ($canResendEmail): ?>
             <section class="home-section ticket-products__section ticket-products__placeholders" aria-labelledby="ticket-producto-acciones-documentales">
                 <h2 id="ticket-producto-acciones-documentales">Acciones documentales</h2>
-                <?php if ($canViewAttachments): ?>
-                    <p class="ticket-products__placeholder">Adjuntos documentales pendientes de fase posterior.</p>
-                <?php endif; ?>
                 <?php if ($canResendEmail): ?>
                     <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>
                         Reenvío de correo pendiente de fase posterior.

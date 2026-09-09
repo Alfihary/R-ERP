@@ -168,8 +168,10 @@ return new class implements DatabaseTest {
             'csrf_global_middleware_available_for_post' => str_contains($routes, 'CsrfMiddleware')
                 || str_contains($this->read('bootstrap/app.php'), 'CsrfMiddleware'),
             'no_public_comment_route' => !str_contains($routes, '/v/{slug}/comentarios'),
-            'no_attachment_or_email_routes_created' => !str_contains($routes, '/adjuntos')
-                && !str_contains($routes, '/correo'),
+            'authorized_attachment_runtime_route_allowed' => str_contains($routes, "'/tickets/productos/{id}/adjuntos'")
+                && str_contains($routes, '->attachment($request, $params)')
+                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
+            'no_email_routes_created' => !str_contains($routes, '/correo'),
         ];
     }
 

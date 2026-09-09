@@ -32,7 +32,7 @@ La fase mantiene el flujo exclusivamente documental.
 - `tickets_productos.resolver` controla aprobar/rechazar partidas.
 - `tickets_productos.cancelar` controla cancelar ticket.
 - `tickets_productos.eventos.ver` controla eventos.
-- `tickets_productos.adjuntos.ver` controla placeholder de adjuntos.
+- `tickets_productos.adjuntos.ver` controla adjuntos; desde `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1` muestra la UI real de carga privada autorizada.
 - `tickets_productos.comentarios.crear` controla placeholder de comentarios.
 - `tickets_productos.correo.reenviar` controla placeholder deshabilitado de reenvío.
 
@@ -50,11 +50,12 @@ La seguridad real sigue dependiendo de middleware, controlador y servicio existe
 
 ## Placeholders agregados o conservados
 
-- Adjuntos: `Adjuntos documentales pendientes de fase posterior.`
+- Adjuntos: el placeholder original fue reemplazado por UI real de carga privada en `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1`.
 - Comentarios: `Comentarios documentales pendientes de fase posterior.`
 - Correo: `Reenvío de correo pendiente de fase posterior.`
 
 Estos placeholders no ejecutan lógica, no escriben archivos y no envían correos.
+La UI real de adjuntos no habilita descarga ni preview y no expone rutas físicas, `ruta_relativa` ni `nombre_guardado`.
 
 ## Guardrails de no creación operativa
 
@@ -68,7 +69,6 @@ Esta fase no crea ni modifica:
 - compras;
 - proveedores reales;
 - claves definitivas;
-- adjuntos reales;
 - correos runtime.
 
 Aprobar una partida continúa significando únicamente revisión documental.
@@ -83,7 +83,7 @@ Aprobar una partida continúa significando únicamente revisión documental.
 - No modifica `create.php`.
 - No crea JavaScript.
 - No implementa correos.
-- No implementa adjuntos reales.
+- No implementó adjuntos reales en esta fase; el runtime privado autorizado llegó después en `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1`.
 - No toca migraciones ni seeds.
 - No toca compras, inventario, precios ni productos funcionalmente.
 

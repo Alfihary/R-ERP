@@ -30,7 +30,7 @@ Esta fase mantiene el flujo exclusivamente documental.
   - Muestra `Aprobar partida` y `Rechazar partida` solo con `tickets_productos.resolver`.
   - Muestra `Cancelar ticket` solo con `tickets_productos.cancelar`.
   - Muestra eventos solo con `tickets_productos.eventos.ver`.
-  - Muestra placeholder de adjuntos solo con `tickets_productos.adjuntos.ver`.
+  - Muestra adjuntos solo con `tickets_productos.adjuntos.ver`; desde `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1` esto incluye la UI real de carga privada autorizada.
   - Muestra placeholder de comentarios documentales solo con `tickets_productos.comentarios.crear`.
   - Muestra únicamente un placeholder deshabilitado de reenvío de correo con `tickets_productos.correo.reenviar`.
 
@@ -66,7 +66,7 @@ Aprobar una partida sigue significando únicamente revisión documental.
 - No modifica seeds.
 - No crea JavaScript.
 - No implementa mail runtime.
-- No implementa adjuntos reales.
+- No implementó adjuntos reales en esta fase; el runtime privado autorizado llegó después en `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1`.
 - No toca productos, precios, inventario, compras ni proveedores funcionalmente.
 
 ## Pruebas esperadas

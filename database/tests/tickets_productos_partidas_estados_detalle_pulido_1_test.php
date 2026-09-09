@@ -75,9 +75,13 @@ return new class implements DatabaseTest {
                 'events_only_with_permission' => str_contains($html['all'], 'Eventos')
                     && str_contains($html['all'], 'PARTIDA_APROBADA')
                     && !str_contains($html['limited'], 'PARTIDA_APROBADA'),
-                'attachments_placeholder_only_with_permission' =>
-                    str_contains($html['all'], 'Adjuntos documentales pendientes de fase posterior.')
-                    && !str_contains($html['limited'], 'Adjuntos documentales pendientes de fase posterior.'),
+                'attachments_runtime_only_with_permission' =>
+                    str_contains($html['all'], 'Los adjuntos sirven como soporte para revisar la solicitud.')
+                    && str_contains($html['all'], 'Subir adjunto')
+                    && str_contains($html['all'], 'type="file"')
+                    && str_contains($html['all'], 'enctype="multipart/form-data"')
+                    && !str_contains($html['limited'], 'Los adjuntos sirven como soporte para revisar la solicitud.')
+                    && !str_contains($html['limited'], 'Subir adjunto'),
                 'comments_contract_only_with_permission' =>
                     str_contains($html['all'], 'Los comentarios son documentales y no modifican el estado del ticket.')
                     && str_contains($html['all'], 'Agregar comentario general')
@@ -106,6 +110,18 @@ return new class implements DatabaseTest {
                 'show_uses_escape_helper' => str_contains($show, '<?= e('),
                 'no_storage_uploads_in_html' => !$this->containsAny($html, ['storage/uploads']),
                 'no_physical_paths_in_html' => !$this->containsAny($html, ['C:\\', '/var/', 'BASE_PATH']),
+                'no_attachment_download_or_preview_in_html' => !$this->containsAny($html, [
+                    'Descargar adjunto',
+                    'Vista previa',
+                    '/descargar',
+                    '/download',
+                    '/preview',
+                ]),
+                'no_internal_attachment_paths_or_names_in_html' => !$this->containsAny($html, [
+                    'ruta_relativa',
+                    'nombre_guardado',
+                    'storage/private',
+                ]),
                 'no_sensitive_data_in_html' => !$this->containsAny($html, [
                     'password_hash',
                     'token_hash',

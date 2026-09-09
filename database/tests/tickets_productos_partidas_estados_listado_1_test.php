@@ -111,18 +111,23 @@ return new class implements DatabaseTest {
      */
     private function repositoryCases(array $tickets, array $fixture): array
     {
-        $all = $this->repository->listar([], 1, 20);
+        $fixtureScope = ['empresa_id' => (string) $fixture['empresa_id']];
+        $all = $this->repository->listar($fixtureScope, 1, 20);
         $folio = $this->repository->listar(['folio' => (string) $tickets['middle']['folio']], 1, 20);
-        $state = $this->repository->listar(['estado' => 'APROBADO'], 1, 20);
-        $invalidState = $this->repository->listar(['estado' => 'DROP TABLE'], 1, 20);
+        $state = $this->repository->listar($fixtureScope + ['estado' => 'APROBADO'], 1, 20);
+        $invalidState = $this->repository->listar($fixtureScope + ['estado' => 'DROP TABLE'], 1, 20);
         $company = $this->repository->listar(['empresa_id' => (string) $fixture['empresa_id']], 1, 20);
         $warehouse = $this->repository->listar(['almacen_id' => (string) $fixture['almacen_id']], 1, 20);
-        $from = $this->repository->listar(['fecha_desde' => '2026-09-02'], 1, 20);
-        $to = $this->repository->listar(['fecha_hasta' => '2026-09-02'], 1, 20);
-        $invalidDates = $this->repository->listar(['fecha_desde' => '2026-99-99', 'fecha_hasta' => 'bad'], 1, 20);
-        $pageOne = $this->repository->listar([], 1, 10);
-        $pageTwo = $this->repository->listar([], 2, 10);
-        $maxPerPage = $this->repository->listar([], 1, 500);
+        $from = $this->repository->listar($fixtureScope + ['fecha_desde' => '2026-09-02'], 1, 20);
+        $to = $this->repository->listar($fixtureScope + ['fecha_hasta' => '2026-09-02'], 1, 20);
+        $invalidDates = $this->repository->listar(
+            $fixtureScope + ['fecha_desde' => '2026-99-99', 'fecha_hasta' => 'bad'],
+            1,
+            20
+        );
+        $pageOne = $this->repository->listar($fixtureScope, 1, 10);
+        $pageTwo = $this->repository->listar($fixtureScope, 2, 10);
+        $maxPerPage = $this->repository->listar($fixtureScope, 1, 500);
         $repository = $this->read('app/Infrastructure/Repositories/ProductRequestTicketRepository.php');
 
         return [

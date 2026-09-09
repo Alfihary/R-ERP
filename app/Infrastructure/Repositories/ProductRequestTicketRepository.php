@@ -1061,6 +1061,66 @@ final class ProductRequestTicketRepository
     }
 
     /**
+     * @param array{
+     *     nombre_original: string,
+     *     nombre_guardado: string,
+     *     ruta_relativa: string,
+     *     mime: string,
+     *     extension: string,
+     *     tamano_bytes: int,
+     *     hash_sha256: string
+     * } $metadata
+     */
+    public function agregarAdjunto(
+        int $ticketId,
+        ?int $partidaId,
+        int $userId,
+        array $metadata
+    ): int {
+        $statement = $this->connection->pdo()->prepare(
+            'INSERT INTO tickets_productos_adjuntos (
+                ticket_producto_id,
+                partida_id,
+                subido_por_usuario_id,
+                nombre_original,
+                nombre_guardado,
+                ruta_relativa,
+                mime,
+                extension,
+                tamano_bytes,
+                hash_sha256,
+                created_at
+             ) VALUES (
+                :ticket_producto_id,
+                :partida_id,
+                :subido_por_usuario_id,
+                :nombre_original,
+                :nombre_guardado,
+                :ruta_relativa,
+                :mime,
+                :extension,
+                :tamano_bytes,
+                :hash_sha256,
+                CURRENT_TIMESTAMP
+             )'
+        );
+        $statement->execute([
+            'ticket_producto_id' => $ticketId,
+            'partida_id' => $partidaId,
+            'subido_por_usuario_id' => $userId,
+            'nombre_original' => $metadata['nombre_original'],
+            'nombre_guardado' => $metadata['nombre_guardado'],
+            'ruta_relativa' => $metadata['ruta_relativa'],
+            'mime' => $metadata['mime'],
+            'extension' => $metadata['extension'],
+            'tamano_bytes' => $metadata['tamano_bytes'],
+            'hash_sha256' => $metadata['hash_sha256'],
+        ]);
+
+        return (int) $this->connection->pdo()->lastInsertId();
+    }
+
+    /**
      * @param array<string, mixed>|null $metadata
      */
     public function insertEvent(

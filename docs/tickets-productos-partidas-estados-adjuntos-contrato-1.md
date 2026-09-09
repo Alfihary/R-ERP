@@ -4,7 +4,7 @@
 
 Definir y validar el contrato seguro de adjuntos documentales para Tickets de Solicitud de Alta de Productos.
 
-Esta fase es contractual y de auditoría. No implementa subida real de archivos, no crea endpoints de descarga, no mueve archivos y no escribe archivos en `storage`.
+Esta fase nació como contractual y de auditoría para adjuntos documentales. Desde `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1`, el contrato permite el runtime autorizado de carga privada por `POST /tickets/productos/{id}/adjuntos`. No crea endpoints de descarga, no crea preview y no crea rutas públicas de archivo.
 
 El flujo sigue siendo exclusivamente documental.
 
@@ -21,21 +21,28 @@ El flujo sigue siendo exclusivamente documental.
 - Guardrails de no creación operativa.
 - Validaciones mínimas para la futura implementación.
 
-## Qué NO implementa esta fase
+## Evolución autorizada por runtime
 
-- No implementa upload real.
+- Se permite upload real únicamente desde el detalle privado del ticket.
+- Se permite `POST /tickets/productos/{id}/adjuntos`.
+- La ruta debe usar `AuthMiddleware`.
+- La ruta debe usar `PermissionMiddleware` con `tickets_productos.adjuntos.ver`.
+- La ruta debe mantener CSRF global para POST.
+- La carga debe guardar archivos fuera de `public/`.
+- La vista puede mostrar formulario de carga y metadata segura.
+
+## Qué sigue prohibido
+
 - No implementa download real.
 - No implementa preview real.
-- No crea rutas nuevas.
-- No modifica rutas existentes.
-- No modifica controlador, servicio ni repositorio.
-- No modifica vistas.
-- No crea CSS.
+- No crea rutas públicas de archivos.
+- No expone `ruta_relativa`.
+- No expone `nombre_guardado`.
+- No expone rutas físicas.
 - No crea JavaScript.
 - No crea migraciones.
 - No modifica seeds.
 - No implementa correos.
-- No crea adjuntos reales.
 
 ## Tabla base
 
@@ -69,7 +76,7 @@ Un adjunto puede pertenecer a:
 
 `partida_id` es opcional. Si se informa, la partida específica debe pertenecer al ticket completo indicado por `ticket_producto_id`.
 
-La futura implementación debe rechazar cualquier `partida_id` que no pertenezca al ticket.
+La implementación runtime debe rechazar cualquier `partida_id` que no pertenezca al ticket.
 
 ## Tipos y extensiones permitidas
 
@@ -93,7 +100,7 @@ webp
 
 ## MIME reales permitidos
 
-La futura implementación debe validar MIME real con `fileinfo`/`finfo`, no solo por extensión.
+La implementación runtime debe validar MIME real con `fileinfo`/`finfo`, no solo por extensión.
 
 MIME permitidos:
 
@@ -138,7 +145,7 @@ Archivos ejecutables, HTML, JavaScript, SVG y ZIP/RAR/7Z no forman parte del con
 
 ## Doble extensión peligrosa
 
-La futura implementación debe rechazar nombres como:
+La implementación runtime debe rechazar nombres como:
 
 - `archivo.pdf.php`
 - `imagen.jpg.php`
@@ -156,7 +163,7 @@ Tamaño máximo definido:
 5 MB por archivo
 ```
 
-La futura implementación debe validar tamaño antes de persistir metadatos.
+La implementación runtime debe validar tamaño antes de persistir metadatos.
 
 ## Nombre original
 
@@ -168,7 +175,7 @@ No debe imprimirse sin escape.
 
 ## Nombre almacenado
 
-`nombre_guardado` debe generarse de forma segura en la futura implementación:
+`nombre_guardado` debe generarse de forma segura en la implementación runtime:
 
 - aleatorio;
 - sin datos sensibles;
@@ -195,7 +202,7 @@ La ruta relativa segura no debe imprimirse al usuario.
 
 ## Ubicación privada sugerida
 
-Ubicación futura sugerida:
+Ubicación runtime autorizada:
 
 ```text
 storage/private/tickets_productos/{ticket_id}/...
@@ -221,11 +228,11 @@ Nunca mostrar al usuario:
 - `stored_name` si revela estructura interna;
 - metadata interna sensible.
 
-La descarga futura debe pasar por controlador privado con permiso y validación de alcance.
+Una descarga futura, si se autoriza en otra fase, deberá pasar por controlador privado con permiso y validación de alcance. En el contrato actual no hay descarga ni preview.
 
 ## Permiso de visualización
 
-Para ver, listar o descargar adjuntos debe requerirse:
+Para ver, listar o subir adjuntos debe requerirse:
 
 ```text
 tickets_productos.adjuntos.ver
@@ -235,17 +242,21 @@ tickets_productos.adjuntos.ver
 
 No se crea permiso nuevo en esta fase.
 
-La futura fase deberá decidir si la carga de adjuntos usa un permiso existente o un permiso específico nuevo. Preferencia actual: no crear permisos hasta definir la implementación real.
+El runtime autorizado usa el permiso existente `tickets_productos.adjuntos.ver`. No se crea permiso nuevo y cualquier futura fase deberá decidir si separa permisos.
 
 ## Eventos futuros
 
-La futura implementación puede registrar evento documental:
+El contrato inicial contemplaba el evento documental:
 
 ```text
 ADJUNTO_AGREGADO
 ```
 
-Esta fase no modifica CHECK constraints ni enums de eventos. No crea migración.
+Como el CHECK actual de eventos no permite `ADJUNTO_AGREGADO` y no se modifica la migración, el runtime autorizado registra el evento existente permitido:
+
+```text
+ADJUNTO_CARGADO
+```
 
 ## Antivirus/escaneo
 
@@ -299,11 +310,11 @@ Validaciones esperadas:
 - Relación con ticket validada.
 - Relación opcional con partida validada.
 - Campos de metadatos validados.
-- Se confirma que no hay upload real.
+- Se confirma que el upload real permitido es solo el runtime autorizado.
 - Se confirma que no hay download real.
-- Se confirma que no hay rutas nuevas de adjuntos.
+- Se confirma que la única ruta runtime de adjuntos es `POST /tickets/productos/{id}/adjuntos`.
 - Se confirma que no hay controlador específico de adjuntos.
-- Se confirma que no se escriben archivos reales.
+- Se confirma que los archivos reales se escriben solo en `storage/private/tickets_productos/{ticket_id}` durante el runtime autorizado.
 - Se confirma que no se exponen rutas físicas.
 - Se confirma que no se crean permisos nuevos.
 - Se confirma que no se modifican migraciones ni seeds.
@@ -311,4 +322,4 @@ Validaciones esperadas:
 
 ## Siguiente fase recomendada
 
-`TP-PARTIDAS-ESTADOS-ADJUNTOS-IMPLEMENTACION-1`
+`TP-PARTIDAS-ESTADOS-ADJUNTOS-IMPLEMENTACION-1` fue sustituida por `TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1` como fase autorizada de implementación.

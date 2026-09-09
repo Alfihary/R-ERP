@@ -12,6 +12,8 @@ Se agrega `ProductRequestTicketRepository::listar(array $filters, int $page = 1,
 
 El método usa PDO con consultas preparadas, filtros normalizados y orden por `created_at DESC, id DESC`.
 
+El runner de regresión usa fixtures propios aislados por empresa/almacén y fechas explícitas. Las pruebas de orden, filtros por fecha y paginación no dependen de que `tickets_productos` esté vacía ni de datos persistentes usados para revisión visual local.
+
 ## Filtros soportados
 
 - `folio`: búsqueda parcial con `LIKE` preparado y escape de comodines.

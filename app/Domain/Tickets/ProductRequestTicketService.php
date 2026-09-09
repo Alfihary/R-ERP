@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Tickets;
 
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Support\SafeUpload;
 use PDOException;
 use Throwable;
 
@@ -304,6 +305,72 @@ final class ProductRequestTicketService
 
             return $this->obtenerTicketOrFail($ticketId);
         });
+    }
+
+    /**
+     * @param array<string, mixed> $file
+     * @return array<string, mixed>
+     */
+    public function agregarAdjunto(
+        int $ticketId,
+        ?int $partidaId,
+        array $file,
+        int $usuarioId
+    ): array {
+        $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
+        $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
+        $partidaId = $partidaId === null
+            ? null
+            : $this->positiveIdValue($partidaId, 'partida_id');
+        $storedPath = null;
+
+        try {
+            return $this->transactional(function () use (
+                $ticketId,
+                $partidaId,
+                $file,
+                $usuarioId,
+                &$storedPath
+            ): array {
+                $this->assertActiveUser($usuarioId);
+                $this->assertTicketForUpdate($ticketId);
+
+                if ($partidaId !== null) {
+                    $this->assertPartidaForUpdate($ticketId, $partidaId);
+                }
+
+                $metadata = (new SafeUpload())->storeTicketAttachment($file, $ticketId);
+                $storedPath = BASE_PATH . '/storage/' . $metadata['ruta_relativa'];
+                $attachmentId = $this->tickets->agregarAdjunto(
+                    $ticketId,
+                    $partidaId,
+                    $usuarioId,
+                    $metadata
+                );
+
+                $this->tickets->insertEvent(
+                    $ticketId,
+                    $partidaId,
+                    $usuarioId,
+                    'ADJUNTO_CARGADO',
+                    'Adjunto documental cargado al ticket.',
+                    [
+                        'adjunto_id' => $attachmentId,
+                        'nombre_original' => $metadata['nombre_original'],
+                        'mime' => $metadata['mime'],
+                        'tamano_bytes' => $metadata['tamano_bytes'],
+                    ]
+                );
+
+                return $this->obtenerTicketOrFail($ticketId);
+            });
+        } catch (Throwable $exception) {
+            if (is_string($storedPath) && is_file($storedPath)) {
+                unlink($storedPath);
+            }
+
+            throw $exception;
+        }
     }
 
     /**

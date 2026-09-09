@@ -155,6 +155,26 @@ final class ProductRequestTicketController
     /**
      * @param array<string, string> $params
      */
+    public function attachment(Request $request, array $params): Response
+    {
+        try {
+            $ticketId = $this->id($params['id'] ?? null);
+            $this->tickets->agregarAdjunto(
+                $ticketId,
+                $this->optionalId($request->input('partida_id')),
+                $this->uploadedFile($request, 'adjunto'),
+                $this->userId()
+            );
+        } catch (ProductRequestTicketValidationException $exception) {
+            return $this->actionValidationResponse($exception, $params);
+        }
+
+        return Response::redirect('/tickets/productos/' . $ticketId);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
     public function cancel(Request $request, array $params): Response
     {
         try {
@@ -230,6 +250,22 @@ final class ProductRequestTicketController
         }
 
         return $this->id($value);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function uploadedFile(Request $request, string $field): array
+    {
+        $file = $request->file($field);
+
+        if (!is_array($file)) {
+            throw new ProductRequestTicketValidationException([
+                $field => 'Selecciona un archivo adjunto válido.',
+            ]);
+        }
+
+        return $file;
     }
 
     private function userId(): int
