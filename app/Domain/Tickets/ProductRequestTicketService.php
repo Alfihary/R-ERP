@@ -139,6 +139,7 @@ final class ProductRequestTicketService
             $ticketId,
             $partidaId,
             $accion,
+            $input,
             $comment,
             $rejectReason,
             $usuarioId
@@ -159,6 +160,10 @@ final class ProductRequestTicketService
                 ]);
             }
 
+            $authorizedData = $accion === 'APROBAR'
+                ? $this->validateAuthorizedApprovalData($input, $partida)
+                : null;
+
             $newState = $accion === 'APROBAR'
                 ? self::PARTIDA_APROBADA
                 : self::PARTIDA_RECHAZADA;
@@ -171,7 +176,8 @@ final class ProductRequestTicketService
                 $newState,
                 $usuarioId,
                 $comment,
-                $accion === 'APROBAR' ? null : $rejectReason
+                $accion === 'APROBAR' ? null : $rejectReason,
+                $authorizedData
             );
             $this->recalculateTicket($ticketId);
             $this->tickets->insertEvent(
@@ -187,6 +193,7 @@ final class ProductRequestTicketService
                     'motivo_rechazo' => $accion === 'APROBAR'
                         ? null
                         : $rejectReason,
+                    'datos_autorizados' => $authorizedData,
                 ]
             );
 
@@ -481,6 +488,92 @@ final class ProductRequestTicketService
         $counts = $this->tickets->countPartidasByState($ticketId);
         $state = $this->ticketStateFromCounts($counts);
         $this->tickets->updateTicketCounters($ticketId, $state, $counts);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $partida
+     * @return array{
+     *     clave_autorizada: string|null,
+     *     descripcion_autorizada: string,
+     *     unidad_sat_id_autorizada: int|null,
+     *     clave_sat_id_autorizada: int|null
+     * }
+     */
+    private function validateAuthorizedApprovalData(array $input, array $partida): array
+    {
+        $errors = [];
+        $authorizedKey = $this->nullableText($input, 'clave_autorizada', 16);
+        $authorizedDescription = $this->nullableText($input, 'descripcion_autorizada', 255);
+        $authorizedUnitText = trim((string) ($input['unidad_sat_autorizada'] ?? ''));
+        $authorizedSatKeyText = trim((string) ($input['clave_sat_autorizada'] ?? ''));
+        $authorizedUnitId = $this->optionalPositiveId($input['unidad_sat_id_autorizada'] ?? null);
+        $authorizedSatKeyId = $this->optionalPositiveId($input['clave_sat_id_autorizada'] ?? null);
+
+        if ($authorizedKey === false) {
+            $errors['clave_autorizada'] = 'La clave autorizada admite hasta 16 caracteres.';
+        } elseif ($authorizedKey !== null && preg_match('/^[A-Za-z0-9._-]{1,16}$/', $authorizedKey) !== 1) {
+            $errors['clave_autorizada'] = 'La clave autorizada solo admite letras, números, guion, punto y guion bajo.';
+        }
+
+        if ($authorizedDescription === false) {
+            $errors['descripcion_autorizada'] = 'La descripción autorizada admite hasta 255 caracteres.';
+        }
+
+        $description = $authorizedDescription ?? trim((string) ($partida['descripcion'] ?? ''));
+
+        if ($description === '') {
+            $errors['descripcion_autorizada'] = 'La descripción autorizada es obligatoria.';
+        } elseif ($this->length($description) > 255) {
+            $errors['descripcion_autorizada'] = 'La descripción autorizada admite hasta 255 caracteres.';
+        }
+
+        if ($authorizedUnitText !== '') {
+            $resolved = $this->tickets->resolveActiveSatUnit($authorizedUnitText);
+
+            if ($resolved['status'] === 'found' && $resolved['id'] !== null) {
+                $authorizedUnitId = (int) $resolved['id'];
+            } elseif ($resolved['status'] === 'ambiguous') {
+                $errors['unidad_sat_autorizada'] = 'La unidad SAT autorizada es ambigua; escribe una clave más específica.';
+            } else {
+                $errors['unidad_sat_autorizada'] = 'Selecciona una unidad SAT autorizada válida del catálogo.';
+            }
+        } elseif ($authorizedUnitId === false) {
+            $errors['unidad_sat_autorizada'] = 'La unidad SAT autorizada debe ser un identificador válido.';
+        } elseif ($authorizedUnitId !== null && $this->tickets->activeSatUnitById($authorizedUnitId) === null) {
+            $errors['unidad_sat_autorizada'] = 'Selecciona una unidad SAT autorizada válida del catálogo.';
+        } elseif ($authorizedUnitId === null && isset($partida['unidad_sat_id']) && (int) $partida['unidad_sat_id'] > 0) {
+            $authorizedUnitId = (int) $partida['unidad_sat_id'];
+        }
+
+        if ($authorizedSatKeyText !== '') {
+            $resolved = $this->tickets->resolveActiveSatKey($authorizedSatKeyText);
+
+            if ($resolved['status'] === 'found' && $resolved['id'] !== null) {
+                $authorizedSatKeyId = (int) $resolved['id'];
+            } elseif ($resolved['status'] === 'ambiguous') {
+                $errors['clave_sat_autorizada'] = 'La clave SAT autorizada es ambigua; escribe una clave más específica.';
+            } else {
+                $errors['clave_sat_autorizada'] = 'Selecciona una clave SAT autorizada válida del catálogo.';
+            }
+        } elseif ($authorizedSatKeyId === false) {
+            $errors['clave_sat_autorizada'] = 'La clave SAT autorizada debe ser un identificador válido.';
+        } elseif ($authorizedSatKeyId !== null && $this->tickets->activeSatKeyById($authorizedSatKeyId) === null) {
+            $errors['clave_sat_autorizada'] = 'Selecciona una clave SAT autorizada válida del catálogo.';
+        } elseif ($authorizedSatKeyId === null && isset($partida['clave_sat_id']) && (int) $partida['clave_sat_id'] > 0) {
+            $authorizedSatKeyId = (int) $partida['clave_sat_id'];
+        }
+
+        if ($errors !== []) {
+            throw new ProductRequestTicketValidationException($errors);
+        }
+
+        return [
+            'clave_autorizada' => $authorizedKey === false ? null : $authorizedKey,
+            'descripcion_autorizada' => $description,
+            'unidad_sat_id_autorizada' => $authorizedUnitId === false ? null : $authorizedUnitId,
+            'clave_sat_id_autorizada' => $authorizedSatKeyId === false ? null : $authorizedSatKeyId,
+        ];
     }
 
     /**

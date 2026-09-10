@@ -321,7 +321,7 @@
 .ticket-products__line-actions {
     display: grid;
     gap: 1rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .ticket-products__action-form {
@@ -464,6 +464,71 @@
     font-weight: 650;
 }
 
+.ticket-products__approval {
+    display: grid;
+    gap: 0.875rem;
+}
+
+.ticket-products__approval-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.ticket-products__approval-card {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-line));
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)), var(--color-surface));
+}
+
+.ticket-products__approval-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ticket-products__approval-head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.ticket-products__approval-request {
+    display: grid;
+    gap: 0.625rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+}
+
+.ticket-products__approval-request > div {
+    min-width: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+}
+
+.ticket-products__approval-request dt {
+    color: var(--color-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.ticket-products__approval-request dd {
+    margin: 0.25rem 0 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.ticket-products__approval-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+}
+
 .ticket-products__placeholders {
     display: grid;
     gap: 0.75rem;
@@ -505,6 +570,8 @@
     .ticket-products__summary,
     .ticket-products__metrics,
     .ticket-products__line-data,
+    .ticket-products__approval-request,
+    .ticket-products__approval-form,
     .ticket-products__line-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -529,6 +596,8 @@
     .ticket-products__summary,
     .ticket-products__metrics,
     .ticket-products__line-data,
+    .ticket-products__approval-request,
+    .ticket-products__approval-form,
     .ticket-products__line-actions {
         grid-template-columns: 1fr;
     }

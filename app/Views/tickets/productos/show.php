@@ -15,6 +15,9 @@ $comentarios = is_array($ticket['comentarios'] ?? null) ? $ticket['comentarios']
 $adjuntos = is_array($ticket['adjuntos'] ?? null) ? $ticket['adjuntos'] : [];
 $estadoTicket = (string) ($ticket['estado'] ?? '');
 $permissions = is_array($permissions ?? null) ? $permissions : [];
+$approvalCatalogs = is_array($approvalCatalogs ?? null) ? $approvalCatalogs : [];
+$approvalSatUnits = is_array($approvalCatalogs['sat_units'] ?? null) ? $approvalCatalogs['sat_units'] : [];
+$approvalSatKeys = is_array($approvalCatalogs['sat_keys'] ?? null) ? $approvalCatalogs['sat_keys'] : [];
 $canResolve = ($permissions['canResolve'] ?? false) === true;
 $canCancel = ($permissions['canCancel'] ?? false) === true;
 $canViewAttachments = ($permissions['canViewAttachments'] ?? false) === true;
@@ -54,6 +57,20 @@ $formatBytes = static function (mixed $bytes): string {
     }
 
     return $size . ' bytes';
+};
+$catalogLabel = static function (array $item, string $descriptionField = 'descripcion'): string {
+    $code = trim((string) ($item['codigo'] ?? ''));
+    $description = trim((string) ($item[$descriptionField] ?? $item['nombre'] ?? ''));
+
+    if ($code === '') {
+        return $description;
+    }
+
+    if ($description === '') {
+        return $code;
+    }
+
+    return $code . ' - ' . $description;
 };
 
 foreach ($comentarios as $comentario) {
@@ -242,6 +259,85 @@ foreach ($adjuntos as $adjunto) {
             </section>
         <?php endif; ?>
 
+        <?php if ($canResolve && $partidasEnRevision > 0): ?>
+            <section class="home-section ticket-products__section ticket-products__approval" aria-labelledby="ticket-producto-aprobar-partidas">
+                <div class="home-section__heading">
+                    <div>
+                        <p class="section-kicker">Resolución</p>
+                        <h2 id="ticket-producto-aprobar-partidas">Aprobar partidas</h2>
+                    </div>
+                </div>
+                <p class="ticket-products__hint">
+                    Completa la respuesta de aprobación por cada partida antes de aprobar el ticket. Aprobar no crea un producto real.
+                </p>
+                <datalist id="ticket-producto-unidades-sat-autorizadas">
+                    <?php foreach ($approvalSatUnits as $unit): ?>
+                        <?php if (!is_array($unit)) {
+                            continue;
+                        } ?>
+                        <option value="<?= e($catalogLabel($unit, 'nombre')) ?>"></option>
+                    <?php endforeach; ?>
+                </datalist>
+                <datalist id="ticket-producto-claves-sat-autorizadas">
+                    <?php foreach ($approvalSatKeys as $satKey): ?>
+                        <?php if (!is_array($satKey)) {
+                            continue;
+                        } ?>
+                        <option value="<?= e($catalogLabel($satKey, 'descripcion')) ?>"></option>
+                    <?php endforeach; ?>
+                </datalist>
+                <div class="ticket-products__approval-grid">
+                    <?php foreach ($partidas as $partida): ?>
+                        <?php if (!is_array($partida) || (string) ($partida['estado'] ?? '') !== 'EN_REVISION') {
+                            continue;
+                        } ?>
+                        <?php $partidaId = (string) ($partida['id'] ?? ''); ?>
+                        <?php $descriptionValue = trim((string) ($partida['descripcion'] ?? '')); ?>
+                        <article class="ticket-products__approval-card">
+                            <div class="ticket-products__approval-head">
+                                <div>
+                                    <span class="ticket-products__overline">Partida <?= e($partida['numero_partida'] ?? '') ?></span>
+                                    <h3><?= e($formatValue($descriptionValue)) ?></h3>
+                                </div>
+                                <span class="badge ticket-products__badge ticket-products__badge--en_revision">EN_REVISION</span>
+                            </div>
+                            <dl class="ticket-products__approval-request">
+                                <div><dt>Clave solicitada</dt><dd><?= e($formatValue($partida['clave_autorizada'] ?? null)) ?></dd></div>
+                                <div><dt>Unidad SAT solicitada</dt><dd><?= e($formatValue($partida['unidad_sat_id'] ?? null)) ?></dd></div>
+                                <div><dt>Clave SAT solicitada</dt><dd><?= e($formatValue($partida['clave_sat_id'] ?? null)) ?></dd></div>
+                            </dl>
+                            <form class="ticket-products__action-form ticket-products__approval-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
+                                <?= csrf_field($csrf) ?>
+                                <label class="field">
+                                    <span>Clave autorizada</span>
+                                    <input type="text" name="clave_autorizada" maxlength="16" pattern="[A-Za-z0-9._-]{1,16}" autocomplete="off">
+                                </label>
+                                <label class="field ticket-products__field-full">
+                                    <span>Descripción autorizada *</span>
+                                    <input type="text" name="descripcion_autorizada" maxlength="255" value="<?= e($descriptionValue) ?>" required>
+                                </label>
+                                <label class="field">
+                                    <span>Unidad SAT autorizada</span>
+                                    <input type="text" name="unidad_sat_autorizada" list="ticket-producto-unidades-sat-autorizadas" autocomplete="off">
+                                </label>
+                                <label class="field">
+                                    <span>Clave SAT autorizada</span>
+                                    <input type="text" name="clave_sat_autorizada" list="ticket-producto-claves-sat-autorizadas" autocomplete="off">
+                                </label>
+                                <label class="field ticket-products__field-full">
+                                    <span>Respuesta / comentario para el solicitante</span>
+                                    <textarea name="comentario_resolucion">Producto autorizado para captura manual en catálogo.</textarea>
+                                </label>
+                                <button class="button" type="submit">Aprobar partida</button>
+                            </form>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php elseif (!$canResolve): ?>
+            <p class="ticket-products__permission-note">No tienes permiso para aprobar partidas.</p>
+        <?php endif; ?>
+
         <section class="ticket-products__section" aria-labelledby="ticket-producto-partidas">
             <div class="ticket-products__section-header">
                 <p class="section-kicker">Revisión documental</p>
@@ -348,15 +444,6 @@ foreach ($adjuntos as $adjunto) {
 
                         <?php if ($canResolve && $estadoPartida === 'EN_REVISION'): ?>
                             <div class="ticket-products__line-actions">
-                                <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
-                                    <?= csrf_field($csrf) ?>
-                                    <label class="field">
-                                        <span>Comentario de resolución</span>
-                                        <textarea name="comentario_resolucion"></textarea>
-                                    </label>
-                                    <button class="button" type="submit">Aprobar partida</button>
-                                </form>
-
                                 <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/rechazar">
                                     <?= csrf_field($csrf) ?>
                                     <label class="field">

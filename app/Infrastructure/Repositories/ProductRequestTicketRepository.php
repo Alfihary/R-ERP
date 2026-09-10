@@ -918,8 +918,10 @@ final class ProductRequestTicketRepository
         string $state,
         int $actorId,
         ?string $comment,
-        ?string $rejectReason
+        ?string $rejectReason,
+        ?array $authorizedData = null
     ): void {
+        $authorizedData ??= [];
         $statement = $this->connection->pdo()->prepare(
             'UPDATE tickets_productos_partidas
              SET estado = :estado,
@@ -927,6 +929,10 @@ final class ProductRequestTicketRepository
                  resuelto_at = CURRENT_TIMESTAMP,
                  comentario_resolucion = :comentario_resolucion,
                  motivo_rechazo = :motivo_rechazo,
+                 clave_autorizada = :clave_autorizada,
+                 descripcion_autorizada = :descripcion_autorizada,
+                 unidad_sat_id_autorizada = :unidad_sat_id_autorizada,
+                 clave_sat_id_autorizada = :clave_sat_id_autorizada,
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = :id
                AND deleted_at IS NULL'
@@ -937,6 +943,10 @@ final class ProductRequestTicketRepository
             'resuelto_por_usuario_id' => $actorId,
             'comentario_resolucion' => $comment,
             'motivo_rechazo' => $rejectReason,
+            'clave_autorizada' => $authorizedData['clave_autorizada'] ?? null,
+            'descripcion_autorizada' => $authorizedData['descripcion_autorizada'] ?? null,
+            'unidad_sat_id_autorizada' => $authorizedData['unidad_sat_id_autorizada'] ?? null,
+            'clave_sat_id_autorizada' => $authorizedData['clave_sat_id_autorizada'] ?? null,
         ]);
     }
 

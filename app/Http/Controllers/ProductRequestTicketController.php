@@ -86,6 +86,7 @@ final class ProductRequestTicketController
         return $this->render('tickets/productos/show', [
             'errors' => [],
             'ticket' => $ticket,
+            'approvalCatalogs' => $this->approvalCatalogs(),
         ]);
     }
 
@@ -99,7 +100,13 @@ final class ProductRequestTicketController
                 $this->id($params['id'] ?? null),
                 $this->id($params['partidaId'] ?? null),
                 'APROBAR',
-                ['comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion')],
+                [
+                    'clave_autorizada' => $this->nullableText($request, 'clave_autorizada'),
+                    'descripcion_autorizada' => $this->nullableText($request, 'descripcion_autorizada'),
+                    'unidad_sat_autorizada' => $this->nullableText($request, 'unidad_sat_autorizada'),
+                    'clave_sat_autorizada' => $this->nullableText($request, 'clave_sat_autorizada'),
+                    'comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion'),
+                ],
                 $this->userId()
             );
         } catch (ProductRequestTicketValidationException $exception) {
@@ -322,6 +329,7 @@ final class ProductRequestTicketController
         return $this->render('tickets/productos/show', [
             'errors' => $exception->errors(),
             'ticket' => $ticket,
+            'approvalCatalogs' => $this->approvalCatalogs(),
         ], 422);
     }
 
@@ -401,6 +409,26 @@ final class ProductRequestTicketController
             'all_warehouses' => $repository->availableWarehousesForUser($userId),
             'brands' => $repository->activeBrands(),
             'currencies' => $repository->activeCurrencies(),
+            'sat_units' => $repository->activeSatUnits(),
+            'sat_keys' => $repository->activeSatKeys(),
+        ];
+    }
+
+    /**
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function approvalCatalogs(): array
+    {
+        $repository = $this->repository();
+
+        if ($repository === null) {
+            return [
+                'sat_units' => [],
+                'sat_keys' => [],
+            ];
+        }
+
+        return [
             'sat_units' => $repository->activeSatUnits(),
             'sat_keys' => $repository->activeSatKeys(),
         ];
