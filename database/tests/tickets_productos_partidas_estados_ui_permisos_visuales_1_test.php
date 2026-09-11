@@ -129,7 +129,17 @@ return new class implements DatabaseTest {
                     'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
                     'ui-permisos-visuales'
                 ),
-                'no_ticket_js_created' => !$this->hasFiles('public/js', '/tickets.*productos|productos.*tickets/i'),
+                'only_expected_ticket_js_created' =>
+                    is_file(BASE_PATH . '/public/js/modules/tickets-productos-create.js')
+                    && !$this->containsAny([$this->read('public/js/modules/tickets-productos-create.js')], [
+                        'https://',
+                        'http://',
+                        'jquery',
+                        'React',
+                        'Vue',
+                        'Angular',
+                        'console.log',
+                    ]),
                 'no_mail_runtime_created' =>
                     !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                     && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),

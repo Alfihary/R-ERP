@@ -26,6 +26,52 @@ $canResendEmail = ($permissions['canResendEmail'] ?? false) === true;
 $canViewEvents = ($permissions['canViewEvents'] ?? false) === true;
 $isCancelled = $estadoTicket === 'CANCELADO';
 $formatValue = static fn (mixed $value): string => trim((string) ($value ?? '')) !== '' ? (string) $value : '—';
+$entityLabel = static function (
+    array $item,
+    string $codeField,
+    string $nameField,
+    string $fallbackField
+) use ($formatValue): string {
+    $code = trim((string) ($item[$codeField] ?? ''));
+    $name = trim((string) ($item[$nameField] ?? ''));
+
+    if ($code !== '' && $name !== '') {
+        return $code . ' · ' . $name;
+    }
+
+    if ($name !== '') {
+        return $name;
+    }
+
+    if ($code !== '') {
+        return $code;
+    }
+
+    return $formatValue($item[$fallbackField] ?? null);
+};
+$personLabel = static function (
+    array $item,
+    string $usernameField,
+    string $nameField,
+    string $fallbackField
+) use ($formatValue): string {
+    $username = trim((string) ($item[$usernameField] ?? ''));
+    $name = trim((string) ($item[$nameField] ?? ''));
+
+    if ($username !== '' && $name !== '') {
+        return $username . ' / ' . $name;
+    }
+
+    if ($username !== '') {
+        return $username;
+    }
+
+    if ($name !== '') {
+        return $name;
+    }
+
+    return $formatValue($item[$fallbackField] ?? null);
+};
 $countByState = static function (array $items, string $state): int {
     $count = 0;
 
@@ -71,6 +117,32 @@ $catalogLabel = static function (array $item, string $descriptionField = 'descri
     }
 
     return $code . ' - ' . $description;
+};
+$partCatalogLabel = static function (
+    array $item,
+    string $codeField,
+    string $nameField,
+    string $descriptionField,
+    string $fallbackField
+) use ($formatValue): string {
+    $code = trim((string) ($item[$codeField] ?? ''));
+    $description = trim((string) ($item[$descriptionField] ?? ''));
+    $name = trim((string) ($item[$nameField] ?? ''));
+    $text = $description !== '' ? $description : $name;
+
+    if ($code !== '' && $text !== '') {
+        return $code . ' · ' . $text;
+    }
+
+    if ($code !== '') {
+        return $code;
+    }
+
+    if ($text !== '') {
+        return $text;
+    }
+
+    return $formatValue($item[$fallbackField] ?? null);
 };
 
 foreach ($comentarios as $comentario) {
@@ -155,9 +227,9 @@ foreach ($adjuntos as $adjunto) {
                 </div>
             </div>
             <dl class="ticket-products__summary">
-                <div><dt>Empresa</dt><dd><?= e($formatValue($ticket['empresa_nombre'] ?? $ticket['empresa_id'] ?? null)) ?></dd></div>
-                <div><dt>Almacén</dt><dd><?= e($formatValue($ticket['almacen_nombre'] ?? $ticket['almacen_id'] ?? null)) ?></dd></div>
-                <div><dt>Solicitante</dt><dd><?= e($formatValue($ticket['solicitante_nombre'] ?? $ticket['solicitante_usuario_id'] ?? null)) ?></dd></div>
+                <div><dt>Empresa</dt><dd><?= e($entityLabel($ticket, 'empresa_codigo', 'empresa_nombre', 'empresa_id')) ?></dd></div>
+                <div><dt>Almacén</dt><dd><?= e($entityLabel($ticket, 'almacen_codigo', 'almacen_nombre', 'almacen_id')) ?></dd></div>
+                <div><dt>Solicitante</dt><dd><?= e($personLabel($ticket, 'solicitante_username', 'solicitante_nombre_completo', 'solicitante_usuario_id')) ?></dd></div>
                 <div><dt>Fecha de creación</dt><dd><?= e($formatValue($ticket['created_at'] ?? null)) ?></dd></div>
                 <div><dt>Última actualización</dt><dd><?= e($formatValue($ticket['updated_at'] ?? null)) ?></dd></div>
                 <?php if (($ticket['motivo_cancelacion'] ?? null) !== null): ?>
@@ -302,9 +374,8 @@ foreach ($adjuntos as $adjunto) {
                                 <span class="badge ticket-products__badge ticket-products__badge--en_revision">EN_REVISION</span>
                             </div>
                             <dl class="ticket-products__approval-request">
-                                <div><dt>Clave solicitada</dt><dd><?= e($formatValue($partida['clave_autorizada'] ?? null)) ?></dd></div>
-                                <div><dt>Unidad SAT solicitada</dt><dd><?= e($formatValue($partida['unidad_sat_id'] ?? null)) ?></dd></div>
-                                <div><dt>Clave SAT solicitada</dt><dd><?= e($formatValue($partida['clave_sat_id'] ?? null)) ?></dd></div>
+                                <div><dt>Unidad SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_clave', 'unidad_sat_nombre', 'unidad_sat_descripcion', 'unidad_sat_id')) ?></dd></div>
+                                <div><dt>Clave SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_clave', 'clave_sat_descripcion', 'clave_sat_descripcion', 'clave_sat_id')) ?></dd></div>
                             </dl>
                             <form class="ticket-products__action-form ticket-products__approval-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/aprobar">
                                 <?= csrf_field($csrf) ?>
@@ -367,14 +438,18 @@ foreach ($adjuntos as $adjunto) {
                             <div><dt>Modelo</dt><dd><?= e($formatValue($partida['modelo'] ?? null)) ?></dd></div>
                             <div><dt>Marca documental</dt><dd><?= e($formatValue($partida['marca_texto'] ?? null)) ?></dd></div>
                             <div><dt>Proveedor documental</dt><dd><?= e($formatValue($partida['proveedor_texto'] ?? null)) ?></dd></div>
-                            <div><dt>Unidad SAT</dt><dd><?= e($formatValue($partida['unidad_sat_id'] ?? null)) ?></dd></div>
-                            <div><dt>Clave SAT</dt><dd><?= e($formatValue($partida['clave_sat_id'] ?? null)) ?></dd></div>
-                            <div><dt>Moneda</dt><dd><?= e($formatValue($partida['moneda_id'] ?? null)) ?></dd></div>
+                            <div><dt>Unidad SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_clave', 'unidad_sat_nombre', 'unidad_sat_descripcion', 'unidad_sat_id')) ?></dd></div>
+                            <div><dt>Clave SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_clave', 'clave_sat_descripcion', 'clave_sat_descripcion', 'clave_sat_id')) ?></dd></div>
+                            <div><dt>Moneda</dt><dd><?= e($entityLabel($partida, 'moneda_codigo', 'moneda_nombre', 'moneda_id')) ?></dd></div>
                             <div><dt>Costo sugerido <span class="ticket-products__muted-inline">documental</span></dt><dd><?= e($formatValue($partida['costo_sugerido'] ?? null)) ?></dd></div>
                             <div><dt>Peso</dt><dd><?= e($formatValue($partida['peso'] ?? null)) ?></dd></div>
                             <div><dt>Lleva serie</dt><dd><?= ((int) ($partida['lleva_serie'] ?? 0)) === 1 ? 'Sí' : 'No' ?></dd></div>
-                            <div><dt>Resuelto por</dt><dd><?= e($formatValue($partida['resuelto_por_usuario_id'] ?? null)) ?></dd></div>
+                            <div><dt>Resuelto por</dt><dd><?= e($personLabel($partida, 'resuelto_por_username', 'resuelto_por_nombre_completo', 'resuelto_por_usuario_id')) ?></dd></div>
                             <div><dt>Fecha de resolución</dt><dd><?= e($formatValue($partida['resuelto_at'] ?? null)) ?></dd></div>
+                            <div><dt>Clave autorizada</dt><dd><?= e($formatValue($partida['clave_autorizada'] ?? null)) ?></dd></div>
+                            <div class="ticket-products__line-full"><dt>Descripción autorizada</dt><dd><?= e($formatValue($partida['descripcion_autorizada'] ?? null)) ?></dd></div>
+                            <div><dt>Unidad SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_autorizada_clave', 'unidad_sat_autorizada_nombre', 'unidad_sat_autorizada_descripcion', 'unidad_sat_id_autorizada')) ?></dd></div>
+                            <div><dt>Clave SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_autorizada_clave', 'clave_sat_autorizada_descripcion', 'clave_sat_autorizada_descripcion', 'clave_sat_id_autorizada')) ?></dd></div>
                             <div class="ticket-products__line-full"><dt>Observaciones</dt><dd><?= e($formatValue($partida['observaciones'] ?? null)) ?></dd></div>
                             <div class="ticket-products__line-full"><dt>Motivo de rechazo</dt><dd><?= e($formatValue($partida['motivo_rechazo'] ?? null)) ?></dd></div>
                             <div class="ticket-products__line-full"><dt>Comentario de resolución</dt><dd><?= e($formatValue($partida['comentario_resolucion'] ?? null)) ?></dd></div>

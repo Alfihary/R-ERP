@@ -264,7 +264,7 @@ return new class implements DatabaseTest {
                 && !str_contains($html, 'token_hash')
                 && !str_contains($html, 'auth_user')
                 && !str_contains($html, '$_SESSION'),
-            'no_js_created' => !$this->hasFiles('public/js', '/ticket|solicitud|alta/i'),
+            'only_authorized_ticket_create_js_runtime' => $this->onlyAuthorizedTicketCreateJsRuntime(),
             'no_mail_runtime_created' => !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
             'no_real_attachments_created' => !$this->hasFiles('storage', '/tickets-productos|ticket|solicitud/i'),
@@ -570,6 +570,75 @@ return new class implements DatabaseTest {
                 && $file->isFile()
                 && preg_match($pattern, str_replace('\\', '/', $file->getPathname())) === 1
             ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function onlyAuthorizedTicketCreateJsRuntime(): bool
+    {
+        $allowedRelative = 'public/js/modules/tickets-productos-create.js';
+        $allowedPath = BASE_PATH . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $allowedRelative);
+
+        if (!is_file($allowedPath)) {
+            return false;
+        }
+
+        $js = (string) file_get_contents($allowedPath);
+
+        $safeContent =
+            !preg_match('/https?:\/\/|cdn/i', $js)
+            && !preg_match('/\b(jquery|react|vue|angular|bootstrap)\b/i', $js)
+            && !preg_match('/\beval\s*\(|new\s+Function\s*\(/', $js)
+            && !str_contains($js, '.innerHTML')
+            && str_contains($js, "document.createElement('option')")
+            && str_contains($js, '.textContent')
+            && !str_contains($js, 'console.log')
+            && !preg_match('/\b(insert|update|delete|drop|alter)\b/i', $js)
+            && !preg_match('/\bselect\s+.+\s+from\b/i', $js)
+            && !preg_match('/\bcreate\s+table\b/i', $js)
+            && !preg_match('/storage\/private|storage\/uploads|[A-Z]:\\\\/i', $js)
+            && !preg_match('/\b(password|secret|dsn|api[_-]?key|token_hash|auth_user)\b/i', $js)
+            && str_contains($js, 'empresa')
+            && str_contains($js, 'almacen');
+
+        if (!$safeContent) {
+            return false;
+        }
+
+        return !$this->hasUnauthorizedTicketJsRuntime($allowedRelative);
+    }
+
+    private function hasUnauthorizedTicketJsRuntime(string $allowedRelative): bool
+    {
+        $directory = BASE_PATH . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'js';
+
+        if (!is_dir($directory)) {
+            return false;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file instanceof SplFileInfo || !$file->isFile()) {
+                continue;
+            }
+
+            $relative = str_replace(
+                [BASE_PATH . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR],
+                ['', '/'],
+                $file->getPathname()
+            );
+
+            if ($relative === $allowedRelative) {
+                continue;
+            }
+
+            if (preg_match('/ticket|solicitud|alta/i', $relative) === 1) {
                 return true;
             }
         }

@@ -184,10 +184,10 @@ return new class implements DatabaseTest {
                 'app/Http/Controllers',
                 '/Adjunto|Adjuntos|Attachment|Attachments|Archivo|Archivos/i'
             ) === [],
-            'no_upload_runtime_in_index_or_create' => !preg_match(
-                '/type=["\']file["\']|enctype=["\']multipart\/form-data/i',
-                $index . $create
-            ),
+            'create_initial_upload_allowed_without_download_or_preview' =>
+                str_contains($create, 'name="adjuntos[]"')
+                && str_contains($create, 'enctype="multipart/form-data"')
+                && !preg_match('/(?:descargar|download|preview|vista previa)/i', $index . $create),
             'show_has_authorized_upload_form' => str_contains($show, 'action="/tickets/productos/<?= e($ticketId) ?>/adjuntos"')
                 && str_contains($show, 'enctype="multipart/form-data"')
                 && str_contains($show, 'name="adjunto"')
@@ -318,7 +318,10 @@ return new class implements DatabaseTest {
                 !str_contains($this->read('app/Views/tickets/productos/show.php'), 'TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1')
                 && !str_contains($this->read('app/Views/tickets/productos/index.php'), 'TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1')
                 && !str_contains($this->read('app/Views/tickets/productos/create.php'), 'TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1'),
-            'no_js_created' => !$this->hasFiles('public/js', '/ticket|solicitud|alta|adjunto|archivo/i'),
+            'only_expected_ticket_create_js_created' => $this->relativeFiles(
+                'public/js',
+                '/ticket|solicitud|alta|adjunto|archivo/i'
+            ) === ['public/js/modules/tickets-productos-create.js'],
             'no_ticket_mail_runtime_created' =>
                 !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),

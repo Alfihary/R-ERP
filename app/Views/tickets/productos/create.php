@@ -91,7 +91,7 @@ $warehouseOptionsJson = json_encode(
                 <p>La ruta conserva el control principal de seguridad mediante middleware.</p>
             </section>
         <?php else: ?>
-        <form class="ticket-products__form" method="post" action="/tickets/productos">
+        <form class="ticket-products__form" method="post" action="/tickets/productos" enctype="multipart/form-data">
             <?= csrf_field($csrf) ?>
 
             <fieldset class="home-section ticket-products__fieldset">
@@ -126,14 +126,8 @@ $warehouseOptionsJson = json_encode(
                             required
                         >
                             <option value="">Selecciona un almacén</option>
-                            <?php foreach ($warehouses as $warehouse): ?>
-                                <?php $warehouseId = (string) ($warehouse['id'] ?? ''); ?>
-                                <option value="<?= e($warehouseId) ?>" <?= $value('almacen_id') === $warehouseId ? 'selected' : '' ?>>
-                                    <?= e((string) ($warehouse['codigo'] ?? '')) ?> · <?= e((string) ($warehouse['nombre'] ?? '')) ?>
-                                </option>
-                            <?php endforeach; ?>
                         </select>
-                        <small>El listado se limita a la empresa seleccionada.</small>
+                        <small data-warehouse-message>Selecciona una empresa primero.</small>
                     </label>
 
                     <label class="field ticket-products__field-full" for="observaciones_generales">
@@ -245,6 +239,24 @@ $warehouseOptionsJson = json_encode(
                 </div>
             </fieldset>
 
+            <fieldset class="home-section ticket-products__fieldset">
+                <legend>Adjuntos de soporte</legend>
+                <p class="ticket-products__hint">
+                    Puedes anexar fichas, imágenes o documentos de apoyo desde la solicitud. La descarga se habilitará en una fase posterior.
+                </p>
+                <label class="field ticket-products__field-full" for="ticket_adjuntos">
+                    <span>Archivos iniciales del ticket</span>
+                    <input
+                        id="ticket_adjuntos"
+                        type="file"
+                        name="adjuntos[]"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                        multiple
+                    >
+                    <small>PDF, JPG, JPEG, PNG o WEBP. Máximo 5 MB por archivo. Se almacenan en storage privado.</small>
+                </label>
+            </fieldset>
+
             <div class="form-actions ticket-products__actions">
                 <button class="button" type="submit">Crear ticket</button>
                 <a class="button button--secondary" href="/tickets/productos">Cancelar</a>
@@ -253,87 +265,6 @@ $warehouseOptionsJson = json_encode(
         <?php endif; ?>
     </main>
     <script type="application/json" id="ticket-products-warehouses-data"><?= $warehouseOptionsJson ?></script>
-    <script>
-        (() => {
-            'use strict';
-
-            const company = document.querySelector('[data-company-select]');
-            const warehouse = document.querySelector('[data-warehouse-select]');
-            const data = document.getElementById('ticket-products-warehouses-data');
-
-            if (!(company instanceof HTMLSelectElement)
-                || !(warehouse instanceof HTMLSelectElement)
-                || data === null
-            ) {
-                return;
-            }
-
-            let warehouses = [];
-
-            try {
-                const parsed = JSON.parse(data.textContent || '[]');
-                warehouses = Array.isArray(parsed) ? parsed : [];
-            } catch (error) {
-                warehouses = [];
-            }
-
-            const option = (value, text) => {
-                const element = document.createElement('option');
-                element.value = value;
-                element.textContent = text;
-
-                return element;
-            };
-
-            const refreshWarehouses = () => {
-                const selectedCompanyId = company.value;
-                const selected = warehouse.dataset.selectedWarehouse || warehouse.value;
-
-                warehouse.replaceChildren(option('', 'Selecciona un almacén'));
-
-                if (selectedCompanyId === '') {
-                    warehouse.value = '';
-                    warehouse.dataset.selectedWarehouse = '';
-                    return;
-                }
-
-                const available = warehouses.filter((item) => String(item.empresa_id) === selectedCompanyId);
-
-                if (available.length === 0) {
-                    const empty = option('', 'Sin almacenes disponibles');
-                    empty.disabled = true;
-                    warehouse.append(empty);
-                    warehouse.value = '';
-                    warehouse.dataset.selectedWarehouse = '';
-                    return;
-                }
-
-                available.forEach((item) => {
-                    const value = String(item.almacen_id);
-                    const text = `${item.codigo} · ${item.nombre}`;
-                    const element = option(value, text);
-
-                    if (value === selected) {
-                        element.selected = true;
-                    }
-
-                    warehouse.append(element);
-                });
-
-                if (!available.some((item) => String(item.almacen_id) === warehouse.value)) {
-                    warehouse.value = '';
-                }
-
-                warehouse.dataset.selectedWarehouse = warehouse.value;
-            };
-
-            company.addEventListener('change', () => {
-                warehouse.dataset.selectedWarehouse = '';
-                refreshWarehouses();
-            });
-
-            refreshWarehouses();
-        })();
-    </script>
+    <script src="/js/modules/tickets-productos-create.js" defer></script>
 </body>
 </html>

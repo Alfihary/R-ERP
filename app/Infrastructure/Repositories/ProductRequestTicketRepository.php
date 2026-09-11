@@ -863,10 +863,34 @@ final class ProductRequestTicketRepository
     public function findTicketById(int $ticketId): ?array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT *
-             FROM tickets_productos
-             WHERE id = :id
-               AND deleted_at IS NULL
+            'SELECT
+                tp.*,
+                e.codigo AS empresa_codigo,
+                e.nombre AS empresa_nombre,
+                a.codigo AS almacen_codigo,
+                a.nombre AS almacen_nombre,
+                u.username AS solicitante_username,
+                NULLIF(TRIM(CONCAT_WS(
+                    \' \',
+                    pu.primer_nombre,
+                    pu.segundo_nombre,
+                    pu.apellido_paterno,
+                    pu.apellido_materno
+                )), \'\') AS solicitante_nombre_completo
+             FROM tickets_productos tp
+             LEFT JOIN empresas e
+                ON e.id = tp.empresa_id
+               AND e.eliminado_en IS NULL
+             LEFT JOIN almacenes a
+                ON a.id = tp.almacen_id
+               AND a.eliminado_en IS NULL
+             LEFT JOIN usuarios u
+                ON u.id = tp.solicitante_usuario_id
+               AND u.eliminado_en IS NULL
+             LEFT JOIN perfiles_usuario pu
+                ON pu.usuario_id = u.id
+             WHERE tp.id = :id
+               AND tp.deleted_at IS NULL
              LIMIT 1'
         );
         $statement->execute(['id' => $ticketId]);
@@ -1178,11 +1202,52 @@ final class ProductRequestTicketRepository
     public function listPartidas(int $ticketId): array
     {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT *
-             FROM tickets_productos_partidas
-             WHERE ticket_producto_id = :ticket_id
-               AND deleted_at IS NULL
-             ORDER BY numero_partida ASC, id ASC'
+            'SELECT
+                tpp.*,
+                us.codigo AS unidad_sat_clave,
+                us.nombre AS unidad_sat_nombre,
+                us.descripcion AS unidad_sat_descripcion,
+                cs.codigo AS clave_sat_clave,
+                cs.descripcion AS clave_sat_descripcion,
+                uas.codigo AS unidad_sat_autorizada_clave,
+                uas.nombre AS unidad_sat_autorizada_nombre,
+                uas.descripcion AS unidad_sat_autorizada_descripcion,
+                csa.codigo AS clave_sat_autorizada_clave,
+                csa.descripcion AS clave_sat_autorizada_descripcion,
+                m.codigo AS moneda_codigo,
+                m.nombre AS moneda_nombre,
+                ru.username AS resuelto_por_username,
+                NULLIF(TRIM(CONCAT_WS(
+                    \' \',
+                    rpu.primer_nombre,
+                    rpu.segundo_nombre,
+                    rpu.apellido_paterno,
+                    rpu.apellido_materno
+                )), \'\') AS resuelto_por_nombre_completo
+             FROM tickets_productos_partidas tpp
+             LEFT JOIN unidades_sat us
+                ON us.id = tpp.unidad_sat_id
+               AND us.eliminado_en IS NULL
+             LEFT JOIN claves_sat cs
+                ON cs.id = tpp.clave_sat_id
+               AND cs.eliminado_en IS NULL
+             LEFT JOIN unidades_sat uas
+                ON uas.id = tpp.unidad_sat_id_autorizada
+               AND uas.eliminado_en IS NULL
+             LEFT JOIN claves_sat csa
+                ON csa.id = tpp.clave_sat_id_autorizada
+               AND csa.eliminado_en IS NULL
+             LEFT JOIN monedas m
+                ON m.id = tpp.moneda_id
+               AND m.eliminado_en IS NULL
+             LEFT JOIN usuarios ru
+                ON ru.id = tpp.resuelto_por_usuario_id
+               AND ru.eliminado_en IS NULL
+             LEFT JOIN perfiles_usuario rpu
+                ON rpu.usuario_id = ru.id
+             WHERE tpp.ticket_producto_id = :ticket_id
+               AND tpp.deleted_at IS NULL
+             ORDER BY tpp.numero_partida ASC, tpp.id ASC'
         );
         $statement->execute(['ticket_id' => $ticketId]);
 

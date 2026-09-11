@@ -141,6 +141,7 @@ return new class implements DatabaseTest {
             $createHtml = $createDefault->body();
             $companyBHtml = $createCompanyB->body();
             $view = $this->read('app/Views/tickets/productos/create.php');
+            $ticketCreateJs = $this->read('public/js/modules/tickets-productos-create.js');
             $controllerSource = $this->read('app/Http/Controllers/ProductRequestTicketController.php');
             $repositorySource = $this->read('app/Infrastructure/Repositories/ProductRequestTicketRepository.php');
 
@@ -158,9 +159,25 @@ return new class implements DatabaseTest {
                     'company_warehouse_auto_filter_js_exists' =>
                         str_contains($createHtml, 'id="ticket-products-warehouses-data"')
                         && str_contains($createHtml, 'data-company-select')
-                        && str_contains($createHtml, 'addEventListener')
-                        && str_contains($createHtml, "'change'")
-                        && str_contains($createHtml, 'replaceChildren'),
+                        && str_contains($createHtml, 'src="/js/modules/tickets-productos-create.js" defer')
+                        && str_contains($ticketCreateJs, 'addEventListener')
+                        && str_contains($ticketCreateJs, "'change'")
+                        && str_contains($ticketCreateJs, 'replaceChildren'),
+                    'company_warehouse_js_is_external_local_and_safe' =>
+                        is_file(BASE_PATH . '/public/js/modules/tickets-productos-create.js')
+                        && !str_contains($view, "document.addEventListener('DOMContentLoaded'")
+                        && str_contains($view, 'type="application/json" id="ticket-products-warehouses-data"')
+                        && !str_contains($ticketCreateJs, 'https://')
+                        && !str_contains($ticketCreateJs, 'http://')
+                        && !str_contains($ticketCreateJs, 'jquery')
+                        && !str_contains($ticketCreateJs, 'React')
+                        && !str_contains($ticketCreateJs, 'Vue')
+                        && !str_contains($ticketCreateJs, 'Angular')
+                        && !str_contains($ticketCreateJs, 'console.log')
+                        && str_contains($ticketCreateJs, 'document.createElement(\'option\')')
+                        && str_contains($ticketCreateJs, 'option.textContent = text')
+                        && !str_contains($ticketCreateJs, 'innerHTML')
+                        && !str_contains($ticketCreateJs, 'eval('),
                     'warehouse_json_is_limited_to_safe_fields' =>
                         str_contains($createHtml, '"empresa_id"')
                         && str_contains($createHtml, '"almacen_id"')
@@ -230,20 +247,21 @@ return new class implements DatabaseTest {
                         'value="' . $fixture['company_a_id'] . '" selected'
                     ),
                     'company_b_filters_warehouses' =>
-                        str_contains($companyBHtml, 'value="' . $fixture['warehouse_b_id'] . '"')
-                        && !str_contains($companyBHtml, 'value="' . $fixture['warehouse_a_id'] . '" selected'),
+                        str_contains($companyBHtml, '"almacen_id":' . $fixture['warehouse_b_id'])
+                        && !str_contains($companyBHtml, '<option value="' . $fixture['warehouse_a_id'] . '"'),
                     'company_change_clears_foreign_warehouse_in_js' =>
-                        str_contains($view, "warehouse.dataset.selectedWarehouse = '';")
-                        && str_contains($view, 'String(item.empresa_id) === selectedCompanyId')
-                        && !str_contains($view, 'item.empresa_id === companyId'),
+                        str_contains($ticketCreateJs, "warehouse.dataset.selectedWarehouse = '';")
+                        && str_contains($ticketCreateJs, 'item.empresa_id === selectedCompanyId')
+                        && !str_contains($ticketCreateJs, 'item.empresa_id === companyId'),
                     'warehouse_empty_state_when_company_has_no_available_warehouse' =>
-                        str_contains($view, 'Sin almacenes disponibles'),
+                        str_contains($ticketCreateJs, 'Sin almacenes asignados para esta empresa')
+                        && str_contains($ticketCreateJs, 'No tienes almacenes asignados para esta empresa.'),
                     'companies_limited_to_user_scope' =>
                         str_contains($createHtml, 'Empresa QA Catálogos A')
                         && !str_contains($createHtml, 'Empresa QA Catálogos Sin Scope'),
                     'warehouses_limited_to_user_scope' =>
-                        str_contains($createHtml, 'Almacén QA Catálogos A')
-                        && !str_contains($createHtml, 'Almacén QA Catálogos Sin Scope'),
+                        str_contains($createHtml, '"almacen_id":' . $fixture['warehouse_a_id'])
+                        && !str_contains($createHtml, '"almacen_id":' . $fixture['warehouse_a_out_scope_id']),
                 ],
                 'controller_repository_contract' => [
                     'controller_preserves_post_action' =>

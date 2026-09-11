@@ -227,6 +227,7 @@ final class ProductRequestTicketController
             'almacen_id' => $request->input('almacen_id'),
             'observaciones_generales' => $this->nullableText($request, 'observaciones_generales'),
             'partidas' => array_values($partidas),
+            'adjuntos' => $this->uploadedFiles($request, 'adjuntos'),
         ];
     }
 
@@ -273,6 +274,28 @@ final class ProductRequestTicketController
         }
 
         return $file;
+    }
+
+    /**
+     * @return list<array<string, mixed>>|array<string, mixed>
+     */
+    private function uploadedFiles(Request $request, string $field): array
+    {
+        $file = $request->file($field);
+
+        if (!is_array($file)) {
+            return [];
+        }
+
+        if (isset($file['name']) && is_array($file['name'])) {
+            return $file;
+        }
+
+        if (array_is_list($file)) {
+            return $file;
+        }
+
+        return isset($file['name']) ? [$file] : [];
     }
 
     private function userId(): int

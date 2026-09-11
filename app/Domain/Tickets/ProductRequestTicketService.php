@@ -34,61 +34,97 @@ final class ProductRequestTicketService
     public function crearTicket(array $input, int $usuarioId): array
     {
         $request = $this->validateTicketInput($input, $usuarioId);
+        $storedPaths = [];
 
-        return $this->transactional(function () use ($request): array {
-            $this->assertActiveUser($request['solicitante_usuario_id']);
-            $this->assertCompany($request['empresa_id']);
-            $this->assertWarehouseScope(
-                $request['empresa_id'],
-                $request['almacen_id']
-            );
-
-            $folio = $this->tickets->emitProductTicketFolio(
-                $request['empresa_id'],
-                $request['almacen_id'],
-                $request['solicitante_usuario_id']
-            );
-
-            $ticketId = $this->tickets->createTicket([
-                'folio' => $folio['folio'],
-                'empresa_id' => $request['empresa_id'],
-                'almacen_id' => $request['almacen_id'],
-                'solicitante_usuario_id' => $request['solicitante_usuario_id'],
-                'estado' => self::TICKET_EN_REVISION,
-                'observaciones_generales' => $request['observaciones_generales'],
-                'total_partidas' => count($request['partidas']),
-                'partidas_en_revision' => count($request['partidas']),
-                'partidas_aprobadas' => 0,
-                'partidas_rechazadas' => 0,
-            ]);
-
-            $this->tickets->insertEvent(
-                $ticketId,
-                null,
-                $request['solicitante_usuario_id'],
-                'TICKET_CREADO',
-                'Ticket documental de solicitud de alta de productos creado.',
-                ['folio' => $folio['folio']]
-            );
-
-            foreach ($request['partidas'] as $index => $partida) {
-                $partidaId = $this->tickets->createPartida(
-                    $ticketId,
-                    $index + 1,
-                    $partida
+        try {
+            return $this->transactional(function () use ($request, &$storedPaths): array {
+                $this->assertActiveUser($request['solicitante_usuario_id']);
+                $this->assertCompany($request['empresa_id']);
+                $this->assertWarehouseScope(
+                    $request['empresa_id'],
+                    $request['almacen_id']
                 );
+
+                $folio = $this->tickets->emitProductTicketFolio(
+                    $request['empresa_id'],
+                    $request['almacen_id'],
+                    $request['solicitante_usuario_id']
+                );
+
+                $ticketId = $this->tickets->createTicket([
+                    'folio' => $folio['folio'],
+                    'empresa_id' => $request['empresa_id'],
+                    'almacen_id' => $request['almacen_id'],
+                    'solicitante_usuario_id' => $request['solicitante_usuario_id'],
+                    'estado' => self::TICKET_EN_REVISION,
+                    'observaciones_generales' => $request['observaciones_generales'],
+                    'total_partidas' => count($request['partidas']),
+                    'partidas_en_revision' => count($request['partidas']),
+                    'partidas_aprobadas' => 0,
+                    'partidas_rechazadas' => 0,
+                ]);
+
                 $this->tickets->insertEvent(
                     $ticketId,
-                    $partidaId,
+                    null,
                     $request['solicitante_usuario_id'],
-                    'PARTIDA_AGREGADA',
-                    'Partida documental agregada al ticket.',
-                    ['numero_partida' => $index + 1]
+                    'TICKET_CREADO',
+                    'Ticket documental de solicitud de alta de productos creado.',
+                    ['folio' => $folio['folio']]
                 );
+
+                foreach ($request['partidas'] as $index => $partida) {
+                    $partidaId = $this->tickets->createPartida(
+                        $ticketId,
+                        $index + 1,
+                        $partida
+                    );
+                    $this->tickets->insertEvent(
+                        $ticketId,
+                        $partidaId,
+                        $request['solicitante_usuario_id'],
+                        'PARTIDA_AGREGADA',
+                        'Partida documental agregada al ticket.',
+                        ['numero_partida' => $index + 1]
+                    );
+                }
+
+                foreach ($request['adjuntos'] as $file) {
+                    $metadata = (new SafeUpload())->storeTicketAttachment($file, $ticketId);
+                    $storedPaths[] = BASE_PATH . '/storage/' . $metadata['ruta_relativa'];
+                    $attachmentId = $this->tickets->agregarAdjunto(
+                        $ticketId,
+                        null,
+                        $request['solicitante_usuario_id'],
+                        $metadata
+                    );
+
+                    $this->tickets->insertEvent(
+                        $ticketId,
+                        null,
+                        $request['solicitante_usuario_id'],
+                        'ADJUNTO_CARGADO',
+                        'Adjunto documental inicial cargado al crear el ticket.',
+                        [
+                            'adjunto_id' => $attachmentId,
+                            'nombre_original' => $metadata['nombre_original'],
+                            'mime' => $metadata['mime'],
+                            'tamano_bytes' => $metadata['tamano_bytes'],
+                        ]
+                    );
+                }
+
+                return $this->obtenerTicketOrFail($ticketId);
+            });
+        } catch (Throwable $exception) {
+            foreach (array_unique($storedPaths) as $path) {
+                if (is_string($path) && is_file($path)) {
+                    unlink($path);
+                }
             }
 
-            return $this->obtenerTicketOrFail($ticketId);
-        });
+            throw $exception;
+        }
     }
 
     /**
@@ -601,7 +637,8 @@ final class ProductRequestTicketService
      *     almacen_id: int,
      *     solicitante_usuario_id: int,
      *     observaciones_generales: string|null,
-     *     partidas: list<array<string, mixed>>
+     *     partidas: list<array<string, mixed>>,
+     *     adjuntos: list<array<string, mixed>>
      * }
      */
     private function validateTicketInput(array $input, int $usuarioId): array
@@ -660,7 +697,48 @@ final class ProductRequestTicketService
             'solicitante_usuario_id' => $requesterId ?? 0,
             'observaciones_generales' => $notes,
             'partidas' => $parts,
+            'adjuntos' => $this->normalizeInitialAttachments($input['adjuntos'] ?? []),
         ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeInitialAttachments(mixed $files): array
+    {
+        if (!is_array($files) || $files === []) {
+            return [];
+        }
+
+        if (array_is_list($files)) {
+            return array_values(array_filter(
+                $files,
+                static fn (mixed $file): bool => is_array($file) && $file !== []
+            ));
+        }
+
+        if (!isset($files['name']) || !is_array($files['name'])) {
+            return isset($files['name']) ? [$files] : [];
+        }
+
+        $normalized = [];
+        $names = $files['name'];
+
+        foreach ($names as $index => $name) {
+            if ((string) $name === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'name' => $name,
+                'type' => $files['type'][$index] ?? '',
+                'tmp_name' => $files['tmp_name'][$index] ?? '',
+                'error' => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                'size' => $files['size'][$index] ?? 0,
+            ];
+        }
+
+        return $normalized;
     }
 
     /**
