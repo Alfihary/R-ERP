@@ -60,6 +60,127 @@
         }
     };
 
+    const refreshPartidaIndexes = (list) => {
+        const cards = Array.from(list.querySelectorAll('[data-partida-card]'));
+        const single = cards.length === 1;
+
+        cards.forEach((card, index) => {
+            const title = card.querySelector('[data-partida-title]');
+            const remove = card.querySelector('[data-remove-partida]');
+
+            if (title instanceof HTMLElement) {
+                title.textContent = `Partida ${index + 1}`;
+            }
+
+            if (remove instanceof HTMLButtonElement) {
+                remove.disabled = single && index === 0;
+                remove.hidden = single && index === 0;
+            }
+
+            card.querySelectorAll('[data-partida-field]').forEach((field) => {
+                if (!(field instanceof HTMLInputElement)
+                    && !(field instanceof HTMLTextAreaElement)
+                    && !(field instanceof HTMLSelectElement)
+                ) {
+                    return;
+                }
+
+                const key = field.dataset.partidaField || '';
+
+                if (key === '') {
+                    return;
+                }
+
+                field.name = `partidas[${index}][${key}]`;
+                field.id = `partida_${index}_${key}`;
+
+                if (field instanceof HTMLInputElement && key === 'peso') {
+                    field.type = 'number';
+                    field.min = '0';
+                    field.step = '0.001';
+                    field.required = false;
+                }
+
+                const label = field.closest('label');
+
+                if (label instanceof HTMLLabelElement) {
+                    label.htmlFor = field.id;
+                }
+            });
+        });
+    };
+
+    const clearPartidaCard = (card) => {
+        card.querySelectorAll('[data-partida-field]').forEach((field) => {
+            if (field instanceof HTMLInputElement) {
+                if (field.type === 'checkbox') {
+                    field.checked = false;
+                    return;
+                }
+
+                field.value = '';
+                return;
+            }
+
+            if (field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+                field.value = '';
+            }
+        });
+    };
+
+    const initPartidas = () => {
+        const list = document.querySelector('[data-partidas-list]');
+        const addButton = document.querySelector('[data-add-partida]');
+
+        if (!(list instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement)) {
+            return;
+        }
+
+        addButton.addEventListener('click', () => {
+            const cards = list.querySelectorAll('[data-partida-card]');
+            const source = cards.item(cards.length - 1) || cards.item(0);
+
+            if (!(source instanceof HTMLElement) || cards.length >= 50) {
+                return;
+            }
+
+            const clone = source.cloneNode(true);
+
+            if (!(clone instanceof HTMLElement)) {
+                return;
+            }
+
+            clearPartidaCard(clone);
+            list.append(clone);
+            refreshPartidaIndexes(list);
+        });
+
+        list.addEventListener('click', (event) => {
+            const target = event.target;
+
+            if (!(target instanceof HTMLButtonElement) || !target.matches('[data-remove-partida]')) {
+                return;
+            }
+
+            const cards = list.querySelectorAll('[data-partida-card]');
+
+            if (cards.length <= 1) {
+                refreshPartidaIndexes(list);
+                return;
+            }
+
+            const card = target.closest('[data-partida-card]');
+
+            if (card instanceof HTMLElement) {
+                card.remove();
+            }
+
+            refreshPartidaIndexes(list);
+        });
+
+        refreshPartidaIndexes(list);
+    };
+
     ready(() => {
         const company = document.querySelector('[data-company-select]');
         const warehouse = document.querySelector('[data-warehouse-select]');
@@ -128,5 +249,6 @@
         });
 
         refreshWarehouses();
+        initPartidas();
     });
 }());

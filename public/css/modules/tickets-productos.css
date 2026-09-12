@@ -232,6 +232,59 @@
     accent-color: var(--color-primary);
 }
 
+.ticket-products__partidas-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.ticket-products__partida-card,
+.ticket-products__line-section {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+}
+
+.ticket-products__partida-head,
+.ticket-products__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ticket-products__partida-head h2,
+.ticket-products__line-section h4 {
+    margin: 0;
+}
+
+.ticket-products__remove-partida:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.ticket-products__add-partida {
+    justify-self: start;
+}
+
+.ticket-products__pending-feature {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    border: 1px dashed var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+}
+
+.ticket-products__pending-feature strong {
+    color: var(--color-ink);
+}
+
 .ticket-products__actions {
     padding-top: 0.25rem;
 }
@@ -311,6 +364,23 @@
 
 .ticket-products__line-data {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ticket-products__line-response {
+    background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg));
+}
+
+.ticket-products__chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.625rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    color: var(--color-muted);
+    background: var(--color-surface);
+    font-size: 0.75rem;
+    font-weight: 800;
 }
 
 .ticket-products__muted-inline {
@@ -532,6 +602,11 @@
 .ticket-products__placeholders {
     display: grid;
     gap: 0.75rem;
+}
+
+.ticket-products__mail-placeholder {
+    display: grid;
+    gap: 0.65rem;
 }
 
 .ticket-products__placeholder {

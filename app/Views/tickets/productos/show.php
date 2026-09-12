@@ -331,7 +331,7 @@ foreach ($adjuntos as $adjunto) {
             </section>
         <?php endif; ?>
 
-        <?php if ($canResolve && $partidasEnRevision > 0): ?>
+        <?php if ($canResolve && !$isCancelled && $partidasEnRevision > 0): ?>
             <section class="home-section ticket-products__section ticket-products__approval" aria-labelledby="ticket-producto-aprobar-partidas">
                 <div class="home-section__heading">
                     <div>
@@ -430,30 +430,55 @@ foreach ($adjuntos as $adjunto) {
                     <?php $adjuntosDePartida = $adjuntosPorPartida[$partidaId] ?? []; ?>
                     <article class="home-section ticket-products__line-card">
                         <div class="ticket-products__line-heading">
-                            <h3>Partida <?= e($partida['numero_partida'] ?? '') ?></h3>
-                            <span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estadoPartida)) ?>"><?= e($estadoPartida) ?></span>
+                            <div>
+                                <span class="ticket-products__overline">Partida documental</span>
+                                <h3>Partida <?= e($partida['numero_partida'] ?? '') ?></h3>
+                            </div>
+                            <div class="ticket-products__chips">
+                                <span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estadoPartida)) ?>"><?= e($estadoPartida) ?></span>
+                                <?php if ($estadoPartida === 'EN_REVISION'): ?>
+                                    <span class="ticket-products__chip">Pendiente de revisión</span>
+                                <?php endif; ?>
+                            </div>
                         </div>
-                        <dl class="ticket-products__line-data">
-                            <div class="ticket-products__line-full"><dt>Descripción</dt><dd><?= e($formatValue($partida['descripcion'] ?? null)) ?></dd></div>
-                            <div><dt>Modelo</dt><dd><?= e($formatValue($partida['modelo'] ?? null)) ?></dd></div>
-                            <div><dt>Marca documental</dt><dd><?= e($formatValue($partida['marca_texto'] ?? null)) ?></dd></div>
-                            <div><dt>Proveedor documental</dt><dd><?= e($formatValue($partida['proveedor_texto'] ?? null)) ?></dd></div>
-                            <div><dt>Unidad SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_clave', 'unidad_sat_nombre', 'unidad_sat_descripcion', 'unidad_sat_id')) ?></dd></div>
-                            <div><dt>Clave SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_clave', 'clave_sat_descripcion', 'clave_sat_descripcion', 'clave_sat_id')) ?></dd></div>
-                            <div><dt>Moneda</dt><dd><?= e($entityLabel($partida, 'moneda_codigo', 'moneda_nombre', 'moneda_id')) ?></dd></div>
-                            <div><dt>Costo sugerido <span class="ticket-products__muted-inline">documental</span></dt><dd><?= e($formatValue($partida['costo_sugerido'] ?? null)) ?></dd></div>
-                            <div><dt>Peso</dt><dd><?= e($formatValue($partida['peso'] ?? null)) ?></dd></div>
-                            <div><dt>Lleva serie</dt><dd><?= ((int) ($partida['lleva_serie'] ?? 0)) === 1 ? 'Sí' : 'No' ?></dd></div>
-                            <div><dt>Resuelto por</dt><dd><?= e($personLabel($partida, 'resuelto_por_username', 'resuelto_por_nombre_completo', 'resuelto_por_usuario_id')) ?></dd></div>
-                            <div><dt>Fecha de resolución</dt><dd><?= e($formatValue($partida['resuelto_at'] ?? null)) ?></dd></div>
-                            <div><dt>Clave autorizada</dt><dd><?= e($formatValue($partida['clave_autorizada'] ?? null)) ?></dd></div>
-                            <div class="ticket-products__line-full"><dt>Descripción autorizada</dt><dd><?= e($formatValue($partida['descripcion_autorizada'] ?? null)) ?></dd></div>
-                            <div><dt>Unidad SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_autorizada_clave', 'unidad_sat_autorizada_nombre', 'unidad_sat_autorizada_descripcion', 'unidad_sat_id_autorizada')) ?></dd></div>
-                            <div><dt>Clave SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_autorizada_clave', 'clave_sat_autorizada_descripcion', 'clave_sat_autorizada_descripcion', 'clave_sat_id_autorizada')) ?></dd></div>
-                            <div class="ticket-products__line-full"><dt>Observaciones</dt><dd><?= e($formatValue($partida['observaciones'] ?? null)) ?></dd></div>
-                            <div class="ticket-products__line-full"><dt>Motivo de rechazo</dt><dd><?= e($formatValue($partida['motivo_rechazo'] ?? null)) ?></dd></div>
-                            <div class="ticket-products__line-full"><dt>Comentario de resolución</dt><dd><?= e($formatValue($partida['comentario_resolucion'] ?? null)) ?></dd></div>
-                        </dl>
+
+                        <section class="ticket-products__line-section" aria-label="Datos solicitados">
+                            <h4>Datos solicitados</h4>
+                            <dl class="ticket-products__line-data">
+                                <div class="ticket-products__line-full"><dt>Descripción solicitada</dt><dd><?= e($formatValue($partida['descripcion'] ?? null)) ?></dd></div>
+                                <div><dt>Modelo</dt><dd><?= e($formatValue($partida['modelo'] ?? null)) ?></dd></div>
+                                <div><dt>Marca documental</dt><dd><?= e($formatValue($partida['marca_texto'] ?? null)) ?></dd></div>
+                                <div><dt>Proveedor documental</dt><dd><?= e($formatValue($partida['proveedor_texto'] ?? null)) ?></dd></div>
+                                <div><dt>Unidad SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_clave', 'unidad_sat_nombre', 'unidad_sat_descripcion', 'unidad_sat_id')) ?></dd></div>
+                                <div><dt>Clave SAT solicitada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_clave', 'clave_sat_descripcion', 'clave_sat_descripcion', 'clave_sat_id')) ?></dd></div>
+                                <div><dt>Moneda</dt><dd><?= e($entityLabel($partida, 'moneda_codigo', 'moneda_nombre', 'moneda_id')) ?></dd></div>
+                                <div><dt>Costo sugerido <span class="ticket-products__muted-inline">solicitado</span></dt><dd><?= e($formatValue($partida['costo_sugerido'] ?? null)) ?></dd></div>
+                                <div><dt>Peso</dt><dd><?= e($formatValue($partida['peso'] ?? null)) ?></dd></div>
+                                <div><dt>Lleva serie</dt><dd><?= ((int) ($partida['lleva_serie'] ?? 0)) === 1 ? 'Sí' : 'No' ?></dd></div>
+                                <div class="ticket-products__line-full"><dt>Observaciones</dt><dd><?= e($formatValue($partida['observaciones'] ?? null)) ?></dd></div>
+                            </dl>
+                        </section>
+
+                        <section class="ticket-products__line-section ticket-products__line-response" aria-label="Respuesta del área de productos">
+                            <h4>Respuesta del área de productos</h4>
+                            <?php if ($estadoPartida === 'EN_REVISION'): ?>
+                                <p class="ticket-products__placeholder">Pendiente de revisión.</p>
+                            <?php else: ?>
+                                <dl class="ticket-products__line-data">
+                                    <div><dt>Resuelto por</dt><dd><?= e($personLabel($partida, 'resuelto_por_username', 'resuelto_por_nombre_completo', 'resuelto_por_usuario_id')) ?></dd></div>
+                                    <div><dt>Fecha de resolución</dt><dd><?= e($formatValue($partida['resuelto_at'] ?? null)) ?></dd></div>
+                                    <?php if ($estadoPartida === 'APROBADA'): ?>
+                                        <div><dt>Clave autorizada</dt><dd><?= e($formatValue($partida['clave_autorizada'] ?? null)) ?></dd></div>
+                                        <div class="ticket-products__line-full"><dt>Descripción autorizada</dt><dd><?= e($formatValue($partida['descripcion_autorizada'] ?? null)) ?></dd></div>
+                                        <div><dt>Unidad SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'unidad_sat_autorizada_clave', 'unidad_sat_autorizada_nombre', 'unidad_sat_autorizada_descripcion', 'unidad_sat_id_autorizada')) ?></dd></div>
+                                        <div><dt>Clave SAT autorizada</dt><dd><?= e($partCatalogLabel($partida, 'clave_sat_autorizada_clave', 'clave_sat_autorizada_descripcion', 'clave_sat_autorizada_descripcion', 'clave_sat_id_autorizada')) ?></dd></div>
+                                    <?php elseif ($estadoPartida === 'RECHAZADA'): ?>
+                                        <div class="ticket-products__line-full"><dt>Motivo de rechazo</dt><dd><?= e($formatValue($partida['motivo_rechazo'] ?? null)) ?></dd></div>
+                                    <?php endif; ?>
+                                    <div class="ticket-products__line-full"><dt>Comentario / respuesta</dt><dd><?= e($formatValue($partida['comentario_resolucion'] ?? null)) ?></dd></div>
+                                </dl>
+                            <?php endif; ?>
+                        </section>
 
                         <div class="ticket-products__line-comments">
                             <h4>Comentarios de partida</h4>
@@ -517,7 +542,7 @@ foreach ($adjuntos as $adjunto) {
                             </div>
                         <?php endif; ?>
 
-                        <?php if ($canResolve && $estadoPartida === 'EN_REVISION'): ?>
+                        <?php if ($canResolve && !$isCancelled && $estadoPartida === 'EN_REVISION'): ?>
                             <div class="ticket-products__line-actions">
                                 <form class="ticket-products__action-form" method="post" action="/tickets/productos/<?= e($ticketId) ?>/partidas/<?= e($partidaId) ?>/rechazar">
                                     <?= csrf_field($csrf) ?>
@@ -532,8 +557,10 @@ foreach ($adjuntos as $adjunto) {
                                     <button class="button button--secondary" type="submit">Rechazar partida</button>
                                 </form>
                             </div>
-                        <?php elseif ($canResolve): ?>
+                        <?php elseif ($canResolve && !$isCancelled): ?>
                             <p class="ticket-products__permission-note">Esta partida ya fue resuelta; las acciones de aprobación y rechazo están ocultas.</p>
+                        <?php elseif ($isCancelled): ?>
+                            <p class="ticket-products__permission-note">Ticket cancelado; las acciones de la partida están ocultas.</p>
                         <?php else: ?>
                             <p class="ticket-products__permission-note">No tienes permiso para aprobar o rechazar partidas.</p>
                         <?php endif; ?>
@@ -557,16 +584,20 @@ foreach ($adjuntos as $adjunto) {
             </section>
         <?php endif; ?>
 
-        <?php if ($canResendEmail): ?>
-            <section class="home-section ticket-products__section ticket-products__placeholders" aria-labelledby="ticket-producto-acciones-documentales">
-                <h2 id="ticket-producto-acciones-documentales">Acciones documentales</h2>
-                <?php if ($canResendEmail): ?>
-                    <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>
-                        Reenvío de correo pendiente de fase posterior.
-                    </button>
-                <?php endif; ?>
-            </section>
-        <?php endif; ?>
+        <section class="home-section ticket-products__section ticket-products__mail-placeholder" aria-labelledby="ticket-producto-correo">
+            <h2 id="ticket-producto-correo">Correo electrónico</h2>
+            <p class="ticket-products__hint">
+                El envío automático de correo se implementará en una fase posterior.
+            </p>
+            <p class="ticket-products__hint">
+                Eventos futuros: ticket creado, partida aprobada, partida rechazada, ticket resuelto, ticket cancelado.
+            </p>
+            <?php if ($canResendEmail): ?>
+                <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>
+                    Reenvío de correo pendiente de fase posterior.
+                </button>
+            <?php endif; ?>
+        </section>
 
         <?php if ($canViewEvents): ?>
             <section class="home-section ticket-products__section" aria-labelledby="ticket-producto-eventos">

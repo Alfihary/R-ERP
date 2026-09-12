@@ -217,7 +217,7 @@ return new class implements DatabaseTest {
                         && str_contains($createHtml, 'MXN'),
                     'sat_unit_is_single_visible_field' =>
                         substr_count($createHtml, 'list="unidades_sat_options"') === 1
-                        && substr_count($createHtml, 'for="partida_unidad_sat"') === 1
+                        && substr_count($createHtml, 'for="partida_0_unidad_sat"') === 1
                         && str_contains($createHtml, '<datalist id="unidades_sat_options">'),
                     'sat_unit_selection_has_code_and_description' =>
                         str_contains($createHtml, 'name="partidas[0][unidad_sat_busqueda]"')
@@ -225,7 +225,7 @@ return new class implements DatabaseTest {
                         && str_contains($createHtml, 'Pieza QA Catálogos'),
                     'sat_key_is_single_visible_field' =>
                         substr_count($createHtml, 'list="claves_sat_options"') === 1
-                        && substr_count($createHtml, 'for="partida_clave_sat"') === 1
+                        && substr_count($createHtml, 'for="partida_0_clave_sat"') === 1
                         && str_contains($createHtml, '<datalist id="claves_sat_options">'),
                     'sat_key_selection_has_code_and_description' =>
                         str_contains($createHtml, 'name="partidas[0][clave_sat_busqueda]"')

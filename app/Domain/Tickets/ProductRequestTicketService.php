@@ -909,7 +909,38 @@ final class ProductRequestTicketService
             return false;
         }
 
-        $value = trim((string) $value);
+        $rawValue = (string) $value;
+        $value = trim($rawValue);
+
+        if ($value === '') {
+            return false;
+        }
+
+        if ($value !== $rawValue) {
+            return false;
+        }
+
+        if (str_contains($value, ',')) {
+            if (
+                str_contains($value, '.')
+                || (
+                    preg_match('/^(?:0|[1-9]\d{0,11}),\d{1,2}$/', $value) !== 1
+                    && preg_match('/^,\d{1,2}$/', $value) !== 1
+                )
+            ) {
+                return false;
+            }
+
+            if (str_starts_with($value, ',')) {
+                $value = '0' . $value;
+            }
+
+            $value = str_replace(',', '.', $value);
+        }
+
+        if (str_starts_with($value, '.')) {
+            $value = '0' . $value;
+        }
 
         if (
             preg_match('/^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/', $value) !== 1

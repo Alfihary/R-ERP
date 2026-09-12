@@ -23,8 +23,12 @@ $value = static function (string $key, string $default = '') use ($values): stri
 
     return is_scalar($candidate) ? (string) $candidate : $default;
 };
-$partValue = static function (string $key, string $default = '') use ($values): string {
-    $candidate = $values['partidas'][0][$key] ?? $default;
+$partidasValues = is_array($values['partidas'] ?? null) ? array_values($values['partidas']) : [];
+if ($partidasValues === []) {
+    $partidasValues = [[]];
+}
+$partValue = static function (array $partida, string $key, string $default = ''): string {
+    $candidate = $partida[$key] ?? $default;
 
     return is_scalar($candidate) ? (string) $candidate : $default;
 };
@@ -137,106 +141,150 @@ $warehouseOptionsJson = json_encode(
                 </div>
             </fieldset>
 
-            <fieldset class="home-section ticket-products__fieldset">
-                <legend>Partida 1</legend>
-                <p class="ticket-products__hint">Vista mínima: más partidas se agregarán en una fase posterior sin JavaScript dinámico todavía.</p>
+            <fieldset class="home-section ticket-products__fieldset ticket-products__partidas-fieldset" data-partidas-section>
+                <legend>Partidas solicitadas</legend>
+                <p class="ticket-products__hint">
+                    Captura una o varias partidas documentales. La Partida 1 no puede eliminarse si es la única.
+                </p>
 
-                <div class="ticket-products__form-grid">
-                    <label class="field ticket-products__field-full" for="partida_descripcion">
-                        <span>Descripción</span>
-                        <textarea id="partida_descripcion" name="partidas[0][descripcion]" required><?= e($partValue('descripcion')) ?></textarea>
-                    </label>
+                <div class="ticket-products__partidas-list" data-partidas-list>
+                    <?php foreach ($partidasValues as $index => $partida): ?>
+                        <?php $partida = is_array($partida) ? $partida : []; ?>
+                        <?php $number = $index + 1; ?>
+                        <article class="ticket-products__partida-card" data-partida-card>
+                            <header class="ticket-products__partida-head">
+                                <div>
+                                    <span class="ticket-products__overline">Partida solicitada</span>
+                                    <h2 data-partida-title>Partida <?= e((string) $number) ?></h2>
+                                </div>
+                                <button
+                                    class="button button--secondary ticket-products__remove-partida"
+                                    type="button"
+                                    data-remove-partida
+                                    <?= count($partidasValues) === 1 && $index === 0 ? 'disabled' : '' ?>
+                                >Quitar partida</button>
+                            </header>
 
-                    <label class="field" for="partida_modelo">
-                        <span>Modelo</span>
-                        <input id="partida_modelo" name="partidas[0][modelo]" value="<?= e($partValue('modelo')) ?>">
-                    </label>
+                            <div class="ticket-products__form-grid">
+                                <label class="field ticket-products__field-full" for="partida_<?= e((string) $index) ?>_descripcion">
+                                    <span>Descripción</span>
+                                    <textarea id="partida_<?= e((string) $index) ?>_descripcion" name="partidas[<?= e((string) $index) ?>][descripcion]" data-partida-field="descripcion" required><?= e($partValue($partida, 'descripcion')) ?></textarea>
+                                </label>
 
-                    <label class="field" for="partida_marca">
-                        <span>Marca</span>
-                        <select id="partida_marca" name="partidas[0][marca_id]">
-                            <option value="">Selecciona una marca</option>
-                            <?php foreach ($brands as $brand): ?>
-                                <?php $brandId = (string) ($brand['id'] ?? ''); ?>
-                                <option value="<?= e($brandId) ?>" <?= $partValue('marca_id') === $brandId ? 'selected' : '' ?>>
-                                    <?= e((string) ($brand['codigo'] ?? '')) ?> · <?= e((string) ($brand['nombre'] ?? '')) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_modelo">
+                                    <span>Modelo</span>
+                                    <input id="partida_<?= e((string) $index) ?>_modelo" name="partidas[<?= e((string) $index) ?>][modelo]" data-partida-field="modelo" value="<?= e($partValue($partida, 'modelo')) ?>">
+                                </label>
 
-                    <label class="field" for="partida_proveedor">
-                        <span>Proveedor</span>
-                        <input id="partida_proveedor" name="partidas[0][proveedor_texto]" value="<?= e($partValue('proveedor_texto')) ?>">
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_marca">
+                                    <span>Marca</span>
+                                    <select id="partida_<?= e((string) $index) ?>_marca" name="partidas[<?= e((string) $index) ?>][marca_id]" data-partida-field="marca_id">
+                                        <option value="">Selecciona una marca</option>
+                                        <?php foreach ($brands as $brand): ?>
+                                            <?php $brandId = (string) ($brand['id'] ?? ''); ?>
+                                            <option value="<?= e($brandId) ?>" <?= $partValue($partida, 'marca_id') === $brandId ? 'selected' : '' ?>>
+                                                <?= e((string) ($brand['codigo'] ?? '')) ?> · <?= e((string) ($brand['nombre'] ?? '')) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
 
-                    <label class="field" for="partida_unidad_sat">
-                        <span>Unidad SAT</span>
-                        <input
-                            id="partida_unidad_sat"
-                            name="partidas[0][unidad_sat_busqueda]"
-                            list="unidades_sat_options"
-                            value="<?= e($partValue('unidad_sat_busqueda')) ?>"
-                            placeholder="Escribe clave o descripción..."
-                        >
-                        <datalist id="unidades_sat_options">
-                            <?php foreach ($satUnits as $unit): ?>
-                                <option value="<?= e($satUnitLabel($unit)) ?>"></option>
-                            <?php endforeach; ?>
-                        </datalist>
-                        <small>Escribe o selecciona una opción del catálogo activo.</small>
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_proveedor">
+                                    <span>Proveedor sugerido</span>
+                                    <input id="partida_<?= e((string) $index) ?>_proveedor" name="partidas[<?= e((string) $index) ?>][proveedor_texto]" data-partida-field="proveedor_texto" value="<?= e($partValue($partida, 'proveedor_texto')) ?>">
+                                </label>
 
-                    <label class="field" for="partida_clave_sat">
-                        <span>Clave SAT</span>
-                        <input
-                            id="partida_clave_sat"
-                            name="partidas[0][clave_sat_busqueda]"
-                            list="claves_sat_options"
-                            value="<?= e($partValue('clave_sat_busqueda')) ?>"
-                            placeholder="Escribe clave o descripción..."
-                        >
-                        <datalist id="claves_sat_options">
-                            <?php foreach ($satKeys as $satKey): ?>
-                                <option value="<?= e($satKeyLabel($satKey)) ?>"></option>
-                            <?php endforeach; ?>
-                        </datalist>
-                        <small>Escribe o selecciona una opción del catálogo activo.</small>
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_unidad_sat">
+                                    <span>Unidad SAT solicitada</span>
+                                    <input
+                                        id="partida_<?= e((string) $index) ?>_unidad_sat"
+                                        name="partidas[<?= e((string) $index) ?>][unidad_sat_busqueda]"
+                                        data-partida-field="unidad_sat_busqueda"
+                                        list="unidades_sat_options"
+                                        value="<?= e($partValue($partida, 'unidad_sat_busqueda')) ?>"
+                                        placeholder="Escribe clave o descripción..."
+                                    >
+                                    <small>Escribe o selecciona una opción del catálogo activo.</small>
+                                </label>
 
-                    <label class="field" for="partida_moneda">
-                        <span>Moneda</span>
-                        <select id="partida_moneda" name="partidas[0][moneda_id]">
-                            <option value="">Selecciona una moneda</option>
-                            <?php foreach ($currencies as $currency): ?>
-                                <?php $currencyId = (string) ($currency['id'] ?? ''); ?>
-                                <option value="<?= e($currencyId) ?>" <?= $partValue('moneda_id') === $currencyId ? 'selected' : '' ?>>
-                                    <?= e((string) ($currency['codigo'] ?? '')) ?> · <?= e((string) ($currency['nombre'] ?? '')) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_clave_sat">
+                                    <span>Clave SAT solicitada</span>
+                                    <input
+                                        id="partida_<?= e((string) $index) ?>_clave_sat"
+                                        name="partidas[<?= e((string) $index) ?>][clave_sat_busqueda]"
+                                        data-partida-field="clave_sat_busqueda"
+                                        list="claves_sat_options"
+                                        value="<?= e($partValue($partida, 'clave_sat_busqueda')) ?>"
+                                        placeholder="Escribe clave o descripción..."
+                                    >
+                                    <small>Escribe o selecciona una opción del catálogo activo.</small>
+                                </label>
 
-                    <label class="field" for="partida_costo">
-                        <span>Costo sugerido</span>
-                        <input id="partida_costo" name="partidas[0][costo_sugerido]" inputmode="decimal" value="<?= e($partValue('costo_sugerido')) ?>">
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_moneda">
+                                    <span>Moneda</span>
+                                    <select id="partida_<?= e((string) $index) ?>_moneda" name="partidas[<?= e((string) $index) ?>][moneda_id]" data-partida-field="moneda_id">
+                                        <option value="">Selecciona una moneda</option>
+                                        <?php foreach ($currencies as $currency): ?>
+                                            <?php $currencyId = (string) ($currency['id'] ?? ''); ?>
+                                            <option value="<?= e($currencyId) ?>" <?= $partValue($partida, 'moneda_id') === $currencyId ? 'selected' : '' ?>>
+                                                <?= e((string) ($currency['codigo'] ?? '')) ?> · <?= e((string) ($currency['nombre'] ?? '')) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
 
-                    <label class="field" for="partida_peso">
-                        <span>Peso</span>
-                        <input id="partida_peso" name="partidas[0][peso]" inputmode="decimal" value="<?= e($partValue('peso')) ?>">
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_costo">
+                                    <span>Costo sugerido</span>
+                                    <input id="partida_<?= e((string) $index) ?>_costo" name="partidas[<?= e((string) $index) ?>][costo_sugerido]" data-partida-field="costo_sugerido" inputmode="decimal" value="<?= e($partValue($partida, 'costo_sugerido')) ?>">
+                                </label>
 
-                    <label class="ticket-products__check">
-                        <input type="checkbox" name="partidas[0][lleva_serie]" value="1">
-                        <span>Lleva serie</span>
-                    </label>
+                                <label class="field" for="partida_<?= e((string) $index) ?>_peso">
+                                    <span>Peso</span>
+                                    <input
+                                        id="partida_<?= e((string) $index) ?>_peso"
+                                        type="number"
+                                        name="partidas[<?= e((string) $index) ?>][peso]"
+                                        data-partida-field="peso"
+                                        min="0"
+                                        step="0.001"
+                                        inputmode="decimal"
+                                        value="<?= e($partValue($partida, 'peso')) ?>"
+                                    >
+                                </label>
 
-                    <label class="field ticket-products__field-full" for="partida_observaciones">
-                        <span>Observaciones</span>
-                        <textarea id="partida_observaciones" name="partidas[0][observaciones]"><?= e($partValue('observaciones')) ?></textarea>
-                    </label>
+                                <label class="ticket-products__check">
+                                    <input type="checkbox" name="partidas[<?= e((string) $index) ?>][lleva_serie]" data-partida-field="lleva_serie" value="1" <?= $partValue($partida, 'lleva_serie') === '1' ? 'checked' : '' ?>>
+                                    <span>Lleva serie</span>
+                                </label>
+
+                                <label class="field ticket-products__field-full" for="partida_<?= e((string) $index) ?>_observaciones">
+                                    <span>Observaciones</span>
+                                    <textarea id="partida_<?= e((string) $index) ?>_observaciones" name="partidas[<?= e((string) $index) ?>][observaciones]" data-partida-field="observaciones"><?= e($partValue($partida, 'observaciones')) ?></textarea>
+                                </label>
+                            </div>
+
+                            <div class="ticket-products__pending-feature" data-partida-attachments-note>
+                                <strong>Adjuntos por partida durante creación</strong>
+                                <span>Pendiente de fase específica: por ahora adjunta soporte general inicial o agrega adjuntos por partida desde el detalle después de crear el ticket.</span>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
                 </div>
+
+                <button class="button button--secondary ticket-products__add-partida" type="button" data-add-partida>
+                    + Agregar otra partida
+                </button>
+
+                <datalist id="unidades_sat_options">
+                    <?php foreach ($satUnits as $unit): ?>
+                        <option value="<?= e($satUnitLabel($unit)) ?>"></option>
+                    <?php endforeach; ?>
+                </datalist>
+                <datalist id="claves_sat_options">
+                    <?php foreach ($satKeys as $satKey): ?>
+                        <option value="<?= e($satKeyLabel($satKey)) ?>"></option>
+                    <?php endforeach; ?>
+                </datalist>
             </fieldset>
 
             <fieldset class="home-section ticket-products__fieldset">
