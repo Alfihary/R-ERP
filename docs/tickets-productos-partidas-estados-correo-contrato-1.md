@@ -181,7 +181,7 @@ Si el correo falla:
 
 ## Historial/outbox futuro
 
-Se documenta una tabla futura, sin migración en esta fase:
+Se documenta una tabla futura, sin migración en esta fase contractual:
 
 `tickets_productos_correos`
 
@@ -250,7 +250,9 @@ Esta fase no convierte el placeholder en envío real.
 
 ## Fuera de alcance
 
-No se crea:
+Nota de evolución: la fase posterior `TP-PARTIDAS-ESTADOS-CORREO-OUTBOX-DB-1` puede materializar esta tabla como outbox/historial, siempre que mantenga prohibido el envío real, SMTP directo, rutas de correo, seeds nuevos y dependencias.
+
+No se crea en esta fase contractual:
 
 - envío real;
 - SMTP;

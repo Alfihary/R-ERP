@@ -243,10 +243,10 @@ return new class implements DatabaseTest {
                 && !preg_match('#/(?:correo|email|mail)/tickets/productos#i', $this->read('routes/web.php')),
             'no_mail_config_created' => !is_file(BASE_PATH . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'mail.php'),
             'no_mail_tables_created_by_contract' =>
-                !$this->tableMentionExists('mail_templates')
+                $this->onlyAllowedTicketProductOutboxTableMention()
+                && !$this->tableMentionExists('mail_templates')
                 && !$this->tableMentionExists('mail_queue')
-                && !$this->tableMentionExists('mail_logs')
-                && !$this->tableMentionExists('tickets_productos_correos'),
+                && !$this->tableMentionExists('mail_logs'),
             'no_download_or_preview_implemented' => !preg_match(
                 '#/tickets/productos/\\{id\\}/(?:adjuntos|archivos|attachments)/\\{[^}]+\\}/(?:descargar|download|preview|ver)#i',
                 $this->read('routes/web.php')
@@ -283,10 +283,13 @@ return new class implements DatabaseTest {
     private function scopeGuardrails(): array
     {
         return [
-            'no_migrations_created_for_mail_contract' => !$this->hasFiles(
-                'database/migrations',
-                '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
-            ),
+            'no_migrations_created_for_mail_contract' =>
+                $this->relativeFiles(
+                    'database/migrations',
+                    '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
+                ) === [
+                    'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
+                ],
             'no_seeds_created_for_mail_contract' => !$this->hasFiles(
                 'database/seeds',
                 '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
@@ -412,6 +415,21 @@ return new class implements DatabaseTest {
         }
 
         return false;
+    }
+
+    private function onlyAllowedTicketProductOutboxTableMention(): bool
+    {
+        $files = [];
+
+        foreach ($this->relativeFiles('database/migrations', '/\\.php$/i') as $file) {
+            if (str_contains($this->read($file), 'tickets_productos_correos')) {
+                $files[] = $file;
+            }
+        }
+
+        return $files === [
+            'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
+        ];
     }
 
     private function tableExists(PDO $pdo, string $database, string $table): bool

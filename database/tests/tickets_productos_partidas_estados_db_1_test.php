@@ -379,10 +379,12 @@ return new class implements DatabaseTest {
             'only_authorized_ticket_create_js_runtime' => $this->onlyAuthorizedTicketCreateJsRuntime(),
             'service_repository_allowed_after_service_phase' =>
                 $this->onlyExpectedFiles('app/Domain/Tickets', '/\\.php$/i', [
+                    'app/Domain/Tickets/ProductTicketEmailOutboxService.php',
                     'app/Domain/Tickets/ProductRequestTicketService.php',
                     'app/Domain/Tickets/ProductRequestTicketValidationException.php',
                 ])
                 && $this->onlyExpectedFiles('app/Infrastructure/Repositories', '/Ticket|Solicitud|AltaProducto/i', [
+                    'app/Infrastructure/Repositories/ProductTicketEmailOutboxRepository.php',
                     'app/Infrastructure/Repositories/ProductRequestTicketRepository.php',
                 ]),
             'permission_seed_allowed' => $this->fileExists(
