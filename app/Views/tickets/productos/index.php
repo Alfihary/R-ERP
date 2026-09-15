@@ -57,17 +57,7 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
     return '/tickets/productos?' . http_build_query($query);
 };
 ?>
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tickets de productos</title>
-    <link rel="stylesheet" href="/css/core/app.css">
-    <link rel="stylesheet" href="/css/modules/tickets-productos.css">
-</head>
-<body class="ticket-products">
-    <main class="app-main ticket-products__page">
+<div class="ticket-products ticket-products__page">
         <header class="page-heading ticket-products__hero">
             <div class="page-heading__eyebrow">
                 <p class="page-heading__path">Solicitudes de alta de productos</p>
@@ -246,6 +236,4 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
                 </nav>
             <?php endif; ?>
         </section>
-    </main>
-</body>
-</html>
+    </div>

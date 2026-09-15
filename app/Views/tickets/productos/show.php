@@ -175,17 +175,7 @@ foreach ($adjuntos as $adjunto) {
     $adjuntosGenerales[] = $adjunto;
 }
 ?>
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ticket <?= e($ticket['folio'] ?? '') ?></title>
-    <link rel="stylesheet" href="/css/core/app.css">
-    <link rel="stylesheet" href="/css/modules/tickets-productos.css">
-</head>
-<body class="ticket-products">
-    <main class="app-main ticket-products__page">
+<div class="ticket-products ticket-products__page">
         <header class="page-heading ticket-products__hero">
             <div class="page-heading__eyebrow">
                 <p class="page-heading__path">Solicitud documental de alta de productos</p>
@@ -625,6 +615,4 @@ foreach ($adjuntos as $adjunto) {
         <?php endif; ?>
 
         <p><a class="button button--secondary" href="/tickets/productos">Volver a tickets</a></p>
-    </main>
-</body>
-</html>
+    </div>

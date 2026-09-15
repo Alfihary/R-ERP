@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Core\Config;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
+use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
 use App\Support\Security\CsrfTokenService;
 
@@ -33,7 +37,10 @@ final class ProductRequestTicketController
         private readonly AuthService $auth,
         private readonly ProductRequestTicketService $tickets,
         private readonly ?PermissionService $permissions = null,
-        private readonly ?ProductRequestTicketRepository $ticketRepository = null
+        private readonly ?ProductRequestTicketRepository $ticketRepository = null,
+        private readonly ?Config $config = null,
+        private readonly ?ScopeContextService $scopeContext = null,
+        private readonly ?CsrfTokenService $csrf = null
     ) {
     }
 
@@ -367,11 +374,81 @@ final class ProductRequestTicketController
     private function render(string $view, array $data, int $status = 200): Response
     {
         $this->ensureViewHelpers();
+        $user = $this->user();
+        $permissionService = $this->permissionService();
+        $context = $this->scopeContext()->resolveForUser($user['user_id']);
+        $scripts = $view === 'tickets/productos/create'
+            ? ['/js/modules/tickets-productos-create.js']
+            : [];
 
-        return Response::html(View::render($view, [
+        return Response::html(View::render('layouts/app', [
+            'activeNavigation' => 'product-tickets',
+            'appName' => (string) $this->config()->get('app.name', 'SoporteGR ERP'),
+            'canAccessCatalogs' => $permissionService->allows($user['user_id'], 'catalogos.acceder'),
+            'canAccessProducts' => $permissionService->allows($user['user_id'], 'productos.acceder'),
+            'canAccessProductPrices' => $permissionService->allows($user['user_id'], 'precios.productos.acceder'),
+            'canAccessInventory' => $permissionService->allows($user['user_id'], 'inventario.movimientos.acceder'),
+            'canAccessInventoryStock' => $permissionService->allows($user['user_id'], 'inventario.existencias.ver'),
+            'canAccessInventorySerialStock' => $permissionService->allows($user['user_id'], 'inventario.series.existencias.ver'),
+            'canAccessInventoryKardex' => $permissionService->allows($user['user_id'], 'inventario.kardex.ver'),
+            'canAccessInventorySerialKardex' => $permissionService->allows($user['user_id'], 'inventario.series.kardex.ver'),
+            'canAccessInventoryTransfers' => $permissionService->allows($user['user_id'], 'inventario.transferencias.acceder'),
+            'canAccessProductTickets' => true,
+            'canAccessConfiguration' => $permissionService->allows($user['user_id'], 'configuracion.empresas.acceder')
+                || $permissionService->allows($user['user_id'], 'configuracion.almacenes.acceder')
+                || $permissionService->allows($user['user_id'], 'configuracion.folios.acceder')
+                || $permissionService->allows($user['user_id'], 'precios.listas.acceder')
+                || $permissionService->allows($user['user_id'], AuditController::PERMISSION),
+            'canAccessConfigCompanies' => $permissionService->allows($user['user_id'], 'configuracion.empresas.acceder'),
+            'canAccessConfigWarehouses' => $permissionService->allows($user['user_id'], 'configuracion.almacenes.acceder'),
+            'canAccessConfigFolios' => $permissionService->allows($user['user_id'], 'configuracion.folios.acceder'),
+            'canAccessPriceLists' => $permissionService->allows($user['user_id'], 'precios.listas.acceder'),
+            'canAccessAudit' => $permissionService->allows($user['user_id'], AuditController::PERMISSION),
+            'contentData' => [
+                'csrf' => $this->csrf(),
+                'permissions' => $this->visualPermissions(),
+            ] + $data,
+            'contentView' => $view,
+            'context' => $context->toArray(),
             'csrf' => $this->csrf(),
-            'permissions' => $this->visualPermissions(),
-        ] + $data), $status);
+            'pageTitle' => $this->pageTitle($view, $data),
+            'scripts' => $scripts,
+            'stylesheets' => ['/css/modules/tickets-productos.css'],
+            'user' => $user,
+        ]), $status);
+    }
+
+    /**
+     * @return array{user_id: int, username: string, email: string}
+     */
+    private function user(): array
+    {
+        $user = $this->auth->user();
+
+        if (!is_array($user)) {
+            throw new \RuntimeException('Authenticated product ticket controller requires a user.');
+        }
+
+        return $user;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function pageTitle(string $view, array $data): string
+    {
+        if ($view === 'tickets/productos/create') {
+            return 'Crear ticket de productos';
+        }
+
+        if ($view === 'tickets/productos/show') {
+            $ticket = is_array($data['ticket'] ?? null) ? $data['ticket'] : [];
+            $folio = trim((string) ($ticket['folio'] ?? ''));
+
+            return $folio === '' ? 'Detalle de ticket' : 'Ticket ' . $folio;
+        }
+
+        return 'Tickets de productos';
     }
 
     /**
@@ -640,7 +717,7 @@ final class ProductRequestTicketController
         return $permissions;
     }
 
-    private function permissionService(): ?PermissionService
+    private function permissionService(): PermissionService
     {
         if ($this->permissions instanceof PermissionService) {
             return $this->permissions;
@@ -659,13 +736,62 @@ final class ProductRequestTicketController
         $config = require BASE_PATH . '/bootstrap/database.php';
         $databaseConfig = $config->get('database', []);
 
-        return is_array($databaseConfig)
-            ? new PermissionService(
-                new \App\Infrastructure\Repositories\PermissionRepository(
-                    new ConnectionProvider($databaseConfig)
-                )
+        if (!is_array($databaseConfig)) {
+            throw new \RuntimeException('Product ticket controller could not resolve permissions.');
+        }
+
+        return new PermissionService(
+            new \App\Infrastructure\Repositories\PermissionRepository(
+                new ConnectionProvider($databaseConfig)
             )
-            : null;
+        );
+    }
+
+    private function config(): Config
+    {
+        if ($this->config instanceof Config) {
+            return $this->config;
+        }
+
+        $config = require BASE_PATH . '/bootstrap/database.php';
+
+        if (!$config instanceof Config) {
+            throw new \RuntimeException('Product ticket controller could not resolve configuration.');
+        }
+
+        return $config;
+    }
+
+    private function scopeContext(): ScopeContextService
+    {
+        if ($this->scopeContext instanceof ScopeContextService) {
+            return $this->scopeContext;
+        }
+
+        if (($GLOBALS['scopeContext'] ?? null) instanceof ScopeContextService) {
+            return $GLOBALS['scopeContext'];
+        }
+
+        if (($GLOBALS['connection'] ?? null) instanceof ConnectionProvider) {
+            return new ScopeContextService(
+                new UserScopeService(new ScopeRepository($GLOBALS['connection'])),
+                new Session([])
+            );
+        }
+
+        $config = require BASE_PATH . '/bootstrap/database.php';
+        $databaseConfig = $config->get('database', []);
+
+        if (!is_array($databaseConfig)) {
+            throw new \RuntimeException('Product ticket controller could not resolve scope context.');
+        }
+
+        $connection = new ConnectionProvider($databaseConfig);
+
+        return new ScopeContextService(
+            new UserScopeService(new ScopeRepository($connection)),
+            new Session([])
+        );
     }
 
     /**
@@ -778,6 +904,10 @@ final class ProductRequestTicketController
 
     private function csrf(): CsrfTokenService
     {
+        if ($this->csrf instanceof CsrfTokenService) {
+            return $this->csrf;
+        }
+
         return new CsrfTokenService(new Session([]));
     }
 

@@ -31,6 +31,7 @@ $canAccessCredential = ($canAccessCredential ?? false) === true;
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
 $canAccessProducts = ($canAccessProducts ?? false) === true;
 $canAccessProductPrices = ($canAccessProductPrices ?? false) === true;
+$canAccessProductTickets = ($canAccessProductTickets ?? false) === true;
 $canAccessInventory = ($canAccessInventory ?? false) === true;
 $canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
 $canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === true;
@@ -140,6 +141,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">$</span>
                         Precios por producto
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProductTickets): ?>
+                    <span class="app-navigation__section">Tickets</span>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'product-tickets' ? ' is-active' : '' ?>"
+                        href="/tickets/productos"
+                        <?= $activeNavigation === 'product-tickets' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">✉</span>
+                        Tickets de productos
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessInventory): ?>

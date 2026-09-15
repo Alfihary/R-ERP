@@ -55,17 +55,7 @@ $warehouseOptionsJson = json_encode(
     JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
 );
 ?>
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nuevo ticket de productos</title>
-    <link rel="stylesheet" href="/css/core/app.css">
-    <link rel="stylesheet" href="/css/modules/tickets-productos.css">
-</head>
-<body class="ticket-products">
-    <main class="app-main ticket-products__page">
+<div class="ticket-products ticket-products__page">
         <header class="page-heading ticket-products__hero">
             <div class="page-heading__eyebrow">
                 <p class="page-heading__path">Solicitudes de alta de productos</p>
@@ -311,8 +301,5 @@ $warehouseOptionsJson = json_encode(
             </div>
         </form>
         <?php endif; ?>
-    </main>
+    </div>
     <script type="application/json" id="ticket-products-warehouses-data"><?= $warehouseOptionsJson ?></script>
-    <script src="/js/modules/tickets-productos-create.js" defer></script>
-</body>
-</html>

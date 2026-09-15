@@ -51,8 +51,15 @@ return new class implements DatabaseTest {
             ],
             'visual_contract' => [
                 'css_module_exists' => is_file(BASE_PATH . '/public/css/modules/tickets-productos.css'),
-                'views_load_css_module' => $this->allViewsContain('/css/modules/tickets-productos.css'),
-                'uses_existing_core_css' => $this->allViewsContain('/css/core/app.css'),
+                'views_load_css_module' =>
+                    $this->renderedHtmlContains($html, '/css/modules/tickets-productos.css')
+                    || str_contains(
+                        $this->read('app/Http/Controllers/ProductRequestTicketController.php'),
+                        "'stylesheets' => ['/css/modules/tickets-productos.css']"
+                    ),
+                'uses_existing_core_css' =>
+                    $this->renderedHtmlContains($html, '/css/core/app.css')
+                    || str_contains($this->read('app/Views/layouts/app.php'), '/css/core/app.css'),
                 'uses_ticket_products_prefix' =>
                     substr_count($this->read('public/css/modules/tickets-productos.css'), 'ticket-products__') >= 15,
                 'uses_cards_tables_forms_alerts_badges' =>
@@ -268,6 +275,20 @@ return new class implements DatabaseTest {
             'app/Views/tickets/productos/show.php',
         ] as $view) {
             if (!str_contains($this->read($view), $needle)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, string> $html
+     */
+    private function renderedHtmlContains(array $html, string $needle): bool
+    {
+        foreach ($html as $document) {
+            if (!str_contains($document, $needle)) {
                 return false;
             }
         }

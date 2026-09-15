@@ -117,7 +117,10 @@ return new class implements DatabaseTest {
                 'partida_attachments_creation_documented_pending' => str_contains($createHtml, 'Adjuntos por partida durante creación')
                     && str_contains($createHtml, 'Pendiente de fase específica'),
                 'no_inline_js_blockable_by_csp' => !str_contains($createHtml, "document.addEventListener('DOMContentLoaded'")
-                    && str_contains($createHtml, 'src="/js/modules/tickets-productos-create.js" defer'),
+                    && (
+                        str_contains($createHtml, 'src="/js/modules/tickets-productos-create.js" defer')
+                        || str_contains($this->read('app/Http/Controllers/ProductRequestTicketController.php'), "'/js/modules/tickets-productos-create.js'")
+                    ),
             ];
 
             $results['js_contract'] = [

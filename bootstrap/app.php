@@ -368,7 +368,12 @@ $auditController = new AuditController(
 );
 $productRequestTicketController = new ProductRequestTicketController(
     $auth,
-    $productRequestTickets
+    $productRequestTickets,
+    $permissions,
+    null,
+    $config,
+    $scopeContext,
+    $csrf
 );
 
 $router = new Router();
