@@ -490,8 +490,12 @@ return new class implements DatabaseTest {
                 '/tickets/productos/correos',
                 '/tickets/productos/descargar',
             ]),
-            'no_seed_modified_for_phase' => $this->noOpenPath('database/seeds/'),
-            'no_migration_modified_for_phase' => $this->noOpenPath('database/migrations/'),
+            'no_seed_modified_for_phase' => $this->noOpenPathExcept('database/seeds/', [
+                'database/seeds/tp_partidas_estados_correo_config_1_seed_permissions.php',
+            ]),
+            'no_migration_modified_for_phase' => $this->noOpenPathExcept('database/migrations/', [
+                'database/migrations/tp_partidas_estados_correo_config_1_001_create_mail_configuration.php',
+            ]),
             'mail_config_not_modified' => $this->noOpenPath('config/mail.php'),
             'package_files_not_modified' =>
                 $this->noOpenPath('package.json')
@@ -552,6 +556,28 @@ return new class implements DatabaseTest {
         exec('git status --short -- ' . escapeshellarg($path), $output, $code);
 
         return $code === 0 && $output === [];
+    }
+
+    /**
+     * @param list<string> $allowedPaths
+     */
+    private function noOpenPathExcept(string $path, array $allowedPaths): bool
+    {
+        exec('git status --short -- ' . escapeshellarg($path), $output, $code);
+
+        if ($code !== 0) {
+            return false;
+        }
+
+        foreach ($output as $line) {
+            $openPath = str_replace('\\', '/', trim(substr($line, 3)));
+
+            if (!in_array($openPath, $allowedPaths, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

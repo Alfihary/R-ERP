@@ -21,6 +21,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\MailConfigurationController;
 use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
@@ -55,6 +56,7 @@ return static function (
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController,
+    MailConfigurationController $mailConfigurationController,
     AuditController $auditController,
     ProductRequestTicketController $productRequestTicketController
 ): void {
@@ -190,6 +192,9 @@ return static function (
             'precios.listas.acceder'
         ) || $permissions->allows(
             (int) ($user['user_id'] ?? 0),
+            'configuracion.correo.administrar'
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
             AuditController::PERMISSION
         );
 
@@ -219,6 +224,10 @@ return static function (
             'canAccessPriceLists' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
                 'precios.listas.acceder'
+            ),
+            'canAccessMailConfiguration' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                'configuracion.correo.administrar'
             ),
             'canAccessAudit' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
@@ -487,6 +496,30 @@ return static function (
         static fn (Request $request, array $params): Response =>
             $productRequestTicketController->cancel($request, $params),
         $productTicketMiddleware('tickets_productos.cancelar')
+    );
+
+    $mailConfigurationBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, 'configuracion.correo.administrar'),
+    ];
+
+    $router->get(
+        '/admin/correo',
+        static fn (Request $request): Response =>
+            $mailConfigurationController->index($request),
+        $mailConfigurationBaseMiddleware
+    );
+    $router->post(
+        '/admin/correo/cuentas',
+        static fn (Request $request): Response =>
+            $mailConfigurationController->saveAccount($request),
+        $mailConfigurationBaseMiddleware
+    );
+    $router->post(
+        '/admin/correo/reglas',
+        static fn (Request $request): Response =>
+            $mailConfigurationController->saveRules($request),
+        $mailConfigurationBaseMiddleware
     );
 
     $auditBaseMiddleware = [

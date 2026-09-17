@@ -23,6 +23,7 @@ use App\Domain\Credentials\CredentialVerificationService;
 use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
+use App\Domain\Mail\MailConfigurationService;
 use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
@@ -49,6 +50,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\MailConfigurationController;
 use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
@@ -71,6 +73,7 @@ use App\Infrastructure\Repositories\FolioRepository;
 use App\Infrastructure\Repositories\FolioSeriesRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
+use App\Infrastructure\Repositories\MailConfigurationRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
@@ -214,6 +217,9 @@ $inventoryRepository = new InventoryRepository($connection);
 $inventory = new InventoryService($inventoryRepository, $folioService);
 $inventoryTransfers = new InventoryTransferService($inventoryRepository, $folioService);
 $inventoryQueries = new InventoryQueryRepository($connection);
+$mailConfiguration = new MailConfigurationService(
+    new MailConfigurationRepository($connection)
+);
 $productRequestTickets = new ProductRequestTicketService(
     new ProductRequestTicketRepository($connection)
 );
@@ -358,6 +364,14 @@ $inventoryTransferController = new InventoryTransferController(
     $inventoryTransfers,
     $inventoryQueries
 );
+$mailConfigurationController = new MailConfigurationController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $mailConfiguration
+);
 $auditController = new AuditController(
     $config,
     $auth,
@@ -405,6 +419,7 @@ $registerRoutes(
     $productPriceController,
     $inventoryController,
     $inventoryTransferController,
+    $mailConfigurationController,
     $auditController,
     $productRequestTicketController
 );

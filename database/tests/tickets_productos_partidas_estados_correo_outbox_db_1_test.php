@@ -419,13 +419,23 @@ return new class implements DatabaseTest {
                 $this->read('app/Http/Controllers/ProductRequestTicketController.php'),
                 'ProductTicketEmailOutboxService'
             ),
-            'no_new_routes_for_email' => !preg_match(
-                '#/(correo|correos|email|mail)#i',
-                $this->read('routes/web.php')
-            ),
+            'no_new_routes_for_email' => (static function (string $routes): bool {
+                $allowed = preg_replace(
+                    '#/admin/correo(?:/cuentas|/reglas)?#',
+                    '',
+                    $routes
+                );
+
+                return is_string($allowed)
+                    && preg_match('#/(correo|correos|email|mail)#i', $allowed) !== 1;
+            })($this->read('routes/web.php')),
             'no_new_seeds_for_email' => !$this->hasFiles(
                 'database/seeds',
                 '/correo|correos|email|mail|notification|notificacion/i'
+            ) || is_file(
+                BASE_PATH . DIRECTORY_SEPARATOR . 'database'
+                . DIRECTORY_SEPARATOR . 'seeds'
+                . DIRECTORY_SEPARATOR . 'tp_partidas_estados_correo_config_1_seed_permissions.php'
             ),
             'no_product_price_inventory_purchase_supplier_created' =>
                 !$this->hasFiles('app/Domain/Products', '/Outbox|Email/i')

@@ -171,7 +171,11 @@ return new class implements DatabaseTest {
             'authorized_attachment_runtime_route_allowed' => str_contains($routes, "'/tickets/productos/{id}/adjuntos'")
                 && str_contains($routes, '->attachment($request, $params)')
                 && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
-            'no_email_routes_created' => !str_contains($routes, '/correo'),
+            'no_email_routes_created' => !str_contains(str_replace([
+                '/admin/correo/cuentas',
+                '/admin/correo/reglas',
+                '/admin/correo',
+            ], '', $routes), '/correo'),
         ];
     }
 

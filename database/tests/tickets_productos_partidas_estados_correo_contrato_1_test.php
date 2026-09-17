@@ -288,12 +288,16 @@ return new class implements DatabaseTest {
                     'database/migrations',
                     '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
                 ) === [
+                    'database/migrations/tp_partidas_estados_correo_config_1_001_create_mail_configuration.php',
                     'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
                 ],
-            'no_seeds_created_for_mail_contract' => !$this->hasFiles(
-                'database/seeds',
-                '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
-            ),
+            'no_seeds_created_for_mail_contract' =>
+                $this->relativeFiles(
+                    'database/seeds',
+                    '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
+                ) === [
+                    'database/seeds/tp_partidas_estados_correo_config_1_seed_permissions.php',
+                ],
             'no_product_price_inventory_purchase_supplier_phase_marker' =>
                 !str_contains($this->read('docs/tickets-productos-partidas-estados-correo-contrato-1.md'), 'crear producto real')
                 && $this->textContainsAll($this->read('docs/tickets-productos-partidas-estados-correo-contrato-1.md'), [
