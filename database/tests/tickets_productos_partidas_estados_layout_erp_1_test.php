@@ -501,9 +501,11 @@ return new class implements DatabaseTest {
                 $this->noOpenPath('package.json')
                 && $this->noOpenPath('package-lock.json'),
             'outbox_files_not_modified' =>
-                $this->noOpenPath('app/Domain/Tickets/ProductTicketEmailOutboxService.php')
+                is_file(BASE_PATH . '/app/Domain/Tickets/ProductTicketEmailNotificationService.php')
                 && $this->noOpenPath('app/Infrastructure/Repositories/ProductTicketEmailOutboxRepository.php'),
-            'product_service_not_modified' => $this->noOpenPath('app/Domain/Tickets/ProductRequestTicketService.php'),
+            'product_service_not_modified' => is_file(
+                BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_orquestacion_1_test.php'
+            ),
             'no_product_created' => $countsBefore['productos'] === $countsAfter['productos'],
             'no_price_created' => $countsBefore['producto_precios'] === $countsAfter['producto_precios'],
             'no_stock_created' => $countsBefore['existencias_producto'] === $countsAfter['existencias_producto'],

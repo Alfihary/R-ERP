@@ -101,6 +101,24 @@ final class ProductTicketEmailOutboxService
      */
     public function enqueue(array $input): ?array
     {
+        $result = $this->enqueueConfigured($input, [
+            'enviar_solicitante' => 1,
+            'enviar_responsables' => 0,
+            'to_json' => null,
+            'cc_json' => null,
+            'bcc_json' => null,
+        ]);
+
+        return is_array($result['outbox']) ? $result['outbox'] : null;
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $rule
+     * @return array{notification_enqueued:bool,notification_reason:string,outbox:array<string,mixed>|null}
+     */
+    public function enqueueConfigured(array $input, array $rule): array
+    {
         $ticketId = $this->positiveId($input['ticket_id'] ?? null, 'ticket_id');
         $partidaId = $this->nullablePositiveId($input['partida_id'] ?? null, 'partida_id');
         $event = strtoupper(trim((string) ($input['evento'] ?? '')));
@@ -132,10 +150,18 @@ final class ProductTicketEmailOutboxService
             }
         }
 
-        $recipient = strtolower(trim((string) ($ticket['solicitante_email'] ?? '')));
+        $recipients = $this->resolveRecipients(
+            $ticket,
+            $rule,
+            $input['responsable_email'] ?? null
+        );
 
-        if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
-            return null;
+        if ($recipients['to'] === []) {
+            return [
+                'notification_enqueued' => false,
+                'notification_reason' => 'no_valid_recipients',
+                'outbox' => null,
+            ];
         }
 
         $template = self::EVENT_TEMPLATES[$event];
@@ -143,20 +169,24 @@ final class ProductTicketEmailOutboxService
         $existing = $this->outbox->findByDedupeKey($dedupeKey);
 
         if ($existing !== null) {
-            return $existing;
+            return [
+                'notification_enqueued' => false,
+                'notification_reason' => 'duplicate_dedupe_key',
+                'outbox' => $existing,
+            ];
         }
 
         $payload = $this->payload($ticket, $line, $event, $template);
 
         $this->assertSafeText($payload['subject'] . "\n" . $payload['html'] . "\n" . $payload['text']);
 
-        return $this->outbox->insertPending([
+        $row = $this->outbox->insertPending([
             'ticket_id' => $ticketId,
             'partida_id' => $partidaId,
             'evento' => $event,
             'plantilla' => $template,
-            'destinatario_email' => $recipient,
-            'cc_json' => null,
+            'destinatario_email' => $recipients['to'][0],
+            'cc_json' => json_encode($recipients, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'subject' => $payload['subject'],
             'html' => $payload['html'],
             'text' => $payload['text'],
@@ -164,6 +194,12 @@ final class ProductTicketEmailOutboxService
             'creado_por_usuario_id' => $createdBy,
             'dedupe_key' => $dedupeKey,
         ]);
+
+        return [
+            'notification_enqueued' => true,
+            'notification_reason' => 'pending_created',
+            'outbox' => $row,
+        ];
     }
 
     /**
@@ -199,6 +235,9 @@ final class ProductTicketEmailOutboxService
     {
         $folio = trim((string) ($ticket['folio'] ?? ''));
         $subject = str_replace('{folio}', $folio, self::TEMPLATE_SUBJECTS[$template]);
+        if ($event === 'TICKET_RESUELTO_PARCIAL') {
+            $subject = 'Solicitud de alta de producto ' . $folio . ' resuelta parcialmente';
+        }
         $company = trim((string) ($ticket['empresa_nombre'] ?? ''));
         $warehouse = trim((string) ($ticket['almacen_nombre'] ?? $ticket['almacen_codigo'] ?? ''));
         $username = trim((string) ($ticket['solicitante_username'] ?? ''));
@@ -249,6 +288,84 @@ final class ProductTicketEmailOutboxService
     {
         return 'ticket:' . $ticketId . ':partida:' . ($partidaId === null ? 'null' : (string) $partidaId)
             . ':evento:' . $event;
+    }
+
+    /**
+     * `cc_json` is the existing outbox envelope field. It stores the complete
+     * normalized TO/CC/BCC envelope while destinatario_email remains the
+     * primary TO for backwards compatibility.
+     *
+     * @param array<string, mixed> $ticket
+     * @param array<string, mixed> $rule
+     * @return array{to:list<string>,cc:list<string>,bcc:list<string>}
+     */
+    private function resolveRecipients(array $ticket, array $rule, mixed $responsibleEmail): array
+    {
+        $to = $this->jsonEmails($rule['to_json'] ?? null);
+        $cc = $this->jsonEmails($rule['cc_json'] ?? null);
+        $bcc = $this->jsonEmails($rule['bcc_json'] ?? null);
+
+        if ((int) ($rule['enviar_solicitante'] ?? 0) === 1) {
+            $this->appendEmail($to, $ticket['solicitante_email'] ?? null);
+        }
+        if ((int) ($rule['enviar_responsables'] ?? 0) === 1) {
+            $this->appendEmail($cc, $responsibleEmail);
+        }
+
+        $seen = [];
+        foreach (['to' => &$to, 'cc' => &$cc, 'bcc' => &$bcc] as &$emails) {
+            $emails = array_values(array_filter($emails, static function (string $email) use (&$seen): bool {
+                if (isset($seen[$email])) {
+                    return false;
+                }
+                $seen[$email] = true;
+                return true;
+            }));
+        }
+        unset($emails);
+
+        if ($to === [] && $cc !== []) {
+            $to[] = array_shift($cc);
+        }
+        if ($to === [] && $bcc !== []) {
+            $to[] = array_shift($bcc);
+        }
+
+        return ['to' => $to, 'cc' => $cc, 'bcc' => $bcc];
+    }
+
+    /** @return list<string> */
+    private function jsonEmails(mixed $json): array
+    {
+        if (!is_string($json) || trim($json) === '') {
+            return [];
+        }
+
+        try {
+            $values = json_decode($json, true, 8, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (!is_array($values)) {
+            return [];
+        }
+
+        $emails = [];
+        foreach ($values as $value) {
+            $this->appendEmail($emails, $value);
+        }
+
+        return $emails;
+    }
+
+    /** @param list<string> $emails */
+    private function appendEmail(array &$emails, mixed $value): void
+    {
+        $email = strtolower(trim((string) $value));
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false) {
+            $emails[$email] = $email;
+        }
     }
 
     private function positiveId(mixed $value, string $field): int

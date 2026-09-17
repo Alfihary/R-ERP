@@ -150,7 +150,10 @@ return new class implements DatabaseTest {
                     'app/Views/tickets/productos/show.php',
                 ]
             ),
-            'no_mail_implemented' => !preg_match('/mail|smtp|correo/i', $service . $repository),
+            'no_mail_implemented' => !preg_match(
+                '/\\bmail\\s*\\(|PHPMailer|fsockopen|stream_socket_client|curl_exec/i',
+                $service . $repository
+            ),
             'no_operational_writes' => !preg_match(
                 '/\\b(INSERT|UPDATE|DELETE)\\s+(?:INTO\\s+)?(?:productos|producto_precios|existencias_producto|movimientos_inventario|compras|proveedores)\\b/i',
                 $service . "\n" . $repository

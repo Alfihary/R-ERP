@@ -70,7 +70,8 @@ final class ProductRequestTicketController
         try {
             $ticket = $this->tickets->crearTicket(
                 $this->ticketInput($request),
-                $this->userId()
+                $this->userId(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->validationResponse($exception, $request);
@@ -114,7 +115,8 @@ final class ProductRequestTicketController
                     'clave_sat_autorizada' => $this->nullableText($request, 'clave_sat_autorizada'),
                     'comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion'),
                 ],
-                $this->userId()
+                $this->userId(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -137,7 +139,8 @@ final class ProductRequestTicketController
                     'motivo_rechazo' => $this->nullableText($request, 'motivo_rechazo'),
                     'comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion'),
                 ],
-                $this->userId()
+                $this->userId(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -195,7 +198,8 @@ final class ProductRequestTicketController
             $this->tickets->cancelarTicket(
                 $this->id($params['id'] ?? null),
                 (string) $request->input('motivo', ''),
-                $this->userId()
+                $this->userId(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);

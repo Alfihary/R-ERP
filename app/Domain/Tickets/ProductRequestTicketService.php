@@ -22,7 +22,8 @@ final class ProductRequestTicketService
     private const PARTIDA_RECHAZADA = 'RECHAZADA';
 
     public function __construct(
-        private readonly ProductRequestTicketRepository $tickets
+        private readonly ProductRequestTicketRepository $tickets,
+        private readonly ?ProductTicketEmailNotificationService $notifications = null
     )
     {
     }
@@ -31,13 +32,13 @@ final class ProductRequestTicketService
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function crearTicket(array $input, int $usuarioId): array
+    public function crearTicket(array $input, int $usuarioId, ?string $actorEmail = null): array
     {
         $request = $this->validateTicketInput($input, $usuarioId);
         $storedPaths = [];
 
         try {
-            return $this->transactional(function () use ($request, &$storedPaths): array {
+            $ticket = $this->transactional(function () use ($request, &$storedPaths): array {
                 $this->assertActiveUser($request['solicitante_usuario_id']);
                 $this->assertCompany($request['empresa_id']);
                 $this->assertWarehouseScope(
@@ -116,6 +117,16 @@ final class ProductRequestTicketService
 
                 return $this->obtenerTicketOrFail($ticketId);
             });
+
+            $ticket['notification'] = $this->notify(
+                'TICKET_CREADO',
+                (int) $ticket['id'],
+                null,
+                $usuarioId,
+                $actorEmail
+            );
+
+            return $ticket;
         } catch (Throwable $exception) {
             foreach (array_unique($storedPaths) as $path) {
                 if (is_string($path) && is_file($path)) {
@@ -136,7 +147,8 @@ final class ProductRequestTicketService
         int $partidaId,
         string $accion,
         array $input,
-        int $usuarioId
+        int $usuarioId,
+        ?string $actorEmail = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $partidaId = $this->positiveIdValue($partidaId, 'partida_id');
@@ -171,7 +183,7 @@ final class ProductRequestTicketService
             ]);
         }
 
-        return $this->transactional(function () use (
+        $ticket = $this->transactional(function () use (
             $ticketId,
             $partidaId,
             $accion,
@@ -235,6 +247,32 @@ final class ProductRequestTicketService
 
             return $this->obtenerTicketOrFail($ticketId);
         });
+
+        $event = $accion === 'APROBAR' ? 'PARTIDA_APROBADA' : 'PARTIDA_RECHAZADA';
+        $notifications = [
+            $this->notify($event, $ticketId, $partidaId, $usuarioId, $actorEmail),
+        ];
+        $ticketState = (string) ($ticket['estado'] ?? '');
+        if ($ticketState === self::TICKET_RESUELTO_PARCIAL) {
+            $notifications[] = $this->notify(
+                'TICKET_RESUELTO_PARCIAL',
+                $ticketId,
+                null,
+                $usuarioId,
+                $actorEmail
+            );
+        } elseif (in_array($ticketState, [self::TICKET_APROBADO, self::TICKET_RECHAZADO], true)) {
+            $notifications[] = $this->notify(
+                'TICKET_RESUELTO_TOTAL',
+                $ticketId,
+                null,
+                $usuarioId,
+                $actorEmail
+            );
+        }
+        $ticket['notifications'] = $notifications;
+
+        return $ticket;
     }
 
     /**
@@ -243,7 +281,8 @@ final class ProductRequestTicketService
     public function cancelarTicket(
         int $ticketId,
         string $motivo,
-        int $usuarioId
+        int $usuarioId,
+        ?string $actorEmail = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
@@ -260,7 +299,7 @@ final class ProductRequestTicketService
             ]);
         }
 
-        return $this->transactional(function () use (
+        $ticket = $this->transactional(function () use (
             $ticketId,
             $motivo,
             $usuarioId
@@ -286,6 +325,16 @@ final class ProductRequestTicketService
 
             return $this->obtenerTicketOrFail($ticketId);
         });
+
+        $ticket['notification'] = $this->notify(
+            'TICKET_CANCELADO',
+            $ticketId,
+            null,
+            $usuarioId,
+            $actorEmail
+        );
+
+        return $ticket;
     }
 
     /**
@@ -457,6 +506,33 @@ final class ProductRequestTicketService
             $this->tickets->rollBack($ownsTransaction);
             throw $exception;
         }
+    }
+
+    /**
+     * @return array{notification_enqueued:bool,notification_reason:string,outbox:array<string,mixed>|null}
+     */
+    private function notify(
+        string $event,
+        int $ticketId,
+        ?int $partidaId,
+        int $actorUserId,
+        ?string $actorEmail
+    ): array {
+        if ($this->notifications === null) {
+            return [
+                'notification_enqueued' => false,
+                'notification_reason' => 'notification_orchestrator_unavailable',
+                'outbox' => null,
+            ];
+        }
+
+        return $this->notifications->handle(
+            $event,
+            $ticketId,
+            $partidaId,
+            $actorUserId,
+            $actorEmail
+        );
     }
 
     private function assertActiveUser(int $userId): void

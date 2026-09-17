@@ -53,6 +53,29 @@ final class MailConfigurationService
     }
 
     /**
+     * Runtime-safe configuration for an event. This method never resolves
+     * smtp_secret_ref and never reads environment secrets.
+     *
+     * @return array{account:array<string,mixed>|null,rule:array<string,mixed>|null}
+     */
+    public function runtimeEventConfiguration(string $event): array
+    {
+        $event = strtoupper(trim($event));
+
+        if (!in_array($event, self::EVENTS, true)) {
+            throw new InvalidArgumentException('Evento de correo no soportado.');
+        }
+
+        $overview = $this->overview();
+        $rule = $overview['rules'][$event] ?? null;
+
+        return [
+            'account' => is_array($overview['account']) ? $overview['account'] : null,
+            'rule' => is_array($rule) ? $rule : null,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $input
      */
     public function saveAccount(array $input): int

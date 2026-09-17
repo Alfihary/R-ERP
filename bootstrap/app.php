@@ -33,6 +33,8 @@ use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
+use App\Domain\Tickets\ProductTicketEmailNotificationService;
+use App\Domain\Tickets\ProductTicketEmailOutboxService;
 use App\Domain\Vcards\VcardPrivacyService;
 use App\Domain\Vcards\VcardProductService;
 use App\Domain\Vcards\VcardQrService;
@@ -80,6 +82,7 @@ use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
 use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
 use App\Infrastructure\Repositories\ScopeRepository;
@@ -220,8 +223,15 @@ $inventoryQueries = new InventoryQueryRepository($connection);
 $mailConfiguration = new MailConfigurationService(
     new MailConfigurationRepository($connection)
 );
+$productTicketEmailNotifications = new ProductTicketEmailNotificationService(
+    $mailConfiguration,
+    new ProductTicketEmailOutboxService(
+        new ProductTicketEmailOutboxRepository($connection)
+    )
+);
 $productRequestTickets = new ProductRequestTicketService(
-    new ProductRequestTicketRepository($connection)
+    new ProductRequestTicketRepository($connection),
+    $productTicketEmailNotifications
 );
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);

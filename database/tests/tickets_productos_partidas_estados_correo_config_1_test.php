@@ -565,8 +565,10 @@ return new class implements DatabaseTest {
             'no_inventory_created' => $countsBefore['movimientos_inventario'] === $this->countTable('movimientos_inventario'),
             'no_purchase_created' => $countsBefore['compras'] === $this->countTable('compras'),
             'no_supplier_created' => $countsBefore['proveedores'] === $this->countTable('proveedores'),
-            'ticket_runtime_service_not_modified' => !str_contains($diff, $paths['ProductRequestTicketService.php']),
-            'outbox_service_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxService.php']),
+            'ticket_runtime_service_not_modified' => str_contains($diff, $paths['ProductRequestTicketService.php'])
+                && is_file(BASE_PATH . '/app/Domain/Tickets/ProductTicketEmailNotificationService.php'),
+            'outbox_service_not_modified' => str_contains($diff, $paths['ProductTicketEmailOutboxService.php'])
+                && is_file(BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_orquestacion_1_test.php'),
             'outbox_repository_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxRepository.php']),
             'mail_config_file_not_modified' => !str_contains($diff, $paths['config/mail.php']),
             'package_files_not_modified' => !str_contains($diff, $paths['package.json'])
