@@ -1,0 +1,10 @@
+{
+    "name": "soportegr/r-erp",
+    "description": "ERP modular de SoporteGR.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "phpmailer/phpmailer": "^6.12"
+    }
+}
