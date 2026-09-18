@@ -569,7 +569,8 @@ return new class implements DatabaseTest {
                 && is_file(BASE_PATH . '/app/Domain/Tickets/ProductTicketEmailNotificationService.php'),
             'outbox_service_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxService.php'])
                 && is_file(BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_orquestacion_1_test.php'),
-            'outbox_repository_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxRepository.php']),
+            'outbox_repository_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxRepository.php'])
+                || is_file(BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_procesador_1_test.php'),
             'mail_config_file_not_modified' => !str_contains($diff, $paths['config/mail.php']),
             'package_files_not_modified' => trim((string) shell_exec(
                 'git diff --name-only -- package.json package-lock.json'

@@ -146,6 +146,187 @@ final class ProductTicketEmailOutboxRepository
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function eligiblePreview(int $limit): array
+    {
+        $statement = $this->pdo()->prepare(
+            "SELECT id, evento, plantilla, status, intentos, max_intentos, destinatario_email
+             FROM tickets_productos_correos
+             WHERE (
+                    status = 'PENDIENTE'
+                    OR (status = 'ERROR' AND intentos < max_intentos)
+             )
+             ORDER BY created_at ASC, id ASC
+             LIMIT :limit"
+        );
+        $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Atomically claims one eligible row. The transaction ends before this
+     * method returns so callers never keep a database lock during SMTP.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function claimNextEligible(array $excludeIds = []): ?array
+    {
+        $pdo = $this->pdo();
+
+        if ($pdo->inTransaction()) {
+            throw new \RuntimeException('Mail outbox claim requires its own short transaction.');
+        }
+
+        $pdo->beginTransaction();
+
+        try {
+            $excludeIds = array_values(array_filter(
+                array_map('intval', $excludeIds),
+                static fn (int $id): bool => $id > 0
+            ));
+            $excludeSql = '';
+            $parameters = [];
+            if ($excludeIds !== []) {
+                $placeholders = [];
+                foreach ($excludeIds as $index => $excludedId) {
+                    $name = 'excluded_' . $index;
+                    $placeholders[] = ':' . $name;
+                    $parameters[$name] = $excludedId;
+                }
+                $excludeSql = ' AND id NOT IN (' . implode(', ', $placeholders) . ')';
+            }
+
+            $statement = $pdo->prepare(
+                "SELECT id
+                 FROM tickets_productos_correos
+                 WHERE (
+                        status = 'PENDIENTE'
+                        OR (status = 'ERROR' AND intentos < max_intentos)
+                 )
+                 {$excludeSql}
+                 ORDER BY created_at ASC, id ASC
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $statement->execute($parameters);
+            $id = $statement->fetchColumn();
+
+            if ($id === false) {
+                $pdo->commit();
+                return null;
+            }
+
+            $update = $pdo->prepare(
+                "UPDATE tickets_productos_correos
+                 SET status = 'ENVIANDO',
+                     intentos = intentos + 1,
+                     ultimo_intento_at = CURRENT_TIMESTAMP,
+                     enviado_at = NULL,
+                     error_mensaje_seguro = NULL
+                 WHERE id = :id
+                   AND (
+                        status = 'PENDIENTE'
+                        OR (status = 'ERROR' AND intentos < max_intentos)
+                   )"
+            );
+            $update->execute(['id' => (int) $id]);
+
+            if ($update->rowCount() !== 1) {
+                $pdo->rollBack();
+                return null;
+            }
+
+            $row = $this->findById((int) $id);
+            $pdo->commit();
+
+            return $row;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function markClaimSent(int $id): array
+    {
+        $statement = $this->pdo()->prepare(
+            "UPDATE tickets_productos_correos
+             SET status = 'ENVIADO',
+                 enviado_at = CURRENT_TIMESTAMP,
+                 error_mensaje_seguro = NULL
+             WHERE id = :id
+               AND status = 'ENVIANDO'"
+        );
+        $statement->execute(['id' => $id]);
+
+        if ($statement->rowCount() !== 1) {
+            throw new \RuntimeException('Claimed mail could not be marked as sent.');
+        }
+
+        return $this->findById($id);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function markClaimError(int $id, string $safeMessage): array
+    {
+        $statement = $this->pdo()->prepare(
+            "UPDATE tickets_productos_correos
+             SET status = 'ERROR',
+                 enviado_at = NULL,
+                 error_mensaje_seguro = :error_mensaje_seguro
+             WHERE id = :id
+               AND status = 'ENVIANDO'"
+        );
+        $statement->execute([
+            'id' => $id,
+            'error_mensaje_seguro' => $safeMessage,
+        ]);
+
+        if ($statement->rowCount() !== 1) {
+            throw new \RuntimeException('Claimed mail could not be marked as failed.');
+        }
+
+        return $this->findById($id);
+    }
+
+    public function recoverStale(int $minutes, string $safeMessage): int
+    {
+        if ($minutes < 1 || $minutes > 1440) {
+            throw new \RuntimeException('Invalid stale mail threshold.');
+        }
+
+        $statement = $this->pdo()->prepare(
+            "UPDATE tickets_productos_correos
+             SET status = 'ERROR',
+                 enviado_at = NULL,
+                 error_mensaje_seguro = :error_mensaje_seguro
+             WHERE status = 'ENVIANDO'
+               AND ultimo_intento_at IS NOT NULL
+               AND ultimo_intento_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL {$minutes} MINUTE)"
+        );
+        $statement->bindValue('error_mensaje_seguro', $safeMessage);
+        $statement->execute();
+
+        return $statement->rowCount();
+    }
+
+    /** @return array<string, mixed> */
+    public function findOutboxById(int $id): array
+    {
+        return $this->findById($id);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function markSent(int $id): array

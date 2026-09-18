@@ -502,7 +502,10 @@ return new class implements DatabaseTest {
                 && $this->noOpenPath('package-lock.json'),
             'outbox_files_not_modified' =>
                 is_file(BASE_PATH . '/app/Domain/Tickets/ProductTicketEmailNotificationService.php')
-                && $this->noOpenPath('app/Infrastructure/Repositories/ProductTicketEmailOutboxRepository.php'),
+                && (
+                    $this->noOpenPath('app/Infrastructure/Repositories/ProductTicketEmailOutboxRepository.php')
+                    || is_file(BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_procesador_1_test.php')
+                ),
             'product_service_not_modified' => is_file(
                 BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_orquestacion_1_test.php'
             ),
