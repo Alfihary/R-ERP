@@ -88,6 +88,7 @@ final class MailConfigurationController
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
             'pageTitle' => 'Configuración de correo',
+            'stylesheets' => ['/css/modules/mail-configuration.css'],
             'user' => $user,
         ]), $status);
     }

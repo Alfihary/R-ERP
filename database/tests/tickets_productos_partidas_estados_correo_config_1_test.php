@@ -56,12 +56,14 @@ return new class implements DatabaseTest {
         $runner = new MigrationRunner($pdo);
         $migrationState = $runner->migrate($migration);
         $seed->run($pdo);
+        $seed->run($pdo);
         $countsBefore = $this->operationalCounts();
         $results = [];
 
         try {
             $pdo->beginTransaction();
             $fixture = $this->fixture();
+            $unauthorizedFixture = $this->unauthorizedFixture();
             $service = $this->service();
 
             $accountId = $service->saveAccount([
@@ -125,6 +127,20 @@ return new class implements DatabaseTest {
                 ],
             ]));
             $missingCsrf = $router->dispatch(new Request('POST', '/admin/correo/cuentas', [], []));
+            [, $unauthorizedCsrf, $unauthorizedRouter] = $this->stack($unauthorizedFixture);
+            $unauthorizedIndex = $unauthorizedRouter->dispatch(
+                new Request('GET', '/admin/correo')
+            );
+            $unauthorizedAccountPost = $unauthorizedRouter->dispatch(
+                new Request('POST', '/admin/correo/cuentas', [], [
+                    '_token' => $unauthorizedCsrf->token(),
+                ])
+            );
+            $unauthorizedRulesPost = $unauthorizedRouter->dispatch(
+                new Request('POST', '/admin/correo/reglas', [], [
+                    '_token' => $unauthorizedCsrf->token(),
+                ])
+            );
             [$guestAuth, $guestCsrf, $guestRouter] = $this->stack($fixture, false);
             $guest = $guestRouter->dispatch(new Request('GET', '/admin/correo'));
 
@@ -137,8 +153,20 @@ return new class implements DatabaseTest {
             $routes = $this->read('routes/web.php');
             $bootstrap = $this->read('bootstrap/app.php');
             $layout = $this->read('app/Views/layouts/app.php');
+            $mailCss = $this->read('public/css/modules/mail-configuration.css');
 
             $results = [
+                'permission_seed' => [
+                    'permission_active' => $this->permissionIsActive(
+                        MailConfigurationService::PERMISSION
+                    ),
+                    'admin_assignment_active' => $this->adminHasPermission(
+                        MailConfigurationService::PERMISSION
+                    ),
+                    'admin_assignment_idempotent' => $this->adminPermissionAssignments(
+                        MailConfigurationService::PERMISSION
+                    ) === 1,
+                ],
                 'schema' => $this->schemaCases($expectedDatabase),
                 'account' => [
                     'created' => $account !== null,
@@ -174,6 +202,11 @@ return new class implements DatabaseTest {
                     'save_rules_redirect' => $saveRules->status() === 302,
                     'missing_csrf_419' => $missingCsrf->status() === 419,
                     'guest_redirects_to_login' => $guest->status() === 302,
+                    'unauthorized_get_403' => $unauthorizedIndex->status() === 403,
+                    'unauthorized_account_post_403' =>
+                        $unauthorizedAccountPost->status() === 403,
+                    'unauthorized_rules_post_403' =>
+                        $unauthorizedRulesPost->status() === 403,
                     'layout_erp_present' => str_contains($index->body(), 'class="app-sidebar"')
                         && str_contains($index->body(), 'class="app-topbar"'),
                     'secret_value_not_rendered' => !str_contains($index->body(), 'super-secret')
@@ -192,6 +225,18 @@ return new class implements DatabaseTest {
                     ]),
                     'bootstrap_registers_controller' => str_contains($bootstrap, 'MailConfigurationController'),
                     'layout_has_navigation_flag' => str_contains($layout, 'canAccessMailConfiguration'),
+                    'controller_loads_local_css' => str_contains(
+                        $controller,
+                        "'stylesheets' => ['/css/modules/mail-configuration.css']"
+                    ),
+                    'mail_css_is_local_and_responsive' => $mailCss !== ''
+                        && str_contains($mailCss, '.mail-config-page')
+                        && str_contains($mailCss, '@media (max-width: 48rem)')
+                        && !str_contains($mailCss, '@import')
+                        && !str_contains($mailCss, 'http://')
+                        && !str_contains($mailCss, 'https://'),
+                    'view_has_no_inline_css_or_js' => !str_contains($view, '<style')
+                        && !str_contains($view, '<script'),
                     'repository_uses_prepared_statements' => str_contains($repositoryFile, 'prepare('),
                     'view_escapes_output' => str_contains($view, '<?= e('),
                     'no_secret_output' => !$this->containsAny($view . $controller . $repositoryFile, [
@@ -226,6 +271,9 @@ return new class implements DatabaseTest {
             'no_inventory_created' => $countsBefore['movimientos_inventario'] === $countsAfter['movimientos_inventario'],
             'no_purchase_created' => $countsBefore['compras'] === $countsAfter['compras'],
             'no_supplier_created' => $countsBefore['proveedores'] === $countsAfter['proveedores'],
+            'no_outbox_created' =>
+                $countsBefore['tickets_productos_correos']
+                === $countsAfter['tickets_productos_correos'],
         ];
 
         if (!$this->allTrue($results)) {
@@ -345,6 +393,50 @@ return new class implements DatabaseTest {
             'user_id' => $userId,
             'username' => 'qa_mail_config',
             'email' => 'qa.mail.config@example.test',
+        ];
+    }
+
+    /**
+     * @return array{user_id: int, username: string, email: string}
+     */
+    private function unauthorizedFixture(): array
+    {
+        $statement = $this->pdo->prepare(
+            <<<'SQL'
+            INSERT INTO usuarios (
+                username,
+                email,
+                password_hash,
+                activo
+            ) VALUES (
+                'qa_mail_config_denied',
+                'qa.mail.config.denied@example.test',
+                :password_hash,
+                1
+            )
+            SQL
+        );
+        $statement->execute(['password_hash' => self::PASSWORD_HASH]);
+        $userId = (int) $this->pdo->lastInsertId();
+
+        $statement = $this->pdo->prepare(
+            <<<'SQL'
+            INSERT INTO roles (codigo, nombre, descripcion, activo)
+            VALUES (
+                'QA_MAIL_CONFIG_DENIED',
+                'QA Mail Config Denied',
+                'Rol temporal QA sin permiso de correo',
+                1
+            )
+            SQL
+        );
+        $statement->execute();
+        $this->assignRole($userId, (int) $this->pdo->lastInsertId());
+
+        return [
+            'user_id' => $userId,
+            'username' => 'qa_mail_config_denied',
+            'email' => 'qa.mail.config.denied@example.test',
         ];
     }
 
@@ -481,6 +573,53 @@ return new class implements DatabaseTest {
         return (int) $id;
     }
 
+    private function permissionIsActive(string $code): bool
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COUNT(*)
+             FROM permisos
+             WHERE codigo = :codigo
+               AND es_sistema = 1
+               AND activo = 1
+               AND eliminado_en IS NULL'
+        );
+        $statement->execute(['codigo' => $code]);
+
+        return (int) $statement->fetchColumn() === 1;
+    }
+
+    private function adminHasPermission(string $code): bool
+    {
+        return $this->adminPermissionAssignments($code) === 1;
+    }
+
+    private function adminPermissionAssignments(string $code): int
+    {
+        $statement = $this->pdo->prepare(
+            <<<'SQL'
+            SELECT COUNT(*)
+            FROM rol_permisos rp
+            INNER JOIN roles r
+                ON r.id = rp.rol_id
+               AND r.codigo = 'ADMIN'
+               AND r.es_sistema = 1
+               AND r.activo = 1
+               AND r.eliminado_en IS NULL
+            INNER JOIN permisos p
+                ON p.id = rp.permiso_id
+               AND p.codigo = :codigo
+               AND p.es_sistema = 1
+               AND p.activo = 1
+               AND p.eliminado_en IS NULL
+            WHERE rp.activo = 1
+              AND rp.eliminado_en IS NULL
+            SQL
+        );
+        $statement->execute(['codigo' => $code]);
+
+        return (int) $statement->fetchColumn();
+    }
+
     /**
      * @return array<string, mixed>|null
      */
@@ -539,6 +678,7 @@ return new class implements DatabaseTest {
             'movimientos_inventario' => $this->countTable('movimientos_inventario'),
             'compras' => $this->countTable('compras'),
             'proveedores' => $this->countTable('proveedores'),
+            'tickets_productos_correos' => $this->countTable('tickets_productos_correos'),
         ];
     }
 
@@ -565,6 +705,9 @@ return new class implements DatabaseTest {
             'no_inventory_created' => $countsBefore['movimientos_inventario'] === $this->countTable('movimientos_inventario'),
             'no_purchase_created' => $countsBefore['compras'] === $this->countTable('compras'),
             'no_supplier_created' => $countsBefore['proveedores'] === $this->countTable('proveedores'),
+            'no_outbox_created' =>
+                $countsBefore['tickets_productos_correos']
+                === $this->countTable('tickets_productos_correos'),
             'ticket_runtime_service_not_modified' => !str_contains($diff, $paths['ProductRequestTicketService.php'])
                 && is_file(BASE_PATH . '/app/Domain/Tickets/ProductTicketEmailNotificationService.php'),
             'outbox_service_not_modified' => !str_contains($diff, $paths['ProductTicketEmailOutboxService.php'])
