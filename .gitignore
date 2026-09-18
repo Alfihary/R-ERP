@@ -11,6 +11,7 @@
 .yarn/
 
 # Runtime and private storage
+/storage/private/
 /storage/uploads/*
 !/storage/uploads/.gitkeep
 /storage/logs/*
