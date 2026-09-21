@@ -13,7 +13,7 @@ use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 
 return new class implements DatabaseTest {
-    private const PRODUCT_ID = 'QAIMG001';
+    private const PRODUCT_ID = 'QAIMGTEST001';
     private const CREATE_NO_IMAGE_ID = 'QAIMGNOIMG';
     private const CREATE_IMAGE_ID = 'QAIMGCREATE';
     private const CREATE_INVALID_IMAGE_ID = 'QAIMGBADIMG';

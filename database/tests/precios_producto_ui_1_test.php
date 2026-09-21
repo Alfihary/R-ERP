@@ -73,11 +73,34 @@ return new class implements DatabaseTest {
                     'precio_minimo' => '',
                 ],
             ], false, true)['precios_iniciales'] === [],
+            'catalog_rows_without_amounts_ignored' =>
+                $this->normalizedRows([
+                    [
+                        'lista_precio_id' => $publicListId,
+                        'precio_lista' => '',
+                        'precio_minimo' => '',
+                    ],
+                ], false, true)['precios_iniciales'] === [],
+            'catalog_rows_with_null_amounts_ignored' =>
+                $this->normalizedRows([
+                    [
+                        'lista_precio_id' => $publicListId,
+                        'precio_lista' => null,
+                        'precio_minimo' => null,
+                    ],
+                ], false, true)['precios_iniciales'] === [],
             'partial_row_rejected' => $this->controllerFails([
                 [
                     'lista_precio_id' => $publicListId,
                     'precio_lista' => '10.0000',
                     'precio_minimo' => '',
+                ],
+            ], false, true),
+            'minimum_only_row_rejected' => $this->controllerFails([
+                [
+                    'lista_precio_id' => $publicListId,
+                    'precio_lista' => '',
+                    'precio_minimo' => '8.0000',
                 ],
             ], false, true),
             'duplicate_lists_rejected' => $this->controllerFails([
@@ -163,7 +186,7 @@ return new class implements DatabaseTest {
                     $mxnId,
                     $this->normalizedRows([
                         [
-                            'lista_precio_id' => '',
+                            'lista_precio_id' => $publicListId,
                             'precio_lista' => '',
                             'precio_minimo' => '',
                         ],
@@ -399,7 +422,12 @@ return new class implements DatabaseTest {
                 'form_declares_initial_section' =>
                     $this->fileContains(
                         'app/Views/products/form.php',
-                        'Precios iniciales'
+                        'Precios iniciales (opcional)'
+                    ),
+                'form_explains_deferred_price_configuration' =>
+                    $this->fileContains(
+                        'app/Views/products/form.php',
+                        'Puedes guardar el producto sin precios'
                     ),
                 'form_declares_current_prices' =>
                     $this->fileContains(

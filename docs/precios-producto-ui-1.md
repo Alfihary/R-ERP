@@ -27,7 +27,8 @@ menú nuevo, ventas ni autorizaciones funcionales.
 
 Reglas aplicadas:
 
-- filas totalmente vacías se ignoran;
+- filas sin importes se ignoran, aunque la UI envíe el identificador oculto de
+  la lista;
 - filas parciales se rechazan con mensaje visible;
 - listas duplicadas se rechazan;
 - si el usuario no tiene permiso de precios, los datos de precios se ignoran y
@@ -61,6 +62,12 @@ edición directa desde tabla.
 ```
 
 Si se captura al menos una fila, el producto debe tener `moneda_id`.
+
+La presencia de `lista_precio_id` por sí sola no inicia un precio: el
+formulario la envía como dato estructural de cada lista activa. Si
+`precio_lista` y `precio_minimo` llegan vacíos o `null`, la fila se omite y no
+se convierte en `0`. Si cualquiera de los dos importes tiene contenido, la
+fila se considera iniciada y se validan lista, precio de lista y precio mínimo.
 
 ## Estructura de `precios_cambio_moneda`
 
@@ -100,6 +107,8 @@ php database/precios-producto-ui.php db:test --database=r_erp_db_core_0_test --c
 Casos cubiertos:
 
 - crear producto sin precios desde input UI;
+- ignorar listas estructurales con importes vacíos o `null`;
+- confirmar que vacío no se convierte en cero;
 - crear producto con precios iniciales;
 - crear historial `CREACION`;
 - ignorar fila totalmente vacía;

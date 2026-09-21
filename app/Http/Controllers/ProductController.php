@@ -489,7 +489,7 @@ final class ProductController
             $listPrice = $this->trimmed($row['precio_lista'] ?? '');
             $minimumPrice = $this->trimmed($row['precio_minimo'] ?? '');
 
-            if ($listId === '' && $listPrice === '' && $minimumPrice === '') {
+            if ($listPrice === '' && $minimumPrice === '') {
                 continue;
             }
 

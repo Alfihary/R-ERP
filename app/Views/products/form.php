@@ -439,10 +439,11 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
 
     <?php if (!$editing && ($pricePermissions['create'] ?? false) === true): ?>
         <fieldset class="product-form-section">
-            <legend>Precios iniciales</legend>
+            <legend>Precios iniciales (opcional)</legend>
             <p class="product-form-section__help">
-                Opcional. Si capturas al menos un precio, el producto debe
-                tener moneda asignada. Las filas totalmente vacías se ignoran.
+                Puedes guardar el producto sin precios y configurarlos después.
+                Si capturas al menos un precio, el producto debe tener moneda
+                asignada y la fila debe estar completa.
             </p>
             <?php if ($priceLists === []): ?>
                 <p class="product-related-empty">No hay listas de precios activas.</p>
