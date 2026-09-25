@@ -5,6 +5,7 @@
     "license": "proprietary",
     "require": {
         "php": ">=8.2",
-        "phpmailer/phpmailer": "^6.12"
+        "phpmailer/phpmailer": "^6.12",
+        "openspout/openspout": "4.28.5"
     }
 }
