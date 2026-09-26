@@ -27,9 +27,12 @@ $notice = is_string($notice ?? null) ? $notice : null;
         </p>
     </div>
     <?php if (($abilities['crear'] ?? false) === true): ?>
-        <a class="button product-heading-action" href="/productos/crear">
-            Crear producto
-        </a>
+        <div class="product-heading-actions">
+            <a class="button button--secondary" href="/productos/importar">
+                Importar productos
+            </a>
+            <a class="button" href="/productos/crear">Crear producto</a>
+        </div>
     <?php endif; ?>
 </header>
 

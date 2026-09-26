@@ -8,6 +8,8 @@ use App\Core\Response;
 use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Products\Import\ProductImportBusinessValidator;
+use App\Domain\Products\Import\ProductImportPreviewService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
@@ -26,12 +28,17 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
 use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
+use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Import\PrivateProductImportPreviewStore;
+use App\Infrastructure\Import\ProductImportReader;
+use App\Infrastructure\Repositories\PdoProductImportBusinessLookup;
 
 return static function (
     Router $router,
@@ -1196,6 +1203,27 @@ return static function (
             new PermissionMiddleware($auth, $permissions, $permission),
         ]);
     };
+    $productImportDatabaseConfig = $config->get('database', []);
+    if (!is_array($productImportDatabaseConfig)) {
+        throw new RuntimeException('Product import database configuration is invalid.');
+    }
+    $productImportConnection = new ConnectionProvider($productImportDatabaseConfig);
+    $productImportController = new ProductImportController(
+        $config,
+        $auth,
+        $permissions,
+        $scopeContext,
+        $csrf,
+        new ProductImportPreviewService(
+            new ProductImportReader(),
+            new ProductImportBusinessValidator(
+                new PdoProductImportBusinessLookup($productImportConnection->pdo())
+            ),
+            new PrivateProductImportPreviewStore(
+                (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+            )
+        )
+    );
 
     $router->get(
         '/productos',
@@ -1207,6 +1235,24 @@ return static function (
         '/productos/crear',
         static fn (Request $request): Response =>
             $productController->createForm($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->get(
+        '/productos/importar',
+        static fn (Request $request): Response =>
+            $productImportController->index($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->post(
+        '/productos/importar/validar',
+        static fn (Request $request): Response =>
+            $productImportController->validateFile($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->post(
+        '/productos/importar/descartar',
+        static fn (Request $request): Response =>
+            $productImportController->discard($request),
         $productMiddleware('productos.crear')
     );
     $router->post(
