@@ -9,6 +9,8 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Products\Import\ProductImportConfirmationException;
+use App\Domain\Products\Import\ProductImportConfirmationService;
 use App\Domain\Products\Import\ProductImportPreviewException;
 use App\Domain\Products\Import\ProductImportPreviewService;
 use App\Domain\Security\PermissionService;
@@ -24,6 +26,7 @@ final class ProductImportController
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
         private readonly ProductImportPreviewService $previews,
+        private readonly ProductImportConfirmationService $confirmations,
     ) {
     }
 
@@ -47,7 +50,7 @@ final class ProductImportController
             }
         }
 
-        return $this->render($preview, $error, $this->notice($request), $status);
+        return $this->render($preview, null, $error, $this->notice($request), $status);
     }
 
     public function validateFile(Request $request): Response
@@ -63,7 +66,46 @@ final class ProductImportController
                 . rawurlencode((string) $preview['preview_id']),
             );
         } catch (ProductImportPreviewException $exception) {
-            return $this->render(null, $this->safeError($exception), null, $exception->httpStatus);
+            return $this->render(null, null, $this->safeError($exception), null, $exception->httpStatus);
+        }
+    }
+
+    public function confirm(Request $request): Response
+    {
+        $previewId = $request->input('preview_id');
+        if (!is_string($previewId)) {
+            return $this->render(
+                null,
+                null,
+                ['code' => 'invalid_preview_id', 'message' => 'La referencia del preview no es válida.'],
+                null,
+                422,
+            );
+        }
+
+        try {
+            $confirmation = $this->confirmations->confirm(
+                $previewId,
+                $this->user()['user_id'],
+                $this->sessionBinding(),
+            );
+            $preview = is_array($confirmation['preview'] ?? null)
+                ? $confirmation['preview']
+                : null;
+            $displayConfirmation = $confirmation;
+            unset($displayConfirmation['confirmation_token'], $displayConfirmation['preview']);
+            return $this->render($preview, $displayConfirmation, null, null, 200);
+        } catch (ProductImportConfirmationException $exception) {
+            if ($exception->httpStatus === 403 || $exception->httpStatus === 404) {
+                return $this->notFound();
+            }
+            return $this->render(
+                $exception->currentPreview,
+                null,
+                $this->safeConfirmationError($exception),
+                null,
+                $exception->httpStatus,
+            );
         }
     }
 
@@ -84,14 +126,24 @@ final class ProductImportController
             if ($exception->httpStatus === 403 || $exception->httpStatus === 404) {
                 return $this->notFound();
             }
-            return $this->render(null, $this->safeError($exception), null, $exception->httpStatus);
+            return $this->render(null, null, $this->safeError($exception), null, $exception->httpStatus);
         }
 
         return Response::redirect('/productos/importar?result=discarded');
     }
 
-    /** @param array<string, mixed>|null $preview @param array{code: string, message: string}|null $error */
-    private function render(?array $preview, ?array $error, ?string $notice, int $status): Response
+    /**
+     * @param array<string, mixed>|null $preview
+     * @param array<string, mixed>|null $confirmation
+     * @param array{code: string, message: string}|null $error
+     */
+    private function render(
+        ?array $preview,
+        ?array $confirmation,
+        ?array $error,
+        ?string $notice,
+        int $status,
+    ): Response
     {
         $user = $this->user();
         $context = $this->scopeContext->resolveForUser($user['user_id']);
@@ -105,6 +157,7 @@ final class ProductImportController
                 'error' => $error,
                 'notice' => $notice,
                 'preview' => $preview,
+                'confirmation' => $confirmation,
             ],
             'contentView' => 'products/import',
             'context' => $context->toArray(),
@@ -139,6 +192,12 @@ final class ProductImportController
 
     /** @return array{code: string, message: string} */
     private function safeError(ProductImportPreviewException $exception): array
+    {
+        return ['code' => $exception->errorCode, 'message' => $exception->getMessage()];
+    }
+
+    /** @return array{code: string, message: string} */
+    private function safeConfirmationError(ProductImportConfirmationException $exception): array
     {
         return ['code' => $exception->errorCode, 'message' => $exception->getMessage()];
     }

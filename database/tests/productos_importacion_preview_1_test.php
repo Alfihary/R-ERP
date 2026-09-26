@@ -9,6 +9,7 @@ use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Products\Import\ProductImportBusinessLookup;
 use App\Domain\Products\Import\ProductImportBusinessValidator;
+use App\Domain\Products\Import\ProductImportConfirmationService;
 use App\Domain\Products\Import\ProductImportPreviewException;
 use App\Domain\Products\Import\ProductImportPreviewService;
 use App\Domain\Scope\ScopeContextService;
@@ -236,7 +237,16 @@ return static function (PDO $pdo, Config $config, string $expectedDatabase): arr
             $permissions = new PermissionService(new PermissionRepository($provider));
             $scope = new ScopeContextService(new UserScopeService(new ScopeRepository($provider)), $session);
             $service = $this->service($this->temp . '/http');
-            $controller = new ProductImportController($this->config, $auth, $permissions, $scope, $csrf, $service);
+            $confirmationService = $this->confirmationService($this->temp . '/http-confirmation');
+            $controller = new ProductImportController(
+                $this->config,
+                $auth,
+                $permissions,
+                $scope,
+                $csrf,
+                $service,
+                $confirmationService,
+            );
             $router = new Router();
             $router->middleware(new CsrfMiddleware($csrf));
             $middleware = [
@@ -300,7 +310,33 @@ return static function (PDO $pdo, Config $config, string $expectedDatabase): arr
 
         private function service(string $root): ProductImportPreviewService
         {
-            $lookup = new class implements ProductImportBusinessLookup {
+            return new ProductImportPreviewService(
+                new ProductImportReader(),
+                new ProductImportBusinessValidator($this->lookup()),
+                new PrivateProductImportPreviewStore(
+                    $root,
+                    true,
+                    fn (): int => $this->now,
+                ),
+            );
+        }
+
+        private function confirmationService(string $root): ProductImportConfirmationService
+        {
+            return new ProductImportConfirmationService(
+                new ProductImportReader(),
+                new ProductImportBusinessValidator($this->lookup()),
+                new PrivateProductImportPreviewStore(
+                    $root,
+                    true,
+                    fn (): int => $this->now,
+                ),
+            );
+        }
+
+        private function lookup(): ProductImportBusinessLookup
+        {
+            return new class implements ProductImportBusinessLookup {
                 public function resolveCatalogs(array $codesByField): array
                 {
                     $result = [];
@@ -320,15 +356,6 @@ return static function (PDO $pdo, Config $config, string $expectedDatabase): arr
                 public function conflictingSkus(array $skus): array { return []; }
                 public function conflictingBarcodes(array $barcodes): array { return []; }
             };
-            return new ProductImportPreviewService(
-                new ProductImportReader(),
-                new ProductImportBusinessValidator($lookup),
-                new PrivateProductImportPreviewStore(
-                    $root,
-                    true,
-                    fn (): int => $this->now,
-                ),
-            );
         }
 
         /** @return array{user_id: int, username: string, email: string} */

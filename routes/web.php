@@ -8,6 +8,7 @@ use App\Core\Response;
 use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
+use App\Domain\Products\Import\ProductImportConfirmationService;
 use App\Domain\Products\Import\ProductImportBusinessValidator;
 use App\Domain\Products\Import\ProductImportPreviewService;
 use App\Domain\Security\PermissionService;
@@ -1208,6 +1209,13 @@ return static function (
         throw new RuntimeException('Product import database configuration is invalid.');
     }
     $productImportConnection = new ConnectionProvider($productImportDatabaseConfig);
+    $productImportReader = new ProductImportReader();
+    $productImportValidator = new ProductImportBusinessValidator(
+        new PdoProductImportBusinessLookup($productImportConnection->pdo())
+    );
+    $productImportStore = new PrivateProductImportPreviewStore(
+        (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+    );
     $productImportController = new ProductImportController(
         $config,
         $auth,
@@ -1215,14 +1223,15 @@ return static function (
         $scopeContext,
         $csrf,
         new ProductImportPreviewService(
-            new ProductImportReader(),
-            new ProductImportBusinessValidator(
-                new PdoProductImportBusinessLookup($productImportConnection->pdo())
-            ),
-            new PrivateProductImportPreviewStore(
-                (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
-            )
-        )
+            $productImportReader,
+            $productImportValidator,
+            $productImportStore,
+        ),
+        new ProductImportConfirmationService(
+            $productImportReader,
+            $productImportValidator,
+            $productImportStore,
+        ),
     );
 
     $router->get(
@@ -1253,6 +1262,12 @@ return static function (
         '/productos/importar/descartar',
         static fn (Request $request): Response =>
             $productImportController->discard($request),
+        $productMiddleware('productos.crear')
+    );
+    $router->post(
+        '/productos/importar/confirmar',
+        static fn (Request $request): Response =>
+            $productImportController->confirm($request),
         $productMiddleware('productos.crear')
     );
     $router->post(

@@ -107,9 +107,36 @@ final class PrivateProductImportPreviewStore implements ProductImportPreviewStor
     /** @return array<string, mixed> */
     public function readArtifact(string $previewId): array
     {
+        $artifact = $this->readMetadata($previewId);
+        try {
+            $uploadPath = $this->sourcePath($artifact);
+        } catch (ProductImportPreviewException $exception) {
+            if (in_array($exception->errorCode, ['preview_source_missing', 'preview_source_invalid'], true)) {
+                throw new ProductImportPreviewException(
+                    'preview_file_missing',
+                    'El archivo temporal del preview ya no está disponible.',
+                    410,
+                );
+            }
+            throw $exception;
+        }
+        $digest = hash_file('sha256', $uploadPath);
+        if (!is_string($digest) || !hash_equals((string) $artifact['sha256'], $digest)) {
+            throw new ProductImportPreviewException(
+                'preview_file_changed',
+                'El archivo temporal del preview cambió y ya no es válido.',
+                409,
+            );
+        }
+        return $artifact;
+    }
+
+    /** @return array<string, mixed> */
+    public function readMetadata(string $previewId): array
+    {
         $previewId = $this->validatedId($previewId);
         $path = $this->metadataPath($previewId);
-        if (!is_file($path)) {
+        if (!is_file($path) || is_link($path)) {
             throw new ProductImportPreviewException(
                 'preview_not_found',
                 'El preview solicitado no existe.',
@@ -134,29 +161,118 @@ final class PrivateProductImportPreviewStore implements ProductImportPreviewStor
             throw $this->corrupt();
         }
         $this->validateArtifactShape($artifact, $previewId);
-        $uploadPath = $this->pathForRelative((string) $artifact['stored_file'], true);
-        if (!is_file($uploadPath)) {
+        return $artifact;
+    }
+
+    /** @param array<string, mixed> $artifact */
+    public function sourcePath(array $artifact): string
+    {
+        $previewId = $this->validatedId($artifact['preview_id'] ?? null);
+        $this->validateArtifactShape($artifact, $previewId);
+        $candidate = $this->root . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, (string) $artifact['stored_file']);
+        if (is_link($candidate)) {
             throw new ProductImportPreviewException(
-                'preview_file_missing',
-                'El archivo temporal del preview ya no está disponible.',
-                410,
-            );
-        }
-        $digest = hash_file('sha256', $uploadPath);
-        if (!is_string($digest) || !hash_equals((string) $artifact['sha256'], $digest)) {
-            throw new ProductImportPreviewException(
-                'preview_file_changed',
-                'El archivo temporal del preview cambió y ya no es válido.',
+                'preview_source_invalid',
+                'El archivo privado del preview no es válido.',
                 409,
             );
         }
+        try {
+            $path = $this->pathForRelative((string) $artifact['stored_file'], true);
+        } catch (ProductImportPreviewException) {
+            throw new ProductImportPreviewException(
+                'preview_source_missing',
+                'El archivo privado del preview ya no está disponible.',
+                410,
+            );
+        }
+        $size = filesize($path);
+        if ($size === false || $size < 1 || $size > ProductImportLimits::MAX_FILE_BYTES) {
+            throw new ProductImportPreviewException(
+                'preview_source_invalid',
+                'El archivo privado del preview no tiene un tamaño permitido.',
+                409,
+            );
+        }
+        return $path;
+    }
+
+    /** @param array<string, mixed> $artifact */
+    public function replaceConfirmation(array $artifact): void
+    {
+        $token = $this->validatedConfirmationToken($artifact['confirmation_token'] ?? null);
+        $this->validateConfirmationShape($artifact, $token);
+        $this->ensureDirectories();
+        $previewId = (string) $artifact['preview_id'];
+        $lockPath = $this->root . DIRECTORY_SEPARATOR . 'locks'
+            . DIRECTORY_SEPARATOR . $previewId . '.lock';
+        if (is_link($lockPath)) {
+            throw new ProductImportPreviewException(
+                'confirmation_storage_unavailable',
+                'No fue posible asegurar el estado de confirmación.',
+                503,
+            );
+        }
+        $lock = fopen($lockPath, 'c+b');
+        if ($lock === false) {
+            throw new ProductImportPreviewException(
+                'confirmation_storage_unavailable',
+                'No fue posible asegurar el estado de confirmación.',
+                503,
+            );
+        }
+        @chmod($lockPath, 0600);
+        try {
+            if (!flock($lock, LOCK_EX)) {
+                throw new ProductImportPreviewException(
+                    'confirmation_storage_unavailable',
+                    'No fue posible asegurar el estado de confirmación.',
+                    503,
+                );
+            }
+            $this->discardConfirmationsForPreview($previewId, true);
+            $this->writeJsonAtomic(
+                $this->confirmationPath($token),
+                $artifact,
+                'confirmation_metadata_write_failed',
+                'No fue posible guardar la confirmación.',
+            );
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    public function readConfirmation(string $token): array
+    {
+        $token = $this->validatedConfirmationToken($token);
+        $path = $this->confirmationPath($token);
+        if (!is_file($path) || is_link($path)) {
+            throw new ProductImportPreviewException(
+                'confirmation_not_found',
+                'La confirmación solicitada no existe.',
+                404,
+            );
+        }
+        $artifact = $this->readJson($path, 'confirmation_metadata_corrupt');
+        $this->validateConfirmationShape($artifact, $token);
         return $artifact;
+    }
+
+    public function discardConfirmation(string $token): bool
+    {
+        $token = $this->validatedConfirmationToken($token);
+        $path = $this->confirmationPath($token);
+        return is_file($path) && @unlink($path);
     }
 
     public function discard(string $previewId): bool
     {
         $previewId = $this->validatedId($previewId);
         $removed = false;
+        $removed = $this->discardConfirmationsForPreview($previewId, false) > 0 || $removed;
         $metadata = $this->metadataPath($previewId);
         if (is_file($metadata)) {
             $removed = @unlink($metadata) || $removed;
@@ -177,26 +293,29 @@ final class PrivateProductImportPreviewStore implements ProductImportPreviewStor
 
     public function cleanupExpired(): int
     {
+        $this->ensureDirectories();
+        $removed = $this->cleanupConfirmations();
         $metadataDirectory = $this->root . DIRECTORY_SEPARATOR . 'metadata';
-        if (!is_dir($metadataDirectory)) {
-            return 0;
-        }
-        $removed = 0;
         foreach (glob($metadataDirectory . DIRECTORY_SEPARATOR . '*.json') ?: [] as $path) {
             $previewId = pathinfo($path, PATHINFO_FILENAME);
             if (preg_match(self::ID_PATTERN, $previewId) !== 1) {
                 continue;
             }
             $expired = true;
+            $corrupt = false;
             try {
                 $decoded = json_decode((string) file_get_contents($path), true, 64, JSON_THROW_ON_ERROR);
                 if (!is_array($decoded)) {
                     throw $this->corrupt();
                 }
                 $this->validateArtifactShape($decoded, $previewId);
-                $expired = (int) $decoded['expires_at'] < $this->now();
+                $expired = (int) $decoded['expires_at'] <= $this->now();
             } catch (\JsonException | ProductImportPreviewException) {
                 $expired = true;
+                $corrupt = true;
+            }
+            if ($expired && !$corrupt && $this->hasActiveConfirmation($previewId)) {
+                continue;
             }
             if ($expired && $this->discard($previewId)) {
                 ++$removed;
@@ -337,7 +456,13 @@ final class PrivateProductImportPreviewStore implements ProductImportPreviewStor
 
     private function ensureDirectories(): void
     {
-        foreach ([$this->root, $this->root . '/metadata', $this->root . '/uploads'] as $directory) {
+        foreach ([
+            $this->root,
+            $this->root . '/metadata',
+            $this->root . '/uploads',
+            $this->root . '/confirmations',
+            $this->root . '/locks',
+        ] as $directory) {
             if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
                 throw new ProductImportPreviewException('preview_storage_unavailable', 'No fue posible preparar el almacenamiento privado.');
             }
@@ -347,6 +472,223 @@ final class PrivateProductImportPreviewStore implements ProductImportPreviewStor
     private function corrupt(): ProductImportPreviewException
     {
         return new ProductImportPreviewException('preview_metadata_corrupt', 'El preview almacenado no es válido.', 422);
+    }
+
+    /** @param array<string, mixed> $artifact */
+    private function validateConfirmationShape(array $artifact, string $token): void
+    {
+        foreach ([
+            'status',
+            'confirmation_token',
+            'preview_id',
+            'session_binding',
+            'source_sha256',
+            'result_sha256',
+            'metadata_sha256',
+        ] as $field) {
+            if (!is_string($artifact[$field] ?? null) || $artifact[$field] === '') {
+                throw $this->confirmationCorrupt();
+            }
+        }
+        $createdAt = $artifact['created_at'] ?? null;
+        $expiresAt = $artifact['expires_at'] ?? null;
+        $usedAt = $artifact['used_at'] ?? null;
+        $totalRows = $artifact['total_rows'] ?? null;
+        $validRows = $artifact['valid_rows'] ?? null;
+        $invalidRows = $artifact['invalid_rows'] ?? null;
+        if (($artifact['schema_version'] ?? null) !== 1
+            || $artifact['status'] !== 'CONFIRMATION_READY'
+            || $artifact['confirmation_token'] !== $token
+            || preg_match(self::ID_PATTERN, $artifact['preview_id']) !== 1
+            || preg_match(self::ID_PATTERN, $artifact['session_binding']) !== 1
+            || preg_match(self::ID_PATTERN, $artifact['source_sha256']) !== 1
+            || preg_match(self::ID_PATTERN, $artifact['result_sha256']) !== 1
+            || preg_match(self::ID_PATTERN, $artifact['metadata_sha256']) !== 1
+            || (int) ($artifact['user_id'] ?? 0) < 1
+            || !is_int($createdAt)
+            || $createdAt < 1
+            || !is_int($expiresAt)
+            || $expiresAt !== $createdAt + 600
+            || ($usedAt !== null && (!is_int($usedAt) || $usedAt < $createdAt))
+            || !is_int($totalRows)
+            || !is_int($validRows)
+            || !is_int($invalidRows)
+            || $totalRows < 0
+            || $validRows !== $totalRows
+            || $invalidRows !== 0
+            || !is_bool($artifact['preview_totals_changed'] ?? null)
+            || !is_bool($artifact['preview_result_changed'] ?? null)
+            || !hash_equals($artifact['metadata_sha256'], $this->confirmationMetadataDigest($artifact))
+        ) {
+            throw $this->confirmationCorrupt();
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function readJson(string $path, string $errorCode): array
+    {
+        $size = filesize($path);
+        if ($size === false || $size < 2 || $size > self::MAX_ARTIFACT_BYTES) {
+            throw new ProductImportPreviewException($errorCode, 'La metadata privada no es válida.', 422);
+        }
+        try {
+            $artifact = json_decode((string) file_get_contents($path), true, 64, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new ProductImportPreviewException($errorCode, 'La metadata privada no es válida.', 422);
+        }
+        if (!is_array($artifact)) {
+            throw new ProductImportPreviewException($errorCode, 'La metadata privada no es válida.', 422);
+        }
+        return $artifact;
+    }
+
+    /** @param array<string, mixed> $artifact */
+    private function writeJsonAtomic(
+        string $path,
+        array $artifact,
+        string $errorCode,
+        string $message,
+    ): void {
+        $encoded = json_encode(
+            $artifact,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        );
+        if (strlen($encoded) > self::MAX_ARTIFACT_BYTES) {
+            throw new ProductImportPreviewException($errorCode, $message, 422);
+        }
+        $temporary = $path . '.tmp-' . bin2hex(random_bytes(8));
+        try {
+            if (file_put_contents($temporary, $encoded, LOCK_EX) === false) {
+                throw new ProductImportPreviewException($errorCode, $message, 503);
+            }
+            @chmod($temporary, 0600);
+            if (!rename($temporary, $path)) {
+                throw new ProductImportPreviewException($errorCode, $message, 503);
+            }
+        } finally {
+            if (is_file($temporary)) {
+                @unlink($temporary);
+            }
+        }
+    }
+
+    private function cleanupConfirmations(): int
+    {
+        $removed = 0;
+        foreach (glob($this->root . DIRECTORY_SEPARATOR . 'confirmations' . DIRECTORY_SEPARATOR . '*.json') ?: [] as $path) {
+            $token = pathinfo($path, PATHINFO_FILENAME);
+            if (preg_match(self::ID_PATTERN, $token) !== 1) {
+                continue;
+            }
+            $expired = true;
+            try {
+                $artifact = $this->readConfirmation($token);
+                $expired = (int) $artifact['expires_at'] <= $this->now();
+            } catch (ProductImportPreviewException) {
+                $expired = true;
+            }
+            if ($expired && @unlink($path)) {
+                ++$removed;
+            }
+        }
+        return $removed;
+    }
+
+    private function hasActiveConfirmation(string $previewId): bool
+    {
+        foreach (glob($this->root . DIRECTORY_SEPARATOR . 'confirmations' . DIRECTORY_SEPARATOR . '*.json') ?: [] as $path) {
+            $token = pathinfo($path, PATHINFO_FILENAME);
+            if (preg_match(self::ID_PATTERN, $token) !== 1) {
+                continue;
+            }
+            try {
+                $artifact = $this->readConfirmation($token);
+                if ($artifact['preview_id'] === $previewId
+                    && $artifact['used_at'] === null
+                    && (int) $artifact['expires_at'] > $this->now()
+                ) {
+                    return true;
+                }
+            } catch (ProductImportPreviewException) {
+                continue;
+            }
+        }
+        return false;
+    }
+
+    private function discardConfirmationsForPreview(string $previewId, bool $unusedOnly): int
+    {
+        $removed = 0;
+        foreach (glob($this->root . DIRECTORY_SEPARATOR . 'confirmations' . DIRECTORY_SEPARATOR . '*.json') ?: [] as $path) {
+            $token = pathinfo($path, PATHINFO_FILENAME);
+            if (preg_match(self::ID_PATTERN, $token) !== 1) {
+                continue;
+            }
+            try {
+                $artifact = $this->readConfirmation($token);
+            } catch (ProductImportPreviewException) {
+                continue;
+            }
+            if ($artifact['preview_id'] === $previewId
+                && (!$unusedOnly || $artifact['used_at'] === null)
+                && @unlink($path)
+            ) {
+                ++$removed;
+            }
+        }
+        return $removed;
+    }
+
+    private function validatedConfirmationToken(mixed $token): string
+    {
+        if (!is_string($token) || preg_match(self::ID_PATTERN, $token) !== 1) {
+            throw new ProductImportPreviewException(
+                'confirmation_not_found',
+                'La confirmación solicitada no existe.',
+                404,
+            );
+        }
+        return $token;
+    }
+
+    private function confirmationPath(string $token): string
+    {
+        return $this->root . DIRECTORY_SEPARATOR . 'confirmations'
+            . DIRECTORY_SEPARATOR . $token . '.json';
+    }
+
+    private function confirmationCorrupt(): ProductImportPreviewException
+    {
+        return new ProductImportPreviewException(
+            'confirmation_metadata_corrupt',
+            'La confirmación almacenada no es válida.',
+            422,
+        );
+    }
+
+    /** @param array<string, mixed> $artifact */
+    private function confirmationMetadataDigest(array $artifact): string
+    {
+        unset($artifact['metadata_sha256']);
+        return hash('sha256', json_encode(
+            $this->canonicalize($artifact),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR,
+        ));
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        if (array_is_list($value)) {
+            return array_map([$this, 'canonicalize'], $value);
+        }
+        ksort($value, SORT_STRING);
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalize($item);
+        }
+        return $value;
     }
 
     private function normalized(string $path): string

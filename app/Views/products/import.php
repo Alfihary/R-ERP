@@ -8,6 +8,7 @@ if (!$csrf instanceof CsrfTokenService) {
     throw new RuntimeException('Product import preview data is incomplete.');
 }
 $preview = is_array($preview ?? null) ? $preview : null;
+$confirmation = is_array($confirmation ?? null) ? $confirmation : null;
 $error = is_array($error ?? null) ? $error : null;
 $notice = is_string($notice ?? null) ? $notice : null;
 ?>
@@ -29,7 +30,7 @@ $notice = is_string($notice ?? null) ? $notice : null;
 
 <?php if ($error !== null): ?>
     <section class="product-import-alert product-import-alert--error" role="alert">
-        <strong>No fue posible generar el preview.</strong>
+        <strong>No fue posible completar la operación.</strong>
         <p><?= e((string) ($error['message'] ?? 'El archivo no es válido.')) ?></p>
         <small>Código: <?= e((string) ($error['code'] ?? 'preview_error')) ?></small>
     </section>
@@ -85,6 +86,34 @@ $notice = is_string($notice ?? null) ? $notice : null;
                 <?= $ready ? 'LISTO PARA IMPORTAR' : 'CON ERRORES' ?>
             </span>
         </div>
+
+        <?php if ($confirmation !== null): ?>
+            <section class="product-import-confirmation" role="status" aria-labelledby="confirmation-ready-title">
+                <div>
+                    <span class="product-import-status is-ready">CONFIRMATION_READY</span>
+                    <h3 id="confirmation-ready-title">Archivo revalidado correctamente</h3>
+                    <p>La importación está lista para ejecutarse en una fase posterior.</p>
+                </div>
+                <dl class="product-import-confirmation__details">
+                    <div>
+                        <dt>Total filas</dt>
+                        <dd><?= e((string) ($confirmation['total_rows'] ?? 0)) ?></dd>
+                    </div>
+                    <div>
+                        <dt>Filas válidas</dt>
+                        <dd><?= e((string) ($confirmation['valid_rows'] ?? 0)) ?></dd>
+                    </div>
+                    <div>
+                        <dt>Fuente validada</dt>
+                        <dd><code><?= e(substr((string) ($confirmation['source_sha256'] ?? ''), 0, 12)) ?>…</code></dd>
+                    </div>
+                    <div>
+                        <dt>Expira</dt>
+                        <dd><?= e(date('Y-m-d H:i:s', (int) ($confirmation['expires_at'] ?? 0))) ?></dd>
+                    </div>
+                </dl>
+            </section>
+        <?php endif; ?>
 
         <dl class="product-import-summary">
             <div><dt>Total filas</dt><dd><?= e((string) $total) ?></dd></div>
@@ -160,13 +189,22 @@ $notice = is_string($notice ?? null) ? $notice : null;
             </section>
         <?php endif; ?>
 
+        <?php if ($ready && $confirmation === null): ?>
+            <form method="post" action="/productos/importar/confirmar" class="product-import-confirm">
+                <?= csrf_field($csrf) ?>
+                <input type="hidden" name="preview_id" value="<?= e((string) ($preview['preview_id'] ?? '')) ?>">
+                <button class="button" type="submit">Confirmar importación</button>
+                <small>Esta acción solo revalida el archivo; todavía no crea productos.</small>
+            </form>
+        <?php endif; ?>
+
         <form method="post" action="/productos/importar/descartar" class="product-import-discard">
             <?= csrf_field($csrf) ?>
             <input type="hidden" name="preview_id" value="<?= e((string) ($preview['preview_id'] ?? '')) ?>">
             <button class="button button--secondary" type="submit">Descartar preview</button>
         </form>
         <p class="product-import-no-confirm">
-            La importación definitiva todavía no está habilitada.
+            La ejecución definitiva todavía no está habilitada.
         </p>
     </section>
 <?php endif; ?>
