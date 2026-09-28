@@ -37,7 +37,7 @@ return static function (): array {
         'phpmailer_smtp_available' => class_exists(SMTP::class),
         'php_constraint_is_php_82' => ($composerJson['require']['php'] ?? null) === '>=8.2',
         'phpmailer_constraint_is_stable_6x' => ($composerJson['require']['phpmailer/phpmailer'] ?? null) === '^6.12',
-        'only_phpmailer_package_locked' => $packageNames === ['phpmailer/phpmailer'],
+        'phpmailer_package_present' => in_array('phpmailer/phpmailer', $packageNames, true),
         'phpmailer_version_detectable' => InstalledVersions::isInstalled('phpmailer/phpmailer')
             && InstalledVersions::getPrettyVersion('phpmailer/phpmailer') === 'v6.12.0',
     ];
