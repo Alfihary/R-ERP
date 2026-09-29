@@ -5,6 +5,9 @@ declare(strict_types=1);
 $message = is_array($message ?? null) ? $message : [];
 $recipients = is_array($message['recipients'] ?? null) ? $message['recipients'] : [];
 $status = (string) ($message['status'] ?? '');
+$canRetry = ($canRetry ?? false) === true;
+$canCancel = ($canCancel ?? false) === true;
+$actionNotice = is_array($actionNotice ?? null) ? $actionNotice : null;
 $statusMeta = [
     'PENDIENTE' => ['label' => 'Pendiente', 'class' => 'is-pending', 'symbol' => '○'],
     'ENVIANDO' => ['label' => 'Enviando', 'class' => 'is-sending', 'symbol' => '↻'],
@@ -25,10 +28,16 @@ $dateFields = [
         <div>
             <p class="eyebrow">Configuración / Correo / Cola</p>
             <h1>Mensaje #<?= e($message['id'] ?? '') ?></h1>
-            <p>Detalle técnico read-only. El HTML se muestra como texto escapado y nunca se ejecuta.</p>
+            <p>Detalle técnico y acciones administrativas controladas. El HTML se muestra escapado y nunca se ejecuta.</p>
         </div>
         <a class="button button--secondary" href="/admin/correo/cola">Volver a la cola</a>
     </header>
+
+    <?php if ($actionNotice !== null): ?>
+        <div class="alert alert--<?= e($actionNotice['type'] ?? 'warning') ?>" role="status">
+            <?= e($actionNotice['message'] ?? '') ?>
+        </div>
+    <?php endif; ?>
 
     <section class="mail-outbox-detail__hero">
         <div>
@@ -48,6 +57,50 @@ $dateFields = [
         <div class="alert alert--danger" role="status">
             <strong>Error seguro:</strong> <?= e($message['error_mensaje_seguro']) ?>
         </div>
+    <?php endif; ?>
+
+    <?php if ($canRetry || $canCancel || $status === 'ENVIANDO' || ($status === 'ERROR' && (int) ($message['intentos'] ?? 0) >= (int) ($message['max_intentos'] ?? 0))): ?>
+        <section class="mail-outbox-panel mail-outbox-actions" aria-labelledby="mail-outbox-actions-title">
+            <header>
+                <div>
+                    <h2 id="mail-outbox-actions-title">Acciones administrativas</h2>
+                    <p>Las acciones cambian únicamente la cola; nunca envían SMTP desde esta pantalla.</p>
+                </div>
+            </header>
+
+            <?php if ($status === 'ENVIANDO'): ?>
+                <div class="alert alert--warning">Procesamiento en curso. No hay acciones manuales disponibles.</div>
+            <?php elseif ($status === 'ERROR' && (int) ($message['intentos'] ?? 0) >= (int) ($message['max_intentos'] ?? 0)): ?>
+                <div class="alert alert--warning">Máximo de intentos alcanzado. El mensaje no puede reintentarse.</div>
+            <?php endif; ?>
+
+            <div class="mail-outbox-actions__grid">
+                <?php if ($canRetry): ?>
+                    <form method="post" action="/admin/correo/cola/reintentar" class="mail-outbox-action-card">
+                        <?= csrf_field($csrf) ?>
+                        <input type="hidden" name="id" value="<?= e($message['id'] ?? '') ?>">
+                        <div>
+                            <h3>Reintentar procesamiento</h3>
+                            <p>Devuelve el mensaje a pendiente sin reiniciar intentos. Se procesará posteriormente.</p>
+                        </div>
+                        <button class="button button--secondary" type="submit">Reintentar</button>
+                    </form>
+                <?php endif; ?>
+
+                <?php if ($canCancel): ?>
+                    <form method="post" action="/admin/correo/cola/cancelar" class="mail-outbox-action-card mail-outbox-action-card--cancel">
+                        <?= csrf_field($csrf) ?>
+                        <input type="hidden" name="id" value="<?= e($message['id'] ?? '') ?>">
+                        <div class="field">
+                            <label for="mail-cancel-reason">Motivo de cancelación</label>
+                            <textarea id="mail-cancel-reason" name="motivo" rows="3" maxlength="300" required></textarea>
+                            <small>Obligatorio, máximo 300 caracteres. Quedará registrado en auditoría.</small>
+                        </div>
+                        <button class="button button--secondary mail-outbox-cancel-button" type="submit">Cancelar mensaje</button>
+                    </form>
+                <?php endif; ?>
+            </div>
+        </section>
     <?php endif; ?>
 
     <div class="mail-outbox-detail__grid">

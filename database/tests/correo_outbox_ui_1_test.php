@@ -125,7 +125,7 @@ return new class implements DatabaseTest {
                     && str_contains($invalidFilterResponse->body(), 'Algunos filtros fueron ignorados.'),
                 'detail_200' => $detailResponse->status() === 200,
                 'missing_detail_404' => $missingResponse->status() === 404,
-                'get_routes_declared' => $this->routesAreReadOnly(),
+                'get_routes_declared' => $this->readOnlyRoutesRemainDeclared(),
             ];
 
             $results['query_contract'] = [
@@ -405,13 +405,12 @@ return new class implements DatabaseTest {
         )->status();
     }
 
-    private function routesAreReadOnly(): bool
+    private function readOnlyRoutesRemainDeclared(): bool
     {
         $routes = (string) file_get_contents(BASE_PATH . '/routes/web.php');
 
         return preg_match('/->get\s*\(\s*[\'\"]\/admin\/correo\/cola[\'\"]/', $routes) === 1
-            && preg_match('/->get\s*\(\s*[\'\"]\/admin\/correo\/cola\/detalle[\'\"]/', $routes) === 1
-            && preg_match('/->(?:post|put|patch|delete)\s*\(\s*[\'\"]\/admin\/correo\/cola/', $routes) !== 1;
+            && preg_match('/->get\s*\(\s*[\'\"]\/admin\/correo\/cola\/detalle[\'\"]/', $routes) === 1;
     }
 
     /** @param list<array<string,mixed>> $rows */

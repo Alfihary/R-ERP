@@ -554,6 +554,20 @@ return static function (
         static fn (Request $request): Response => $mailOutboxController->show($request),
         $mailOutboxBaseMiddleware
     );
+    $router->post(
+        '/admin/correo/cola/reintentar',
+        static fn (Request $request): Response => $mailOutboxController->retry($request),
+        array_merge($mailOutboxBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, MailOutboxController::RETRY_PERMISSION),
+        ])
+    );
+    $router->post(
+        '/admin/correo/cola/cancelar',
+        static fn (Request $request): Response => $mailOutboxController->cancel($request),
+        array_merge($mailOutboxBaseMiddleware, [
+            new PermissionMiddleware($auth, $permissions, MailOutboxController::CANCEL_PERMISSION),
+        ])
+    );
 
     $auditBaseMiddleware = [
         $authMiddleware,

@@ -339,6 +339,52 @@
     color: var(--color-muted);
 }
 
+.mail-outbox-actions__grid {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mail-outbox-action-card {
+    display: flex;
+    min-width: 0;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    padding: var(--space-4);
+    background: var(--color-surface);
+}
+
+.mail-outbox-action-card--cancel {
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.mail-outbox-action-card h3,
+.mail-outbox-action-card p {
+    margin: 0;
+}
+
+.mail-outbox-action-card p,
+.mail-outbox-action-card small {
+    color: var(--color-muted);
+}
+
+.mail-outbox-action-card p {
+    margin-top: var(--space-2);
+}
+
+.mail-outbox-action-card textarea {
+    resize: vertical;
+}
+
+.mail-outbox-cancel-button {
+    border-color: color-mix(in oklab, var(--color-danger) 55%, var(--color-line));
+    color: var(--color-danger);
+}
+
 .mail-message-source {
     max-width: 100%;
     max-height: 28rem;
@@ -390,7 +436,8 @@
     .mail-outbox-metrics,
     .mail-outbox-filters,
     .mail-outbox-detail__grid,
-    .mail-recipient-columns {
+    .mail-recipient-columns,
+    .mail-outbox-actions__grid {
         grid-template-columns: 1fr 1fr;
     }
 
@@ -470,7 +517,8 @@
     .mail-outbox-metrics,
     .mail-outbox-filters,
     .mail-outbox-detail__grid,
-    .mail-recipient-columns {
+    .mail-recipient-columns,
+    .mail-outbox-actions__grid {
         grid-template-columns: 1fr;
     }
 
@@ -493,6 +541,15 @@
         align-items: stretch;
         flex-direction: column;
         text-align: center;
+    }
+
+    .mail-outbox-action-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .mail-outbox-action-card .button {
+        width: 100%;
     }
 }
 

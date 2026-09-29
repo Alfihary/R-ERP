@@ -24,6 +24,7 @@ use App\Domain\Folios\FolioService;
 use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
 use App\Domain\Mail\MailConfigurationService;
+use App\Domain\Mail\MailOutboxActionService;
 use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
@@ -78,6 +79,7 @@ use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
 use App\Infrastructure\Repositories\MailConfigurationRepository;
 use App\Infrastructure\Repositories\MailOutboxQueryRepository;
+use App\Infrastructure\Repositories\MailOutboxActionRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
@@ -154,7 +156,8 @@ if (!is_array($databaseConfig)) {
 }
 
 $connection = new ConnectionProvider($databaseConfig);
-$audit = new AuditService(new AuditRepository($connection));
+$auditRepository = new AuditRepository($connection);
+$audit = new AuditService($auditRepository);
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
 $catalogs = new CatalogService(new CatalogRepository($connection));
@@ -390,7 +393,13 @@ $mailOutboxController = new MailOutboxController(
     $permissions,
     $scopeContext,
     $csrf,
-    new MailOutboxQueryRepository($connection)
+    new MailOutboxQueryRepository($connection),
+    new MailOutboxActionService(
+        $connection,
+        new MailOutboxActionRepository($connection),
+        $audit,
+        $auditRepository
+    )
 );
 $auditController = new AuditController(
     $config,

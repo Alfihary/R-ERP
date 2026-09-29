@@ -300,6 +300,7 @@ return new class implements DatabaseTest {
                     'database/seeds',
                     '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
                 ) === [
+                    'database/seeds/correo_outbox_acciones_retry_cancel_1_seed_permissions.php',
                     'database/seeds/correo_outbox_ui_1_seed_permissions.php',
                     'database/seeds/tp_partidas_estados_correo_config_1_seed_permissions.php',
                 ],

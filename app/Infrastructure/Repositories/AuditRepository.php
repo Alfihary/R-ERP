@@ -31,6 +31,61 @@ final class AuditRepository
             return;
         }
 
+        $this->insertRow(
+            $actorUserId,
+            $action,
+            $entity,
+            $entityId,
+            $result,
+            $ip,
+            $userAgent,
+            $metadata
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $metadata
+     */
+    public function insertRequired(
+        ?int $actorUserId,
+        string $action,
+        string $entity,
+        ?string $entityId,
+        string $result,
+        ?string $ip,
+        ?string $userAgent,
+        ?array $metadata
+    ): void {
+        if (!$this->tableExists()) {
+            throw new \RuntimeException('Required audit storage is unavailable.');
+        }
+
+        $this->insertRow(
+            $actorUserId,
+            $action,
+            $entity,
+            $entityId,
+            $result,
+            $ip,
+            $userAgent,
+            $metadata
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $metadata
+     */
+    private function insertRow(
+        ?int $actorUserId,
+        string $action,
+        string $entity,
+        ?string $entityId,
+        string $result,
+        ?string $ip,
+        ?string $userAgent,
+        ?array $metadata
+    ): void {
+
         $statement = $this->connection->pdo()->prepare(
             <<<'SQL'
             INSERT INTO auditoria_eventos (
