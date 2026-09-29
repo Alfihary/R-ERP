@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <title>Preview local · Ticket creado · R-ERP</title>
+    <!-- PREVIEW_MOCK_DATA_ONLY=true -->
+    <!-- LOCAL_STATIC_PREVIEW=true; RUNTIME_TEMPLATE=false; REAL_SMTP_TEST=false -->
+    <!-- PREVIEW_PALETTE: MAIL_PAGE_BACKGROUND=#E7EDF6; MAIL_NAVY=#0B2A4A; MAIL_BLUE=#14579B; MAIL_BLUE_BRIGHT=#0B78D1; MAIL_CYAN=#0D9EC4; MAIL_GREEN_ACCENT=#0A7A58; MAIL_AMBER=#9A5B00; MAIL_RED=#B42318; MAIL_SURFACE=#FFFFFF; MAIL_SURFACE_SOFT=#F4F7FB; MAIL_BORDER=#CBD7E6; MAIL_TEXT=#152238; MAIL_TEXT_SECONDARY=#465B74; MAIL_TEXT_MUTED=#64748B -->
+    <style>
+        html,
+        body {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            color: #152238;
+            background-color: #E7EDF6;
+            font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+            font-size: 16px;
+            line-height: 1.55;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
+        table {
+            border-spacing: 0;
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: 0;
+        }
+
+        a {
+            color: #14579B;
+        }
+
+        .preview-shell {
+            width: 100%;
+            background-color: #E7EDF6;
+        }
+
+        .preview-shell__cell {
+            padding: 24px 12px;
+        }
+
+        .mail-container {
+            width: 100%;
+            max-width: 720px;
+            margin: 0 auto;
+            overflow: hidden;
+            border: 1px solid #CBD7E6;
+            border-radius: 14px;
+            background-color: #FFFFFF;
+            box-shadow: 0 4px 8px rgba(11, 42, 74, 0.08);
+        }
+
+        .mail-header {
+            width: 100%;
+            color: #FFFFFF;
+            background-color: #0B2A4A;
+            background-image: linear-gradient(135deg, #0B2A4A 0%, #14579B 100%);
+        }
+
+        .mail-header__inner {
+            width: 100%;
+        }
+
+        .mail-header__copy,
+        .mail-header__identity {
+            vertical-align: middle;
+        }
+
+        .mail-header__copy {
+            width: 60%;
+            padding: 34px 22px 34px 36px;
+        }
+
+        .mail-header__identity {
+            width: 40%;
+            padding: 34px 36px 34px 18px;
+            text-align: right;
+        }
+
+        .mail-brand {
+            margin: 0 0 9px;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+
+        .mail-title {
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.15;
+        }
+
+        .mail-subtitle {
+            margin: 9px 0 0;
+            color: #FFFFFF;
+            font-size: 14px;
+            line-height: 1.45;
+            opacity: 0.88;
+        }
+
+        .mail-folio {
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 30px;
+            font-weight: 800;
+            line-height: 1.15;
+            overflow-wrap: anywhere;
+        }
+
+        .mail-status-wrap {
+            padding-top: 12px;
+        }
+
+        .mail-status {
+            display: inline-block;
+            border: 1px solid #8EDFF1;
+            border-radius: 999px;
+            padding: 6px 11px;
+            color: #FFFFFF;
+            background-color: #0D7898;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: 0.04em;
+        }
+
+        .mail-accent {
+            width: 100%;
+            height: 4px;
+            background-color: #0B78D1;
+            background-image: linear-gradient(90deg, #0B78D1 0%, #0D9EC4 54%, #0A7A58 100%);
+            font-size: 0;
+            line-height: 0;
+        }
+
+        .mail-body {
+            padding: 36px 40px 38px;
+        }
+
+        .mail-greeting {
+            margin: 0;
+            color: #152238;
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .mail-summary {
+            max-width: 620px;
+            margin: 10px 0 0;
+            color: #465B74;
+            font-size: 16px;
+            line-height: 1.55;
+        }
+
+        .mail-section {
+            width: 100%;
+            margin-top: 30px;
+        }
+
+        .mail-section__label {
+            width: 1%;
+            padding-right: 14px;
+            color: #465B74;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.3;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+        }
+
+        .mail-section__rule {
+            width: 99%;
+        }
+
+        .mail-section__rule-line {
+            height: 1px;
+            background-color: #CBD7E6;
+            font-size: 0;
+            line-height: 0;
+        }
+
+        .mail-card {
+            width: 100%;
+            margin-top: 16px;
+            overflow: hidden;
+            border: 1px solid #CBD7E6;
+            border-radius: 10px;
+            background-color: #F4F7FB;
+        }
+
+        .mail-card__rail {
+            width: 5px;
+            background-color: #0D9EC4;
+            font-size: 0;
+            line-height: 0;
+        }
+
+        .mail-card__content {
+            padding: 22px 22px 20px;
+        }
+
+        .mail-card__heading {
+            width: 100%;
+        }
+
+        .mail-card__title-cell {
+            width: 72%;
+            vertical-align: top;
+        }
+
+        .mail-card__badge-cell {
+            width: 28%;
+            padding-left: 14px;
+            vertical-align: top;
+            text-align: right;
+        }
+
+        .mail-card__title {
+            margin: 0;
+            color: #152238;
+            font-size: 21px;
+            font-weight: 700;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+
+        .mail-card__description {
+            margin: 7px 0 0;
+            color: #465B74;
+            font-size: 15px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+
+        .mail-item-badge {
+            display: inline-block;
+            border: 1px solid #8EDFF1;
+            border-radius: 999px;
+            padding: 6px 10px;
+            color: #075B76;
+            background-color: #E3F6FA;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+
+        .mail-grid {
+            width: 100%;
+            margin-top: 20px;
+            table-layout: fixed;
+            border-top: 1px solid #CBD7E6;
+            border-bottom: 1px solid #CBD7E6;
+            background-color: #FFFFFF;
+        }
+
+        .mail-grid__cell {
+            width: 33.333%;
+            padding: 15px 14px;
+            vertical-align: top;
+            border-right: 1px solid #CBD7E6;
+        }
+
+        .mail-grid__cell:last-child {
+            border-right: 0;
+        }
+
+        .mail-grid__label {
+            display: block;
+            margin: 0 0 5px;
+            color: #465B74;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.35;
+            letter-spacing: 0.045em;
+        }
+
+        .mail-grid__value {
+            display: block;
+            color: #152238;
+            font-size: 15px;
+            font-weight: 600;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .mail-response {
+            padding-top: 17px;
+            color: #465B74;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .mail-response strong {
+            color: #14579B;
+        }
+
+        .mail-notice {
+            width: 100%;
+            margin-top: 18px;
+            border: 1px solid #B8D8EE;
+            border-radius: 9px;
+            background-color: #ECF6FC;
+        }
+
+        .mail-notice__symbol,
+        .mail-notice__copy {
+            vertical-align: top;
+        }
+
+        .mail-notice__symbol {
+            width: 34px;
+            padding: 18px 0 18px 18px;
+            color: #14579B;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .mail-notice__copy {
+            padding: 16px 18px 16px 12px;
+            color: #465B74;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .mail-notice__copy strong {
+            color: #152238;
+        }
+
+        .mail-note {
+            width: 100%;
+            margin-top: 18px;
+            border: 1px solid #CBD7E6;
+            border-radius: 9px;
+            background-color: #F4F7FB;
+        }
+
+        .mail-note__accent {
+            width: 5px;
+            background-color: #14579B;
+            font-size: 0;
+            line-height: 0;
+        }
+
+        .mail-note__copy {
+            padding: 15px 17px;
+            color: #465B74;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .mail-note__copy strong {
+            color: #152238;
+        }
+
+        .mail-cta-wrap {
+            padding-top: 28px;
+            text-align: center;
+        }
+
+        .mail-cta {
+            display: inline-block;
+            min-width: 150px;
+            border-radius: 7px;
+            padding: 13px 22px;
+            color: #FFFFFF;
+            background-color: #14579B;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.25;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .mail-footer {
+            padding: 22px 28px 24px;
+            border-top: 1px solid #CBD7E6;
+            color: #465B74;
+            background-color: #F4F7FB;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .mail-footer strong {
+            color: #152238;
+        }
+
+        .mail-footer p {
+            margin: 0;
+        }
+
+        .mail-footer p + p {
+            margin-top: 4px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .preview-shell__cell {
+                padding: 10px 8px !important;
+            }
+
+            .mail-container {
+                border-radius: 10px !important;
+            }
+
+            .mail-header__copy,
+            .mail-header__identity,
+            .mail-card__title-cell,
+            .mail-card__badge-cell,
+            .mail-grid__cell {
+                display: block !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .mail-header__copy {
+                padding: 26px 22px 10px !important;
+            }
+
+            .mail-header__identity {
+                padding: 8px 22px 26px !important;
+                text-align: left !important;
+            }
+
+            .mail-title {
+                font-size: 27px !important;
+            }
+
+            .mail-folio {
+                font-size: 27px !important;
+            }
+
+            .mail-body {
+                padding: 26px 16px 30px !important;
+            }
+
+            .mail-greeting {
+                font-size: 21px !important;
+            }
+
+            .mail-card__content {
+                padding: 19px 16px 17px !important;
+            }
+
+            .mail-card__badge-cell {
+                padding: 12px 0 0 !important;
+                text-align: left !important;
+            }
+
+            .mail-grid {
+                table-layout: auto !important;
+            }
+
+            .mail-grid__cell {
+                border-right: 0 !important;
+                border-bottom: 1px solid #CBD7E6 !important;
+            }
+
+            .mail-grid__cell:last-child {
+                border-bottom: 0 !important;
+            }
+
+            .mail-notice__symbol {
+                width: 28px !important;
+                padding-left: 14px !important;
+            }
+
+            .mail-notice__copy {
+                padding-right: 14px !important;
+            }
+
+            .mail-cta-wrap {
+                padding-top: 24px !important;
+            }
+
+            .mail-cta {
+                display: block !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+            }
+
+            .mail-footer {
+                padding: 20px 18px 22px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- PREVIEW_MOCK_DATA_ONLY=true: no DB, repositories, outbox, secrets or SMTP. -->
+    <table class="preview-shell" role="presentation" width="100%" aria-label="Preview local de correo de ticket creado">
+        <tr>
+            <td class="preview-shell__cell" align="center">
+                <table class="mail-container" role="presentation" width="720">
+                    <tr>
+                        <td>
+                            <table class="mail-header" role="presentation" width="100%">
+                                <tr>
+                                    <td>
+                                        <table class="mail-header__inner" role="presentation" width="100%">
+                                            <tr>
+                                                <td class="mail-header__copy">
+                                                    <p class="mail-brand">ERP REFRIGERACIÓN</p>
+                                                    <h1 class="mail-title">Ticket creado</h1>
+                                                    <p class="mail-subtitle">Notificación automática del sistema</p>
+                                                </td>
+                                                <td class="mail-header__identity">
+                                                    <p class="mail-folio">GU-000014</p>
+                                                    <div class="mail-status-wrap">
+                                                        <span class="mail-status">EN REVISIÓN</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="mail-accent" aria-hidden="true">&nbsp;</td>
+                    </tr>
+                    <tr>
+                        <td class="mail-body">
+                            <p class="mail-greeting">Hola Rosalba,</p>
+                            <p class="mail-summary">Tu solicitud fue registrada correctamente y está pendiente de revisión.</p>
+
+                            <table class="mail-section" role="presentation" width="100%">
+                                <tr>
+                                    <td class="mail-section__label">PARTIDAS DEL TICKET</td>
+                                    <td class="mail-section__rule">
+                                        <div class="mail-section__rule-line" aria-hidden="true">&nbsp;</div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table class="mail-card" role="presentation" width="100%">
+                                <tr>
+                                    <td class="mail-card__rail" aria-hidden="true">&nbsp;</td>
+                                    <td class="mail-card__content">
+                                        <table class="mail-card__heading" role="presentation" width="100%">
+                                            <tr>
+                                                <td class="mail-card__title-cell">
+                                                    <h2 class="mail-card__title">MBZXH451M6C</h2>
+                                                    <p class="mail-card__description">UNIDAD COND COMP SCROLLEXT 4.5 HP R-404A 208-230/3/60</p>
+                                                </td>
+                                                <td class="mail-card__badge-cell">
+                                                    <span class="mail-item-badge">Partida registrada</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <table class="mail-grid" role="presentation" width="100%">
+                                            <tr>
+                                                <td class="mail-grid__cell">
+                                                    <span class="mail-grid__label">RESULTADO</span>
+                                                    <span class="mail-grid__value">En revisión</span>
+                                                </td>
+                                                <td class="mail-grid__cell">
+                                                    <span class="mail-grid__label">UNIDAD SAT SOLICITADA</span>
+                                                    <span class="mail-grid__value">H87 &middot; Pieza</span>
+                                                </td>
+                                                <td class="mail-grid__cell">
+                                                    <span class="mail-grid__label">CLAVE SAT SOLICITADA</span>
+                                                    <span class="mail-grid__value">40101704 &middot; Unidades de condensación</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <div class="mail-response">
+                                            <strong>Respuesta:</strong> Solicitud registrada correctamente.
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table class="mail-notice" role="presentation" width="100%">
+                                <tr>
+                                    <td class="mail-notice__symbol" aria-hidden="true">+</td>
+                                    <td class="mail-notice__copy">
+                                        <strong>Adjuntos</strong><br>
+                                        Este ticket tiene 1 archivo de soporte.<br>
+                                        Consulta el detalle del ticket para revisarlo.
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table class="mail-note" role="presentation" width="100%">
+                                <tr>
+                                    <td class="mail-note__accent" aria-hidden="true">&nbsp;</td>
+                                    <td class="mail-note__copy">
+                                        <strong>Nota</strong><br>
+                                        El ticket se encuentra registrado para seguimiento.
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <div class="mail-cta-wrap">
+                                <a class="mail-cta" href="#" aria-label="Ver ticket">Ver ticket</a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="mail-footer">
+                            <p><strong>SoporteGR ERP · Correo automático</strong></p>
+                            <p>Este mensaje informa sobre una operación registrada en el sistema.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
