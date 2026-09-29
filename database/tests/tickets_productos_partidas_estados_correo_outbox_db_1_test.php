@@ -354,10 +354,13 @@ return new class implements DatabaseTest {
             'enqueue_has_no_direct_file_links_or_paths' =>
                 !$this->containsSensitive((string) $ticketCreated['text'])
                 && !$this->containsSensitive((string) $ticketCreated['html']),
-            'mark_sent_without_sending' => (string) $sent['status'] === 'ENVIADO'
-                && $sent['enviado_at'] !== null,
-            'mark_error_uses_safe_message' => (string) $error['status'] === 'ERROR'
-                && (string) $error['error_mensaje_seguro'] === 'Error temporal seguro.',
+            'legacy_mark_sent_requires_claim_identity' => ($sent['result'] ?? null) === 'state_changed'
+                && (string) ($sent['row']['status'] ?? '') === (string) $lineApproved['status']
+                && ($sent['row']['enviado_at'] ?? null) === ($lineApproved['enviado_at'] ?? null),
+            'legacy_mark_error_requires_claim_identity' => ($error['result'] ?? null) === 'state_changed'
+                && (string) ($error['row']['status'] ?? '') === (string) $lineRejected['status']
+                && ($error['row']['error_mensaje_seguro'] ?? null)
+                    === ($lineRejected['error_mensaje_seguro'] ?? null),
             'mark_error_rejects_sensitive_message' => $this->fails(
                 fn () => $service->markError((int) $lineApproved['id'], 'DSN password token')
             ),

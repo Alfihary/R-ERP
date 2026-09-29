@@ -82,6 +82,10 @@ final class MailOutboxProcessor
     private function deliverClaimed(array $row): array
     {
         $id = (int) $row['id'];
+        $claim = $this->claimIdentity($row);
+        if ($claim === null) {
+            return ['id' => $id, 'status' => 'STATE_CHANGED', 'transition' => 'state_changed'];
+        }
 
         try {
             $account = $this->validatedAccount($this->configuration->primaryAccount());
@@ -95,28 +99,79 @@ final class MailOutboxProcessor
             unset($account['smtp_password']);
 
             if (($result['sent'] ?? false) === true) {
-                $sent = $this->outbox->markClaimSent($id);
+                $sent = $this->outbox->markClaimSent(
+                    $id,
+                    $claim['attempts'],
+                    $claim['last_attempt_at']
+                );
 
-                return ['id' => $id, 'status' => (string) $sent['status']];
+                return $this->transitionResponse($id, $sent);
             }
 
-            return $this->fail($id, $this->safeError((string) ($result['error_type'] ?? 'unexpected')));
+            return $this->fail(
+                $id,
+                $claim,
+                $this->safeError((string) ($result['error_type'] ?? 'unexpected'))
+            );
         } catch (Throwable $exception) {
             $safeMessage = $exception instanceof RuntimeException
                 && $exception->getMessage() === 'Configuración SMTP incompleta.'
                 ? $exception->getMessage()
                 : 'No fue posible enviar el correo.';
 
-            return $this->fail($id, $safeMessage);
+            return $this->fail($id, $claim, $safeMessage);
         }
     }
 
-    /** @return array{id:int,status:string,error:string} */
-    private function fail(int $id, string $safeMessage): array
+    /** @param array{attempts:int,last_attempt_at:string} $claim @return array<string,mixed> */
+    private function fail(int $id, array $claim, string $safeMessage): array
     {
-        $failed = $this->outbox->markClaimError($id, $safeMessage);
+        $failed = $this->outbox->markClaimError(
+            $id,
+            $safeMessage,
+            $claim['attempts'],
+            $claim['last_attempt_at']
+        );
+        $response = $this->transitionResponse($id, $failed);
+        if (($failed['result'] ?? '') === 'success') {
+            $response['error'] = $safeMessage;
+        }
 
-        return ['id' => $id, 'status' => (string) $failed['status'], 'error' => $safeMessage];
+        return $response;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array{attempts:int,last_attempt_at:string}|null
+     */
+    private function claimIdentity(array $row): ?array
+    {
+        $attempts = (int) ($row['intentos'] ?? 0);
+        $lastAttemptAt = (string) ($row['ultimo_intento_at'] ?? '');
+        if (
+            $attempts < 1
+            || preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/D', $lastAttemptAt) !== 1
+        ) {
+            return null;
+        }
+
+        return ['attempts' => $attempts, 'last_attempt_at' => $lastAttemptAt];
+    }
+
+    /**
+     * @param array{result:string,row:array<string,mixed>|null} $transition
+     * @return array<string,mixed>
+     */
+    private function transitionResponse(int $id, array $transition): array
+    {
+        $row = is_array($transition['row'] ?? null) ? $transition['row'] : null;
+        $result = (string) ($transition['result'] ?? 'state_changed');
+
+        return [
+            'id' => $id,
+            'status' => $row === null ? 'NO_ENCONTRADO' : (string) ($row['status'] ?? 'STATE_CHANGED'),
+            'transition' => $result,
+        ];
     }
 
     /** @param array<string, mixed>|null $account @return array<string, mixed> */

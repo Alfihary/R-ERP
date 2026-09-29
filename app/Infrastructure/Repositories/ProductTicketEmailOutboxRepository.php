@@ -253,50 +253,26 @@ final class ProductTicketEmailOutboxRepository
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{result:string,row:array<string,mixed>|null}
      */
-    public function markClaimSent(int $id): array
-    {
-        $statement = $this->pdo()->prepare(
-            "UPDATE tickets_productos_correos
-             SET status = 'ENVIADO',
-                 enviado_at = CURRENT_TIMESTAMP,
-                 error_mensaje_seguro = NULL
-             WHERE id = :id
-               AND status = 'ENVIANDO'"
-        );
-        $statement->execute(['id' => $id]);
-
-        if ($statement->rowCount() !== 1) {
-            throw new \RuntimeException('Claimed mail could not be marked as sent.');
-        }
-
-        return $this->findById($id);
+    public function markClaimSent(
+        int $id,
+        int $expectedAttempts,
+        string $expectedLastAttemptAt
+    ): array {
+        return $this->markSent($id, $expectedAttempts, $expectedLastAttemptAt);
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{result:string,row:array<string,mixed>|null}
      */
-    public function markClaimError(int $id, string $safeMessage): array
-    {
-        $statement = $this->pdo()->prepare(
-            "UPDATE tickets_productos_correos
-             SET status = 'ERROR',
-                 enviado_at = NULL,
-                 error_mensaje_seguro = :error_mensaje_seguro
-             WHERE id = :id
-               AND status = 'ENVIANDO'"
-        );
-        $statement->execute([
-            'id' => $id,
-            'error_mensaje_seguro' => $safeMessage,
-        ]);
-
-        if ($statement->rowCount() !== 1) {
-            throw new \RuntimeException('Claimed mail could not be marked as failed.');
-        }
-
-        return $this->findById($id);
+    public function markClaimError(
+        int $id,
+        string $safeMessage,
+        int $expectedAttempts,
+        string $expectedLastAttemptAt
+    ): array {
+        return $this->markError($id, $safeMessage, $expectedAttempts, $expectedLastAttemptAt);
     }
 
     public function recoverStale(int $minutes, string $safeMessage): int
@@ -327,49 +303,138 @@ final class ProductTicketEmailOutboxRepository
     }
 
     /**
-     * @return array<string, mixed>
+     * Finalizes only the exact claim identified by attempts and timestamp.
+     * Calls without claim identity are retained as safe, non-mutating legacy calls.
+     *
+     * @return array{result:string,row:array<string,mixed>|null}
      */
-    public function markSent(int $id): array
-    {
+    public function markSent(
+        int $id,
+        ?int $expectedAttempts = null,
+        ?string $expectedLastAttemptAt = null
+    ): array {
+        if (!$this->validClaimIdentity($id, $expectedAttempts, $expectedLastAttemptAt)) {
+            return $this->currentTransitionResult($id);
+        }
+
         $statement = $this->pdo()->prepare(
             "UPDATE tickets_productos_correos
              SET status = 'ENVIADO',
-                 intentos = intentos + 1,
-                 ultimo_intento_at = CURRENT_TIMESTAMP,
                  enviado_at = CURRENT_TIMESTAMP,
-                 error_mensaje_seguro = NULL
-             WHERE id = :id"
+                 error_mensaje_seguro = NULL,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id
+               AND status = 'ENVIANDO'
+               AND intentos = :expected_attempts
+               AND ultimo_intento_at = :expected_last_attempt_at"
         );
-        $statement->execute(['id' => $id]);
+        $statement->execute([
+            'id' => $id,
+            'expected_attempts' => $expectedAttempts,
+            'expected_last_attempt_at' => $expectedLastAttemptAt,
+        ]);
 
-        return $this->findById($id);
+        return $this->transitionResult($id, $statement->rowCount());
     }
 
     /**
-     * @return array<string, mixed>
+     * Fails only the exact claim identified by attempts and timestamp.
+     * Calls without claim identity are retained as safe, non-mutating legacy calls.
+     *
+     * @return array{result:string,row:array<string,mixed>|null}
      */
-    public function markError(int $id, string $safeMessage): array
-    {
+    public function markError(
+        int $id,
+        string $safeMessage,
+        ?int $expectedAttempts = null,
+        ?string $expectedLastAttemptAt = null
+    ): array {
+        $safeMessage = $this->safeErrorMessage($safeMessage);
+        if (!$this->validClaimIdentity($id, $expectedAttempts, $expectedLastAttemptAt)) {
+            return $this->currentTransitionResult($id);
+        }
+
         $statement = $this->pdo()->prepare(
             "UPDATE tickets_productos_correos
              SET status = 'ERROR',
-                 intentos = intentos + 1,
-                 ultimo_intento_at = CURRENT_TIMESTAMP,
-                 error_mensaje_seguro = :error_mensaje_seguro
-             WHERE id = :id"
+                 enviado_at = NULL,
+                 error_mensaje_seguro = :error_mensaje_seguro,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = :id
+               AND status = 'ENVIANDO'
+               AND intentos = :expected_attempts
+               AND ultimo_intento_at = :expected_last_attempt_at"
         );
         $statement->execute([
             'id' => $id,
             'error_mensaje_seguro' => $safeMessage,
+            'expected_attempts' => $expectedAttempts,
+            'expected_last_attempt_at' => $expectedLastAttemptAt,
         ]);
 
-        return $this->findById($id);
+        return $this->transitionResult($id, $statement->rowCount());
+    }
+
+    /** @return array{result:string,row:array<string,mixed>|null} */
+    private function transitionResult(int $id, int $affectedRows): array
+    {
+        $row = $this->findByIdOrNull($id);
+
+        return [
+            'result' => $affectedRows === 1 ? 'success' : ($row === null ? 'not_found' : 'state_changed'),
+            'row' => $row,
+        ];
+    }
+
+    /** @return array{result:string,row:array<string,mixed>|null} */
+    private function currentTransitionResult(int $id): array
+    {
+        $row = $this->findByIdOrNull($id);
+
+        return ['result' => $row === null ? 'not_found' : 'state_changed', 'row' => $row];
+    }
+
+    private function validClaimIdentity(
+        int $id,
+        ?int $expectedAttempts,
+        ?string $expectedLastAttemptAt
+    ): bool {
+        return $id > 0
+            && $expectedAttempts !== null
+            && $expectedAttempts > 0
+            && is_string($expectedLastAttemptAt)
+            && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/D', $expectedLastAttemptAt) === 1;
+    }
+
+    private function safeErrorMessage(string $message): string
+    {
+        $message = trim(str_replace(["\r", "\n"], ' ', $message));
+        if (
+            $message === ''
+            || mb_strlen($message, 'UTF-8') > 500
+            || preg_match('~password|secret|token|dsn|storage[\\\\/]private|[a-z]:[\\\\/]~i', $message) === 1
+        ) {
+            throw new \RuntimeException('Safe mail error message is required.');
+        }
+
+        return $message;
     }
 
     /**
      * @return array<string, mixed>
      */
     private function findById(int $id): array
+    {
+        $row = $this->findByIdOrNull($id);
+        if (!is_array($row)) {
+            throw new \RuntimeException('Ticket product email outbox row was not found.');
+        }
+
+        return $row;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findByIdOrNull(int $id): ?array
     {
         $statement = $this->pdo()->prepare(
             'SELECT *
@@ -380,11 +445,7 @@ final class ProductTicketEmailOutboxRepository
         $statement->execute(['id' => $id]);
         $row = $statement->fetch();
 
-        if (!is_array($row)) {
-            throw new \RuntimeException('Ticket product email outbox row was not found.');
-        }
-
-        return $row;
+        return is_array($row) ? $row : null;
     }
 
     private function pdo(): PDO

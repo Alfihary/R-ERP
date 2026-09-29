@@ -97,11 +97,17 @@ return new class implements DatabaseTest {
             $firstClaim = $repository->claimNextEligible();
             $secondClaim = $repository->claimNextEligible();
             $claimedRow = $repository->findOutboxById($claimId);
-            $repository->markClaimError($claimId, 'No fue posible enviar el correo.');
+            $repository->markClaimError(
+                $claimId,
+                'No fue posible enviar el correo.',
+                (int) ($firstClaim['intentos'] ?? 0),
+                (string) ($firstClaim['ultimo_intento_at'] ?? '')
+            );
 
             $staleId = $this->insertOutbox('ENVIANDO', 1, 1, null, '-20 minutes');
             $recovered = $processor->recoverStaleProcessing();
             $staleRow = $repository->findOutboxById($staleId);
+            $hardening = $this->hardeningCases($repository);
 
             $allPreviewIds = array_column($previewExcluded, 'id');
             $sourceChecks = $this->sourceChecks();
@@ -132,6 +138,7 @@ return new class implements DatabaseTest {
                     'stale_recovered' => $recovered === 1 && $staleRow['status'] === 'ERROR',
                     'stale_message_safe' => $staleRow['error_mensaje_seguro'] === 'Procesamiento anterior interrumpido.',
                 ],
+                'hardening' => $hardening,
                 'envelope' => [
                     'primary_to_kept' => ($message['to'][0] ?? null) === 'qa.primary@example.test',
                     'cc_json_to_used' => in_array('second@example.test', $message['to'] ?? [], true),
@@ -252,6 +259,177 @@ return new class implements DatabaseTest {
         }
 
         return $id;
+    }
+
+    /** @return array<string,bool> */
+    private function hardeningCases(ProductTicketEmailOutboxRepository $repository): array
+    {
+        $sentId = $this->insertOutbox('ENVIANDO', 1, 3, null, '-1 minute');
+        $sentClaim = $repository->findOutboxById($sentId);
+        $sentDedupe = (string) $sentClaim['dedupe_key'];
+        $sentAttemptAt = (string) $sentClaim['ultimo_intento_at'];
+        $sent = $repository->markClaimSent($sentId, 1, $sentAttemptAt);
+        $sentRow = $repository->findOutboxById($sentId);
+        $sentAt = $sentRow['enviado_at'];
+        $sentAgain = $repository->markClaimSent($sentId, 1, $sentAttemptAt);
+        $sentAgainRow = $repository->findOutboxById($sentId);
+
+        $sentRejected = [];
+        foreach ([
+            'pending' => ['PENDIENTE', 0, 3],
+            'error' => ['ERROR', 1, 3],
+            'sent' => ['ENVIADO', 1, 3],
+            'cancelled' => ['CANCELADO', 0, 3],
+        ] as $name => [$status, $attempts, $max]) {
+            $id = $this->insertOutbox($status, $attempts, $max);
+            $before = $repository->findOutboxById($id);
+            $result = $repository->markClaimSent($id, max(1, $attempts), '2026-01-01 00:00:00');
+            $after = $repository->findOutboxById($id);
+            $sentRejected[$name] = ($result['result'] ?? null) === 'state_changed'
+                && $before == $after;
+        }
+
+        $errorId = $this->insertOutbox('ENVIANDO', 2, 3, null, '-1 minute');
+        $errorClaim = $repository->findOutboxById($errorId);
+        $errorAttemptAt = (string) $errorClaim['ultimo_intento_at'];
+        $errorDedupe = (string) $errorClaim['dedupe_key'];
+        $error = $repository->markClaimError($errorId, 'Error temporal seguro.', 2, $errorAttemptAt);
+        $errorRow = $repository->findOutboxById($errorId);
+        $errorUpdatedAt = $errorRow['updated_at'];
+        $errorAgain = $repository->markClaimError($errorId, 'Otro error seguro.', 2, $errorAttemptAt);
+        $errorAgainRow = $repository->findOutboxById($errorId);
+
+        $errorRejected = [];
+        foreach ([
+            'pending' => ['PENDIENTE', 0, 3],
+            'error' => ['ERROR', 1, 3],
+            'sent' => ['ENVIADO', 1, 3],
+            'cancelled' => ['CANCELADO', 0, 3],
+        ] as $name => [$status, $attempts, $max]) {
+            $id = $this->insertOutbox($status, $attempts, $max);
+            $before = $repository->findOutboxById($id);
+            $result = $repository->markClaimError(
+                $id,
+                'Error temporal seguro.',
+                max(1, $attempts),
+                '2026-01-01 00:00:00'
+            );
+            $after = $repository->findOutboxById($id);
+            $errorRejected[$name] = ($result['result'] ?? null) === 'state_changed'
+                && $before == $after;
+        }
+
+        $sentWinsId = $this->insertOutbox('ENVIANDO', 1, 3, null, '-1 minute');
+        $sentWinsRow = $repository->findOutboxById($sentWinsId);
+        $sentWinsAt = (string) $sentWinsRow['ultimo_intento_at'];
+        $sentWins = $repository->markClaimSent($sentWinsId, 1, $sentWinsAt);
+        $lateError = $repository->markClaimError($sentWinsId, 'Error tardío seguro.', 1, $sentWinsAt);
+
+        $errorWinsId = $this->insertOutbox('ENVIANDO', 1, 3, null, '-1 minute');
+        $errorWinsRow = $repository->findOutboxById($errorWinsId);
+        $errorWinsAt = (string) $errorWinsRow['ultimo_intento_at'];
+        $errorWins = $repository->markClaimError($errorWinsId, 'Error primero seguro.', 1, $errorWinsAt);
+        $lateSent = $repository->markClaimSent($errorWinsId, 1, $errorWinsAt);
+
+        $staleId = $this->insertOutbox('ENVIANDO', 1, 3, null, '-20 minutes');
+        $claimA = $repository->findOutboxById($staleId);
+        $claimAAt = (string) $claimA['ultimo_intento_at'];
+        $staleRecovered = $repository->recoverStale(15, 'Procesamiento anterior interrumpido.');
+        $oldAfterRecovery = $repository->markClaimSent($staleId, 1, $claimAAt);
+
+        $excluded = array_values(array_filter(
+            $this->outboxIds,
+            static fn (int $id): bool => $id !== $staleId
+        ));
+        $claimB = $repository->claimNextEligible($excluded);
+        $oldSentOnNewClaim = $repository->markClaimSent($staleId, 1, $claimAAt);
+        $oldErrorOnNewClaim = $repository->markClaimError(
+            $staleId,
+            'Error tardío seguro.',
+            1,
+            $claimAAt
+        );
+        $newClaimSent = is_array($claimB)
+            ? $repository->markClaimSent(
+                $staleId,
+                (int) $claimB['intentos'],
+                (string) $claimB['ultimo_intento_at']
+            )
+            : ['result' => 'not_found', 'row' => null];
+
+        $missing = $repository->markClaimSent(2147483647, 1, '2026-01-01 00:00:00');
+        $legacyId = $this->insertOutbox('ENVIANDO', 1, 3, null, '-1 minute');
+        $legacyBefore = $repository->findOutboxById($legacyId);
+        $legacySent = $repository->markSent($legacyId);
+        $legacyError = $repository->markError($legacyId, 'Error seguro heredado.');
+        $legacyAfter = $repository->findOutboxById($legacyId);
+        $unsafeErrorRejected = $this->fails(
+            fn () => $repository->markClaimError(
+                $legacyId,
+                'DSN password secret token',
+                1,
+                (string) $legacyBefore['ultimo_intento_at']
+            )
+        );
+
+        return [
+            'mark_sent_sending_success' => ($sent['result'] ?? null) === 'success'
+                && $sentRow['status'] === 'ENVIADO',
+            'mark_sent_pending_rejected' => $sentRejected['pending'],
+            'mark_sent_error_rejected' => $sentRejected['error'],
+            'mark_sent_sent_rejected' => $sentRejected['sent'],
+            'mark_sent_cancelled_rejected' => $sentRejected['cancelled'],
+            'double_mark_sent_single_transition' => ($sentAgain['result'] ?? null) === 'state_changed'
+                && $sentAt !== null && $sentAgainRow['enviado_at'] === $sentAt,
+            'mark_error_sending_success' => ($error['result'] ?? null) === 'success'
+                && $errorRow['status'] === 'ERROR',
+            'mark_error_pending_rejected' => $errorRejected['pending'],
+            'mark_error_error_rejected' => $errorRejected['error'],
+            'mark_error_sent_rejected' => $errorRejected['sent'],
+            'mark_error_cancelled_rejected' => $errorRejected['cancelled'],
+            'double_mark_error_single_transition' => ($errorAgain['result'] ?? null) === 'state_changed'
+                && $errorAgainRow['error_mensaje_seguro'] === 'Error temporal seguro.'
+                && $errorAgainRow['updated_at'] === $errorUpdatedAt,
+            'sent_then_error_only_sent_wins' => ($sentWins['result'] ?? null) === 'success'
+                && ($lateError['result'] ?? null) === 'state_changed'
+                && $repository->findOutboxById($sentWinsId)['status'] === 'ENVIADO',
+            'error_then_sent_only_error_wins' => ($errorWins['result'] ?? null) === 'success'
+                && ($lateSent['result'] ?? null) === 'state_changed'
+                && $repository->findOutboxById($errorWinsId)['status'] === 'ERROR',
+            'attempts_not_incremented_on_finalize' => (int) $sentRow['intentos'] === 1
+                && (int) $errorRow['intentos'] === 2,
+            'dedupe_preserved' => $sentRow['dedupe_key'] === $sentDedupe
+                && $errorRow['dedupe_key'] === $errorDedupe,
+            'last_attempt_preserved' => $sentRow['ultimo_intento_at'] === $sentAttemptAt
+                && $errorRow['ultimo_intento_at'] === $errorAttemptAt,
+            'safe_error_only' => $errorRow['error_mensaje_seguro'] === 'Error temporal seguro.'
+                && $unsafeErrorRejected,
+            'sent_at_only_on_success' => $sentRow['enviado_at'] !== null
+                && $errorRow['enviado_at'] === null,
+            'row_count_zero_classified' => ($sentAgain['result'] ?? null) === 'state_changed'
+                && ($missing['result'] ?? null) === 'not_found',
+            'claim_a_correct' => (int) $claimA['intentos'] === 1 && $claimAAt !== '',
+            'claim_a_stale_rejected' => ($oldAfterRecovery['result'] ?? null) === 'state_changed',
+            'claim_b_new_accepted' => ($newClaimSent['result'] ?? null) === 'success'
+                && (int) ($claimB['intentos'] ?? 0) === 2,
+            'old_worker_cannot_close_new_claim' => ($oldSentOnNewClaim['result'] ?? null) === 'state_changed',
+            'old_worker_cannot_fail_new_claim' => ($oldErrorOnNewClaim['result'] ?? null) === 'state_changed',
+            'stale_recovery_happened' => $staleRecovered >= 1,
+            'legacy_calls_without_identity_are_safe' => ($legacySent['result'] ?? null) === 'state_changed'
+                && ($legacyError['result'] ?? null) === 'state_changed'
+                && $legacyBefore == $legacyAfter,
+        ];
+    }
+
+    private function fails(callable $operation): bool
+    {
+        try {
+            $operation();
+        } catch (Throwable) {
+            return true;
+        }
+
+        return false;
     }
 
     /** @return array<string,bool> */
