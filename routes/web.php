@@ -25,6 +25,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\MailConfigurationController;
+use App\Http\Controllers\MailOutboxController;
 use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
@@ -65,6 +66,7 @@ return static function (
     InventoryController $inventoryController,
     InventoryTransferController $inventoryTransferController,
     MailConfigurationController $mailConfigurationController,
+    MailOutboxController $mailOutboxController,
     AuditController $auditController,
     ProductRequestTicketController $productRequestTicketController
 ): void {
@@ -203,6 +205,9 @@ return static function (
             'configuracion.correo.administrar'
         ) || $permissions->allows(
             (int) ($user['user_id'] ?? 0),
+            MailOutboxController::PERMISSION
+        ) || $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
             AuditController::PERMISSION
         );
 
@@ -236,6 +241,10 @@ return static function (
             'canAccessMailConfiguration' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
                 'configuracion.correo.administrar'
+            ),
+            'canAccessMailOutbox' => $permissions->allows(
+                (int) ($user['user_id'] ?? 0),
+                MailOutboxController::PERMISSION
             ),
             'canAccessAudit' => $permissions->allows(
                 (int) ($user['user_id'] ?? 0),
@@ -528,6 +537,22 @@ return static function (
         static fn (Request $request): Response =>
             $mailConfigurationController->saveRules($request),
         $mailConfigurationBaseMiddleware
+    );
+
+    $mailOutboxBaseMiddleware = [
+        $authMiddleware,
+        new PermissionMiddleware($auth, $permissions, MailOutboxController::PERMISSION),
+    ];
+
+    $router->get(
+        '/admin/correo/cola',
+        static fn (Request $request): Response => $mailOutboxController->index($request),
+        $mailOutboxBaseMiddleware
+    );
+    $router->get(
+        '/admin/correo/cola/detalle',
+        static fn (Request $request): Response => $mailOutboxController->show($request),
+        $mailOutboxBaseMiddleware
     );
 
     $auditBaseMiddleware = [

@@ -269,11 +269,15 @@ return new class implements DatabaseTest {
             ),
             'existing_resend_permission_available_in_seed_or_db' =>
                 str_contains($seed, 'tickets_productos.correo.reenviar') || $permissionExists,
-            'no_new_mail_permission_declared' =>
+            'mail_permissions_remain_scoped' =>
                 !str_contains($seed, 'correos.')
                 && !str_contains($seed, 'notificaciones.')
                 && !str_contains($seed, 'tickets_productos.correo.enviar')
-                && !str_contains($seed, 'tickets_productos.correo.configurar'),
+                && !str_contains($seed, 'tickets_productos.correo.configurar')
+                && str_contains(
+                    $this->read('database/seeds/correo_outbox_ui_1_seed_permissions.php'),
+                    "private const CODE = 'correos.cola.ver'"
+                ),
         ];
     }
 
@@ -291,11 +295,12 @@ return new class implements DatabaseTest {
                     'database/migrations/tp_partidas_estados_correo_config_1_001_create_mail_configuration.php',
                     'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
                 ],
-            'no_seeds_created_for_mail_contract' =>
+            'only_authorized_mail_seeds_exist' =>
                 $this->relativeFiles(
                     'database/seeds',
                     '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
                 ) === [
+                    'database/seeds/correo_outbox_ui_1_seed_permissions.php',
                     'database/seeds/tp_partidas_estados_correo_config_1_seed_permissions.php',
                 ],
             'no_product_price_inventory_purchase_supplier_phase_marker' =>
@@ -344,9 +349,9 @@ return new class implements DatabaseTest {
 
         return [
             'mail_placeholder_visible' => str_contains($show, 'Correo electrónico'),
-            'mail_placeholder_keeps_future_runtime_copy' => str_contains(
+            'mail_placeholder_reflects_current_queue' => str_contains(
                 $show,
-                'El envío automático de correo se implementará en una fase posterior.'
+                'Las notificaciones de correo se gestionan mediante la cola administrativa de correo.'
             ),
             'future_events_still_listed' => $this->textContainsAll($show, [
                 'ticket creado',
@@ -356,7 +361,7 @@ return new class implements DatabaseTest {
                 'ticket cancelado',
             ]),
             'resend_action_still_disabled' => str_contains($show, 'ticket-products__disabled-action')
-                && str_contains($show, 'Reenvío de correo pendiente de fase posterior.'),
+                && str_contains($show, 'Reenvío manual no disponible.'),
             'placeholder_does_not_submit_mail' => !preg_match('/action="[^"]*(correo|email|mail)/i', $show),
         ];
     }

@@ -44,6 +44,7 @@ $canAccessConfigWarehouses = ($canAccessConfigWarehouses ?? false) === true;
 $canAccessConfigFolios = ($canAccessConfigFolios ?? false) === true;
 $canAccessPriceLists = ($canAccessPriceLists ?? false) === true;
 $canAccessMailConfiguration = ($canAccessMailConfiguration ?? false) === true;
+$canAccessMailOutbox = ($canAccessMailOutbox ?? false) === true;
 $canAccessAudit = ($canAccessAudit ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
@@ -266,6 +267,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     >
                         <span aria-hidden="true">@</span>
                         Correo
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessMailOutbox): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'mail-outbox' ? ' is-active' : '' ?>"
+                        href="/admin/correo/cola"
+                        <?= $activeNavigation === 'mail-outbox' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">✉</span>
+                        Cola de correo
                     </a>
                 <?php endif; ?>
                 <?php if ($canAccessAudit): ?>

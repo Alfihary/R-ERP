@@ -83,6 +83,10 @@ final class MailConfigurationController
                 'configuracion.folios.acceder'
             ),
             'canAccessMailConfiguration' => true,
+            'canAccessMailOutbox' => $this->permissions->allows(
+                $user['user_id'],
+                MailOutboxController::PERMISSION
+            ),
             'contentData' => $data,
             'contentView' => 'admin/mail/index',
             'context' => $context->toArray(),

@@ -53,6 +53,7 @@ use App\Http\Controllers\FolioSeriesController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryTransferController;
 use App\Http\Controllers\MailConfigurationController;
+use App\Http\Controllers\MailOutboxController;
 use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
@@ -76,6 +77,7 @@ use App\Infrastructure\Repositories\FolioSeriesRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
 use App\Infrastructure\Repositories\MailConfigurationRepository;
+use App\Infrastructure\Repositories\MailOutboxQueryRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
@@ -382,6 +384,14 @@ $mailConfigurationController = new MailConfigurationController(
     $csrf,
     $mailConfiguration
 );
+$mailOutboxController = new MailOutboxController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    new MailOutboxQueryRepository($connection)
+);
 $auditController = new AuditController(
     $config,
     $auth,
@@ -430,6 +440,7 @@ $registerRoutes(
     $inventoryController,
     $inventoryTransferController,
     $mailConfigurationController,
+    $mailOutboxController,
     $auditController,
     $productRequestTicketController
 );

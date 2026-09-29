@@ -577,14 +577,14 @@ foreach ($adjuntos as $adjunto) {
         <section class="home-section ticket-products__section ticket-products__mail-placeholder" aria-labelledby="ticket-producto-correo">
             <h2 id="ticket-producto-correo">Correo electrónico</h2>
             <p class="ticket-products__hint">
-                El envío automático de correo se implementará en una fase posterior.
+                Las notificaciones de correo se gestionan mediante la cola administrativa de correo.
             </p>
             <p class="ticket-products__hint">
-                Eventos futuros: ticket creado, partida aprobada, partida rechazada, ticket resuelto, ticket cancelado.
+                Eventos: ticket creado, partida aprobada, partida rechazada, ticket resuelto y ticket cancelado.
             </p>
             <?php if ($canResendEmail): ?>
                 <button class="button button--secondary ticket-products__disabled-action" type="button" disabled>
-                    Reenvío de correo pendiente de fase posterior.
+                    Reenvío manual no disponible.
                 </button>
             <?php endif; ?>
         </section>
