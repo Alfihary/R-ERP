@@ -195,7 +195,7 @@ return new class implements DatabaseTest {
             'text' => 'Detalle interno: /tickets/productos/' . $fixture['ticket_id'],
             'status' => 'PENDIENTE',
             'dedupe_key' => 'ticket:' . $fixture['ticket_id'] . ':partida:' . $fixture['partida_id']
-                . ':evento:PARTIDA_APROBADA',
+                . ':evento:PARTIDA_APROBADA:constraint',
             'creado_por_usuario_id' => $fixture['user_id'],
         ]);
 
@@ -237,7 +237,7 @@ return new class implements DatabaseTest {
                 'text' => 'Duplicado',
                 'status' => 'PENDIENTE',
                 'dedupe_key' => 'ticket:' . $fixture['ticket_id'] . ':partida:' . $fixture['partida_id']
-                    . ':evento:PARTIDA_APROBADA',
+                    . ':evento:PARTIDA_APROBADA:constraint',
                 'creado_por_usuario_id' => $fixture['user_id'],
             ])),
             'foreign_ticket_rejected' => $this->fails(fn () => $this->insertOutbox([
@@ -1099,7 +1099,7 @@ return new class implements DatabaseTest {
 
     private function containsSensitive(string $value): bool
     {
-        return preg_match('#storage/private|storage/uploads|dsn|password|secret|token|[a-z]:[\\\\/]#i', $value) === 1;
+        return preg_match('#storage/private|storage/uploads|dsn|password|secret|token|\b[a-z]:[\\\\/]#i', $value) === 1;
     }
 
     private function fails(callable $operation): bool

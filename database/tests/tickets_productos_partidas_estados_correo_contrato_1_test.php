@@ -292,6 +292,7 @@ return new class implements DatabaseTest {
                     'database/migrations',
                     '/correo|correos|mail|notification|notifications|notificacion|notificaciones/i'
                 ) === [
+                    'database/migrations/correo_outbox_url_check_correccion_1_001_allow_safe_absolute_urls.php',
                     'database/migrations/tp_partidas_estados_correo_config_1_001_create_mail_configuration.php',
                     'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
                 ],
@@ -438,6 +439,7 @@ return new class implements DatabaseTest {
         }
 
         return $files === [
+            'database/migrations/correo_outbox_url_check_correccion_1_001_allow_safe_absolute_urls.php',
             'database/migrations/tp_partidas_estados_correo_outbox_db_1_001_create_ticket_product_email_outbox.php',
         ];
     }
