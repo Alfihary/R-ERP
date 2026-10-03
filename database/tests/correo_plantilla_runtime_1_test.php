@@ -142,6 +142,18 @@ return static function (): array {
         $manual($rejectedPayload, items: [$reasonItem])
     );
 
+    $plainPolicyItem = $approvedPayload->items[0];
+    $plainPolicyItem['description'] = 'Texto antes <b>importante</b> texto después';
+    $plainPolicyItem['response'] = 'Temperatura < 10°C y presión > 20 psi';
+    $plainPolicyRender = $renderer->render(
+        'PARTIDA_APROBADA',
+        $manual(
+            $approvedPayload,
+            items: [$plainPolicyItem],
+            note: 'Entidad &lt;script&gt; & símbolo "comillas" y ñ'
+        )
+    );
+
     $tenLines = [];
     for ($number = 1; $number <= 10; $number++) {
         $tenLines[] = $line($number, 'APROBADA');
@@ -196,6 +208,40 @@ return static function (): array {
         'reason_xss_escaped' => str_contains($reasonRender->htmlBody, '&lt;script&gt;motivo&lt;/script&gt;'),
         'response_xss_escaped' => str_contains($xssRender->htmlBody, '&lt;img src=x onerror=alert(1)&gt;'),
         'note_xss_escaped' => str_contains($xssRender->htmlBody, '&lt;b&gt;Nota&lt;/b&gt;'),
+        'plain_script_markup_neutralized' => !str_contains($xssRender->textBody, '<script>')
+            && !str_contains($xssRender->textBody, '</script>')
+            && str_contains($xssRender->textBody, '&lt;script&gt;alert("x")&lt;/script&gt;'),
+        'plain_img_markup_neutralized' => !str_contains($xssRender->textBody, '<img')
+            && str_contains($xssRender->textBody, '&lt;img src=x onerror=alert(1)&gt;'),
+        'plain_mixed_markup_preserved' => str_contains(
+            $plainPolicyRender->textBody,
+            'Texto antes &lt;b&gt;importante&lt;/b&gt; texto después'
+        ),
+        'plain_comparators_neutralized' => str_contains(
+            $plainPolicyRender->textBody,
+            'Temperatura &lt; 10°C y presión &gt; 20 psi'
+        ),
+        'plain_existing_entities_preserved' => str_contains(
+            $plainPolicyRender->textBody,
+            'Entidad &lt;script&gt; & símbolo "comillas" y ñ'
+        ) && !str_contains($plainPolicyRender->textBody, '&amp;lt;script&amp;gt;'),
+        'plain_reason_markup_neutralized' => str_contains(
+            $reasonRender->textBody,
+            '&lt;script&gt;motivo&lt;/script&gt;'
+        ),
+        'plain_no_raw_tag_delimiters' => preg_match(
+            '/<\/?[a-z][^>]*>/i',
+            $xssRender->textBody . $reasonRender->textBody . $plainPolicyRender->textBody
+        ) === 0,
+        'plain_cta_unchanged' => str_contains(
+            $plainPolicyRender->textBody,
+            'http://localhost:8000/tickets/productos/901'
+        ),
+        'plain_policy_is_idempotent' => !str_contains(
+            $plainPolicyRender->textBody,
+            '&amp;lt;'
+        ),
+        'plain_policy_avoids_strip_tags' => !str_contains($rendererSource, 'strip_tags'),
         'crlf_folio_rejected' => $fails(function () use ($renderer, $manual, $createdPayload): void {
             $ticketData = $createdPayload->ticket;
             $ticketData['folio'] = "QA-900001\r\nBcc:x@example.test";

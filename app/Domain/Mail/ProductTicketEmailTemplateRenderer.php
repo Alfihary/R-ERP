@@ -423,19 +423,20 @@ final class ProductTicketEmailTemplateRenderer
     private function text(array $model): string
     {
         $lines = [
-            (string) $model['system_name'],
+            $this->sanitizePlainTextValue((string) $model['system_name']),
             (string) $model['title'],
-            'Folio: ' . $model['folio'],
-            'Estado: ' . $model['status_label'],
+            'Folio: ' . $this->sanitizePlainTextValue((string) $model['folio']),
+            'Estado: ' . $this->sanitizePlainTextValue((string) $model['status_label']),
             '',
-            (string) $model['greeting'],
+            $this->sanitizePlainTextValue((string) $model['greeting']),
             '',
-            (string) $model['summary'],
+            $this->sanitizePlainTextValue((string) $model['summary']),
             '',
         ];
 
         foreach ($model['metadata'] as $entry) {
-            $lines[] = $entry['label'] . ': ' . $entry['value'];
+            $lines[] = $entry['label'] . ': '
+                . $this->sanitizePlainTextValue((string) $entry['value']);
         }
 
         if ($model['items'] !== []) {
@@ -443,8 +444,12 @@ final class ProductTicketEmailTemplateRenderer
             $lines[] = (string) $model['section'];
             foreach ($model['items'] as $item) {
                 $lines[] = '';
-                $lines[] = 'Partida ' . $item['partida_numero'] . ': ' . $item['description'];
-                $lines[] = 'Resultado: ' . $item['item_status_label'];
+                $lines[] = 'Partida '
+                    . $this->sanitizePlainTextValue((string) $item['partida_numero'])
+                    . ': '
+                    . $this->sanitizePlainTextValue((string) $item['description']);
+                $lines[] = 'Resultado: '
+                    . $this->sanitizePlainTextValue((string) $item['item_status_label']);
                 foreach ([
                     'Referencia' => $item['reference'] ?? null,
                     'Unidad SAT' => $item['unidad_sat_label'] ?? null,
@@ -453,7 +458,7 @@ final class ProductTicketEmailTemplateRenderer
                     'Respuesta' => $item['response'] ?? null,
                 ] as $label => $value) {
                     if (is_string($value) && trim($value) !== '') {
-                        $lines[] = $label . ': ' . $this->plain($value);
+                        $lines[] = $label . ': ' . $this->sanitizePlainTextValue($value);
                     }
                 }
             }
@@ -465,7 +470,7 @@ final class ProductTicketEmailTemplateRenderer
         }
         if (is_string($model['note']) && trim($model['note']) !== '') {
             $lines[] = '';
-            $lines[] = 'Nota: ' . $this->plain($model['note']);
+            $lines[] = 'Nota: ' . $this->sanitizePlainTextValue($model['note']);
         }
         if ($model['truncated']) {
             $lines[] = '';
@@ -476,10 +481,11 @@ final class ProductTicketEmailTemplateRenderer
         $lines[] = 'Ver ticket:';
         $lines[] = (string) $model['cta_url'];
         $lines[] = '';
-        $lines[] = $model['system_name'] . ' · Correo automático';
-        $lines[] = (string) $model['footer'];
+        $lines[] = $this->sanitizePlainTextValue((string) $model['system_name'])
+            . ' · Correo automático';
+        $lines[] = $this->sanitizePlainTextValue((string) $model['footer']);
 
-        return implode("\r\n", array_map(fn (string $line): string => $this->plain($line), $lines));
+        return implode("\r\n", $lines);
     }
 
     private function validateUrl(string $url): void
@@ -567,10 +573,12 @@ final class ProductTicketEmailTemplateRenderer
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    private function plain(string $value): string
+    private function sanitizePlainTextValue(string $value): string
     {
         $value = str_replace(["\r\n", "\r"], "\n", $value);
         $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value) ?? '';
-        return str_replace("\n", ' ', $value);
+        $value = str_replace("\n", ' ', $value);
+
+        return str_replace(['<', '>'], ['&lt;', '&gt;'], $value);
     }
 }
