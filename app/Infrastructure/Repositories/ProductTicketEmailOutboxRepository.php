@@ -23,16 +23,25 @@ final class ProductTicketEmailOutboxRepository
                 tp.id,
                 tp.folio,
                 tp.estado,
+                tp.observaciones_generales,
+                tp.total_partidas,
+                tp.partidas_aprobadas,
+                tp.partidas_rechazadas,
+                tp.cancelado_at,
+                tp.motivo_cancelacion,
+                tp.created_at,
                 e.nombre AS empresa_nombre,
                 a.nombre AS almacen_nombre,
                 a.codigo AS almacen_codigo,
                 u.id AS solicitante_id,
                 u.username AS solicitante_username,
-                u.email AS solicitante_email
+                u.email AS solicitante_email,
+                cu.username AS cancelado_por_username
              FROM tickets_productos tp
              INNER JOIN empresas e ON e.id = tp.empresa_id
              INNER JOIN almacenes a ON a.id = tp.almacen_id
              INNER JOIN usuarios u ON u.id = tp.solicitante_usuario_id
+             LEFT JOIN usuarios cu ON cu.id = tp.cancelado_por_usuario_id
              WHERE tp.id = :ticket_id
                AND tp.deleted_at IS NULL
              LIMIT 1'
@@ -50,17 +59,32 @@ final class ProductTicketEmailOutboxRepository
     {
         $statement = $this->pdo()->prepare(
             'SELECT
-                id,
-                ticket_producto_id,
-                numero_partida,
-                estado,
-                descripcion,
-                motivo_rechazo,
-                comentario_resolucion
-             FROM tickets_productos_partidas
-             WHERE id = :partida_id
-               AND ticket_producto_id = :ticket_id
-               AND deleted_at IS NULL
+                p.id,
+                p.ticket_producto_id,
+                p.numero_partida,
+                p.estado,
+                p.descripcion,
+                p.motivo_rechazo,
+                p.comentario_resolucion,
+                p.resuelto_at,
+                p.clave_autorizada,
+                p.descripcion_autorizada,
+                us.codigo AS unidad_sat_codigo,
+                us.nombre AS unidad_sat_nombre,
+                cs.codigo AS clave_sat_codigo,
+                cs.descripcion AS clave_sat_descripcion,
+                usa.codigo AS unidad_sat_autorizada_codigo,
+                usa.nombre AS unidad_sat_autorizada_nombre,
+                csa.codigo AS clave_sat_autorizada_codigo,
+                csa.descripcion AS clave_sat_autorizada_descripcion
+             FROM tickets_productos_partidas p
+             LEFT JOIN unidades_sat us ON us.id = p.unidad_sat_id
+             LEFT JOIN claves_sat cs ON cs.id = p.clave_sat_id
+             LEFT JOIN unidades_sat usa ON usa.id = p.unidad_sat_id_autorizada
+             LEFT JOIN claves_sat csa ON csa.id = p.clave_sat_id_autorizada
+             WHERE p.id = :partida_id
+               AND p.ticket_producto_id = :ticket_id
+               AND p.deleted_at IS NULL
              LIMIT 1'
         );
         $statement->execute([
@@ -70,6 +94,56 @@ final class ProductTicketEmailOutboxRepository
         $line = $statement->fetch();
 
         return is_array($line) ? $line : null;
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function findLinesContext(int $ticketId): array
+    {
+        $statement = $this->pdo()->prepare(
+            'SELECT
+                p.id,
+                p.ticket_producto_id,
+                p.numero_partida,
+                p.estado,
+                p.descripcion,
+                p.motivo_rechazo,
+                p.comentario_resolucion,
+                p.resuelto_at,
+                p.clave_autorizada,
+                p.descripcion_autorizada,
+                us.codigo AS unidad_sat_codigo,
+                us.nombre AS unidad_sat_nombre,
+                cs.codigo AS clave_sat_codigo,
+                cs.descripcion AS clave_sat_descripcion,
+                usa.codigo AS unidad_sat_autorizada_codigo,
+                usa.nombre AS unidad_sat_autorizada_nombre,
+                csa.codigo AS clave_sat_autorizada_codigo,
+                csa.descripcion AS clave_sat_autorizada_descripcion
+             FROM tickets_productos_partidas p
+             LEFT JOIN unidades_sat us ON us.id = p.unidad_sat_id
+             LEFT JOIN claves_sat cs ON cs.id = p.clave_sat_id
+             LEFT JOIN unidades_sat usa ON usa.id = p.unidad_sat_id_autorizada
+             LEFT JOIN claves_sat csa ON csa.id = p.clave_sat_id_autorizada
+             WHERE p.ticket_producto_id = :ticket_id
+               AND p.deleted_at IS NULL
+             ORDER BY p.numero_partida ASC, p.id ASC'
+        );
+        $statement->execute(['ticket_id' => $ticketId]);
+
+        return $statement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function countAttachments(int $ticketId): int
+    {
+        $statement = $this->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM tickets_productos_adjuntos
+             WHERE ticket_producto_id = :ticket_id
+               AND deleted_at IS NULL'
+        );
+        $statement->execute(['ticket_id' => $ticketId]);
+
+        return (int) $statement->fetchColumn();
     }
 
     public function findByDedupeKey(string $dedupeKey): ?array

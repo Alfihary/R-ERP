@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Domain\Tickets\ProductTicketEmailOutboxService;
+use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
+use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
@@ -178,7 +180,7 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @param array<string, int> $fixture
+     * @param array<string, int|string> $fixture
      * @return array<string, bool>
      */
     private function constraintCases(array $fixture): array
@@ -315,13 +317,19 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @param array<string, int> $fixture
+     * @param array<string, int|string> $fixture
      * @return array<string, bool>
      */
     private function repositoryServiceCases(array $fixture): array
     {
         $service = new ProductTicketEmailOutboxService(
-            new ProductTicketEmailOutboxRepository($this->pdo)
+            new ProductTicketEmailOutboxRepository($this->pdo),
+            new ProductTicketEmailTemplateRenderer(),
+            new ProductTicketEmailTemplatePayloadBuilder(
+                'http://localhost:8000',
+                'America/Mexico_City',
+                true
+            )
         );
 
         $ticketCreated = $service->enqueueTicketCreated($fixture['ticket_id'], $fixture['user_id']);
@@ -329,6 +337,16 @@ return new class implements DatabaseTest {
         $lineApproved = $service->enqueueLineApproved($fixture['ticket_id'], $fixture['partida_id'], $fixture['user_id']);
         $lineRejected = $service->enqueueLineRejected($fixture['ticket_id'], $fixture['partida_id_2'], $fixture['user_id']);
         $resolved = $service->enqueueTicketResolved($fixture['ticket_id'], 'TICKET_RESUELTO_TOTAL', $fixture['user_id']);
+        $this->pdo->prepare(
+            "UPDATE tickets_productos
+             SET estado = 'CANCELADO', cancelado_at = CURRENT_TIMESTAMP,
+                 cancelado_por_usuario_id = :user_id,
+                 motivo_cancelacion = 'Cancelación QA controlada.'
+             WHERE id = :ticket_id"
+        )->execute([
+            'user_id' => $fixture['user_id'],
+            'ticket_id' => $fixture['ticket_id'],
+        ]);
         $cancelled = $service->enqueueTicketCancelled($fixture['ticket_id'], $fixture['user_id']);
         $sent = $service->markSent((int) $lineApproved['id']);
         $error = $service->markError((int) $lineRejected['id'], 'Error temporal seguro.');
@@ -342,11 +360,11 @@ return new class implements DatabaseTest {
                 && $this->countOutboxByDedupe((string) $ticketCreated['dedupe_key']) === 1,
             'enqueue_without_email_returns_null' => $withoutEmail === null,
             'enqueue_generates_expected_subjects' =>
-                str_contains((string) $ticketCreated['subject'], 'recibida')
-                && str_contains((string) $lineApproved['subject'], 'Partida aprobada')
-                && str_contains((string) $lineRejected['subject'], 'Partida rechazada')
-                && str_contains((string) $resolved['subject'], 'resuelta')
-                && str_contains((string) $cancelled['subject'], 'cancelada'),
+                (string) $ticketCreated['subject'] === '[R-ERP] Ticket ' . $fixture['folio'] . ' creado'
+                && (string) $lineApproved['subject'] === '[R-ERP] Ticket ' . $fixture['folio'] . ': partida 1 aprobada'
+                && (string) $lineRejected['subject'] === '[R-ERP] Ticket ' . $fixture['folio'] . ': partida 2 rechazada'
+                && (string) $resolved['subject'] === '[R-ERP] Ticket ' . $fixture['folio'] . ' resuelto'
+                && (string) $cancelled['subject'] === '[R-ERP] Ticket ' . $fixture['folio'] . ' cancelado',
             'enqueue_generates_text_and_html' =>
                 trim((string) $ticketCreated['text']) !== ''
                 && trim((string) $ticketCreated['html']) !== ''
@@ -556,7 +574,7 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, int|string>
      */
     private function fixture(): array
     {
@@ -578,6 +596,7 @@ return new class implements DatabaseTest {
             'user_without_email_id' => $userWithoutEmailId,
             'company_id' => $companyId,
             'warehouse_id' => $warehouseId,
+            'folio' => 'QA-900001',
             'ticket_id' => $ticketId,
             'ticket_without_email_id' => $ticketWithoutEmailId,
             'partida_id' => $partidaId,
@@ -789,7 +808,7 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @param array<string, int> $fixture
+     * @param array<string, int|string> $fixture
      * @param array<string, mixed> $overrides
      */
     private function invalidOutboxRejected(array $fixture, array $overrides): bool

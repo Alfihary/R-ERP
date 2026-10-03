@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Domain\Mail\MailConfigurationService;
+use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
+use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
 use App\Domain\Tickets\ProductTicketEmailNotificationService;
 use App\Domain\Tickets\ProductTicketEmailOutboxService;
 use App\Infrastructure\Database\ConnectionProvider;
@@ -58,7 +60,15 @@ return new class implements DatabaseTest {
 
             $orchestrator = new ProductTicketEmailNotificationService(
                 $configuration,
-                new ProductTicketEmailOutboxService(new ProductTicketEmailOutboxRepository($this->connection()))
+                new ProductTicketEmailOutboxService(
+                    new ProductTicketEmailOutboxRepository($this->connection()),
+                    new ProductTicketEmailTemplateRenderer(),
+                    new ProductTicketEmailTemplatePayloadBuilder(
+                        'http://localhost:8000',
+                        'America/Mexico_City',
+                        true
+                    )
+                )
             );
             $results = [];
             $events = [
@@ -70,6 +80,18 @@ return new class implements DatabaseTest {
                 ['TICKET_CANCELADO', null],
             ];
             foreach ($events as [$event, $partidaId]) {
+                if ($event === 'TICKET_CANCELADO') {
+                    $this->pdo->prepare(
+                        "UPDATE tickets_productos
+                         SET estado = 'CANCELADO', cancelado_at = CURRENT_TIMESTAMP,
+                             cancelado_por_usuario_id = :user_id,
+                             motivo_cancelacion = 'Cancelación QA controlada.'
+                         WHERE id = :ticket_id"
+                    )->execute([
+                        'user_id' => $fixture['user_id'],
+                        'ticket_id' => $fixture['ticket_id'],
+                    ]);
+                }
                 $results[$event] = $orchestrator->handle(
                     $event,
                     $fixture['ticket_id'],
@@ -342,17 +364,22 @@ return new class implements DatabaseTest {
     private function payloadContracts(array $rows): bool
     {
         $expected = [
-            'TICKET_CREADO' => ['ticket_created', 'recibida'],
-            'PARTIDA_APROBADA' => ['line_approved', 'Partida aprobada'],
-            'PARTIDA_RECHAZADA' => ['line_rejected', 'Partida rechazada'],
-            'TICKET_RESUELTO_PARCIAL' => ['ticket_resolved', 'parcialmente'],
-            'TICKET_RESUELTO_TOTAL' => ['ticket_resolved', 'resuelta'],
-            'TICKET_CANCELADO' => ['ticket_cancelled', 'cancelada'],
+            'TICKET_CREADO' => ['ticket_created', '[R-ERP] Ticket ', ' creado'],
+            'PARTIDA_APROBADA' => ['line_approved', ': partida 1 aprobada'],
+            'PARTIDA_RECHAZADA' => ['line_rejected', ': partida 2 rechazada'],
+            'TICKET_RESUELTO_PARCIAL' => ['ticket_resolved', ' resuelto parcialmente'],
+            'TICKET_RESUELTO_TOTAL' => ['ticket_resolved', ' resuelto'],
+            'TICKET_CANCELADO' => ['ticket_cancelled', ' cancelado'],
         ];
         foreach ($rows as $row) {
             $contract = $expected[(string) $row['evento']] ?? null;
-            if ($contract === null || $row['plantilla'] !== $contract[0] || !str_contains((string) $row['subject'], $contract[1])) {
+            if ($contract === null || $row['plantilla'] !== $contract[0]) {
                 return false;
+            }
+            foreach (array_slice($contract, 1) as $subjectPart) {
+                if (!str_contains((string) $row['subject'], $subjectPart)) {
+                    return false;
+                }
             }
         }
         return true;

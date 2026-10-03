@@ -4,30 +4,18 @@ declare(strict_types=1);
 
 namespace App\Domain\Tickets;
 
+use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
+use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
 use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
 use RuntimeException;
 
 final class ProductTicketEmailOutboxService
 {
-    private const EVENT_TEMPLATES = [
-        'TICKET_CREADO' => 'ticket_created',
-        'PARTIDA_APROBADA' => 'line_approved',
-        'PARTIDA_RECHAZADA' => 'line_rejected',
-        'TICKET_RESUELTO_TOTAL' => 'ticket_resolved',
-        'TICKET_RESUELTO_PARCIAL' => 'ticket_resolved',
-        'TICKET_CANCELADO' => 'ticket_cancelled',
-    ];
-
-    private const TEMPLATE_SUBJECTS = [
-        'ticket_created' => 'Solicitud de alta de producto {folio} recibida',
-        'line_approved' => 'Partida aprobada en solicitud {folio}',
-        'line_rejected' => 'Partida rechazada en solicitud {folio}',
-        'ticket_resolved' => 'Solicitud de alta de producto {folio} resuelta',
-        'ticket_cancelled' => 'Solicitud de alta de producto {folio} cancelada',
-    ];
-
-    public function __construct(private readonly ProductTicketEmailOutboxRepository $outbox)
-    {
+    public function __construct(
+        private readonly ProductTicketEmailOutboxRepository $outbox,
+        private readonly ProductTicketEmailTemplateRenderer $renderer,
+        private readonly ProductTicketEmailTemplatePayloadBuilder $payloadBuilder
+    ) {
     }
 
     /**
@@ -124,7 +112,9 @@ final class ProductTicketEmailOutboxService
         $event = strtoupper(trim((string) ($input['evento'] ?? '')));
         $createdBy = $this->nullablePositiveId($input['creado_por_usuario_id'] ?? null, 'creado_por_usuario_id');
 
-        if (!isset(self::EVENT_TEMPLATES[$event])) {
+        try {
+            $template = $this->renderer->templateCode($event);
+        } catch (\App\Domain\Mail\ProductTicketEmailTemplateValidationException $exception) {
             throw new RuntimeException('Unsupported ticket product email event.');
         }
 
@@ -164,7 +154,6 @@ final class ProductTicketEmailOutboxService
             ];
         }
 
-        $template = self::EVENT_TEMPLATES[$event];
         $dedupeKey = $this->dedupeKey($ticketId, $partidaId, $event);
         $existing = $this->outbox->findByDedupeKey($dedupeKey);
 
@@ -176,9 +165,20 @@ final class ProductTicketEmailOutboxService
             ];
         }
 
-        $payload = $this->payload($ticket, $line, $event, $template);
+        $lines = match ($event) {
+            'PARTIDA_APROBADA', 'PARTIDA_RECHAZADA' => [$line],
+            'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => $this->outbox->findLinesContext($ticketId),
+            default => [],
+        };
+        $payload = $this->payloadBuilder->build(
+            $event,
+            $ticket,
+            $lines,
+            $this->outbox->countAttachments($ticketId)
+        );
+        $rendered = $this->renderer->render($event, $payload);
 
-        $this->assertSafeText($payload['subject'] . "\n" . $payload['html'] . "\n" . $payload['text']);
+        $this->assertSafeText($rendered->subject . "\n" . $rendered->htmlBody . "\n" . $rendered->textBody);
 
         $row = $this->outbox->insertPending([
             'ticket_id' => $ticketId,
@@ -187,9 +187,9 @@ final class ProductTicketEmailOutboxService
             'plantilla' => $template,
             'destinatario_email' => $recipients['to'][0],
             'cc_json' => json_encode($recipients, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
-            'subject' => $payload['subject'],
-            'html' => $payload['html'],
-            'text' => $payload['text'],
+            'subject' => $rendered->subject,
+            'html' => $rendered->htmlBody,
+            'text' => $rendered->textBody,
             'max_intentos' => 3,
             'creado_por_usuario_id' => $createdBy,
             'dedupe_key' => $dedupeKey,
@@ -224,64 +224,6 @@ final class ProductTicketEmailOutboxService
         $this->assertSafeText($message);
 
         return $this->outbox->markError($this->positiveId($outboxId, 'outbox_id'), $message);
-    }
-
-    /**
-     * @param array<string, mixed> $ticket
-     * @param array<string, mixed>|null $line
-     * @return array{subject:string, html:string, text:string}
-     */
-    private function payload(array $ticket, ?array $line, string $event, string $template): array
-    {
-        $folio = trim((string) ($ticket['folio'] ?? ''));
-        $subject = str_replace('{folio}', $folio, self::TEMPLATE_SUBJECTS[$template]);
-        if ($event === 'TICKET_RESUELTO_PARCIAL') {
-            $subject = 'Solicitud de alta de producto ' . $folio . ' resuelta parcialmente';
-        }
-        $company = trim((string) ($ticket['empresa_nombre'] ?? ''));
-        $warehouse = trim((string) ($ticket['almacen_nombre'] ?? $ticket['almacen_codigo'] ?? ''));
-        $username = trim((string) ($ticket['solicitante_username'] ?? ''));
-        $state = $line !== null ? (string) ($line['estado'] ?? '') : (string) ($ticket['estado'] ?? '');
-        $description = $line !== null
-            ? trim((string) ($line['descripcion'] ?? ''))
-            : 'Solicitud documental de alta de productos.';
-        $lineNumber = $line !== null ? (string) ($line['numero_partida'] ?? '') : '';
-        $detailUrl = '/tickets/productos/' . (int) ($ticket['id'] ?? 0);
-
-        $textLines = [
-            $subject,
-            'Folio: ' . $folio,
-            'Evento: ' . $event,
-            'Empresa: ' . $company,
-            'Almacén: ' . $warehouse,
-            'Solicitante: ' . $username,
-            'Estado: ' . $state,
-            $lineNumber !== '' ? 'Partida: ' . $lineNumber : null,
-            'Resumen: ' . $description,
-            'Detalle interno: ' . $detailUrl,
-            'Este es un aviso automático; no respondas este correo.',
-        ];
-
-        $text = implode("\n", array_values(array_filter($textLines, static fn (?string $line): bool => $line !== null)));
-        $html = '<article class="mail-card">'
-            . '<h1>' . $this->escape($subject) . '</h1>'
-            . '<p>Folio: <strong>' . $this->escape($folio) . '</strong></p>'
-            . '<p>Evento: ' . $this->escape($event) . '</p>'
-            . '<p>Empresa: ' . $this->escape($company) . '</p>'
-            . '<p>Almacén: ' . $this->escape($warehouse) . '</p>'
-            . '<p>Solicitante: ' . $this->escape($username) . '</p>'
-            . '<p>Estado: ' . $this->escape($state) . '</p>'
-            . ($lineNumber !== '' ? '<p>Partida: ' . $this->escape($lineNumber) . '</p>' : '')
-            . '<p>Resumen: ' . $this->escape($description) . '</p>'
-            . '<p><a href="' . $this->escape($detailUrl) . '">Ver detalle interno</a></p>'
-            . '<p>Este es un aviso automático; no respondas este correo.</p>'
-            . '</article>';
-
-        return [
-            'subject' => $subject,
-            'html' => $html,
-            'text' => $text,
-        ];
     }
 
     private function dedupeKey(int $ticketId, ?int $partidaId, string $event): string
@@ -388,13 +330,9 @@ final class ProductTicketEmailOutboxService
 
     private function assertSafeText(string $value): void
     {
-        if (preg_match('#storage/private|storage/uploads|dsn|password|secret|token|[a-z]:[\\\\/]#i', $value) === 1) {
+        if (preg_match('#storage/private|storage/uploads|dsn|password|secret|token|\b[a-z]:[\\\\/]#i', $value) === 1) {
             throw new RuntimeException('Email outbox payload contains disallowed sensitive content.');
         }
     }
 
-    private function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
 }

@@ -232,8 +232,13 @@ return new class implements DatabaseTest {
             . $this->read('public/js/modules/tickets-productos-create.js');
 
         return [
-            'no_mail_domain_runtime_created' =>
-                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta|producto/i')
+            'no_unauthorized_mail_domain_runtime_created' =>
+                $this->relativeFiles('app/Domain/Mail', '/ticket|solicitud|alta|producto/i') === [
+                    'app/Domain/Mail/ProductTicketEmailTemplatePayload.php',
+                    'app/Domain/Mail/ProductTicketEmailTemplatePayloadBuilder.php',
+                    'app/Domain/Mail/ProductTicketEmailTemplateRenderer.php',
+                    'app/Domain/Mail/ProductTicketEmailTemplateValidationException.php',
+                ]
                 && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta|producto/i'),
             'no_mail_support_runtime_created' => !$this->hasFiles('app/Support/Mail', '/ticket|solicitud|alta|producto/i'),
             'no_direct_phpmailer_in_tickets' => !preg_match('/PHPMailer|SMTP|SwiftMailer|Symfony\\\\Component\\\\Mailer/i', $ticketRuntime),

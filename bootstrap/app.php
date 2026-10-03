@@ -25,6 +25,8 @@ use App\Domain\Inventory\InventoryService;
 use App\Domain\Inventory\InventoryTransferService;
 use App\Domain\Mail\MailConfigurationService;
 use App\Domain\Mail\MailOutboxActionService;
+use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
+use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
 use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
@@ -231,7 +233,17 @@ $mailConfiguration = new MailConfigurationService(
 $productTicketEmailNotifications = new ProductTicketEmailNotificationService(
     $mailConfiguration,
     new ProductTicketEmailOutboxService(
-        new ProductTicketEmailOutboxRepository($connection)
+        new ProductTicketEmailOutboxRepository($connection),
+        new ProductTicketEmailTemplateRenderer(),
+        new ProductTicketEmailTemplatePayloadBuilder(
+            (string) $config->get('app.url', 'http://localhost:8000'),
+            (string) $config->get('app.timezone', 'America/Mexico_City'),
+            in_array(
+                strtolower((string) $config->get('app.env', 'production')),
+                ['local', 'development', 'test'],
+                true
+            )
+        )
     )
 );
 $productRequestTickets = new ProductRequestTicketService(
