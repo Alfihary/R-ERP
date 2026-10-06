@@ -25,6 +25,7 @@ final class ProductTicketEmailOutboxRepository
                 tp.estado,
                 tp.observaciones_generales,
                 tp.total_partidas,
+                tp.partidas_en_revision,
                 tp.partidas_aprobadas,
                 tp.partidas_rechazadas,
                 tp.cancelado_at,
@@ -50,6 +51,35 @@ final class ProductTicketEmailOutboxRepository
         $ticket = $statement->fetch();
 
         return is_array($ticket) ? $ticket : null;
+    }
+
+    public function currentDatabaseName(): string
+    {
+        return (string) $this->pdo()->query('SELECT DATABASE()')->fetchColumn();
+    }
+
+    /** @return array{lines:int,attachments:int} */
+    public function qaFixtureRelationCounts(int $ticketId): array
+    {
+        $statement = $this->pdo()->prepare(
+            'SELECT
+                (SELECT COUNT(*)
+                   FROM tickets_productos_partidas
+                  WHERE ticket_producto_id = :lines_ticket_id) AS line_count,
+                (SELECT COUNT(*)
+                   FROM tickets_productos_adjuntos
+                  WHERE ticket_producto_id = :attachments_ticket_id) AS attachment_count'
+        );
+        $statement->execute([
+            'lines_ticket_id' => $ticketId,
+            'attachments_ticket_id' => $ticketId,
+        ]);
+        $counts = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return [
+            'lines' => (int) ($counts['line_count'] ?? -1),
+            'attachments' => (int) ($counts['attachment_count'] ?? -1),
+        ];
     }
 
     /**

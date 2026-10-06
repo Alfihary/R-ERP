@@ -6,6 +6,8 @@ namespace App\Domain\Tickets;
 
 use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
 use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
+use App\Domain\Mail\QaMailContext;
+use App\Domain\Mail\QaMailValidationException;
 use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
 use RuntimeException;
 
@@ -107,10 +109,46 @@ final class ProductTicketEmailOutboxService
      */
     public function enqueueConfigured(array $input, array $rule): array
     {
+        return $this->enqueueConfiguredInternal($input, $rule, null);
+    }
+
+    /**
+     * Enqueues through the normal renderer, dedupe and repository while
+     * replacing the operational recipient envelope with a validated QA one.
+     * This entry point is intended exclusively for guarded CLI tooling.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $rule
+     * @return array{notification_enqueued:bool,notification_reason:string,outbox:array<string,mixed>|null}
+     * @throws QaMailValidationException
+     */
+    public function enqueueConfiguredQa(array $input, array $rule, QaMailContext $context): array
+    {
+        return $this->enqueueConfiguredInternal($input, $rule, $context);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $rule
+     * @return array{notification_enqueued:bool,notification_reason:string,outbox:array<string,mixed>|null}
+     */
+    private function enqueueConfiguredInternal(
+        array $input,
+        array $rule,
+        ?QaMailContext $qaContext
+    ): array
+    {
         $ticketId = $this->positiveId($input['ticket_id'] ?? null, 'ticket_id');
         $partidaId = $this->nullablePositiveId($input['partida_id'] ?? null, 'partida_id');
         $event = strtoupper(trim((string) ($input['evento'] ?? '')));
         $createdBy = $this->nullablePositiveId($input['creado_por_usuario_id'] ?? null, 'creado_por_usuario_id');
+
+        if ($qaContext !== null) {
+            $qaContext->assertEvent($event);
+            if ($partidaId !== null) {
+                throw new QaMailValidationException('SMTP QA ticket-created event cannot include a line.');
+            }
+        }
 
         try {
             $template = $this->renderer->templateCode($event);
@@ -131,6 +169,10 @@ final class ProductTicketEmailOutboxService
             throw new RuntimeException('Ticket was not found for email outbox.');
         }
 
+        if ($qaContext !== null) {
+            $this->assertQaTicket($ticketId, $ticket, $qaContext);
+        }
+
         $line = null;
         if ($partidaId !== null) {
             $line = $this->outbox->findLineContext($ticketId, $partidaId);
@@ -140,11 +182,13 @@ final class ProductTicketEmailOutboxService
             }
         }
 
-        $recipients = $this->resolveRecipients(
-            $ticket,
-            $rule,
-            $input['responsable_email'] ?? null
-        );
+        $recipients = $qaContext === null
+            ? $this->resolveRecipients(
+                $ticket,
+                $rule,
+                $input['responsable_email'] ?? null
+            )
+            : ['to' => [$qaContext->recipient()], 'cc' => [], 'bcc' => []];
 
         if ($recipients['to'] === []) {
             return [
@@ -170,11 +214,12 @@ final class ProductTicketEmailOutboxService
             'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => $this->outbox->findLinesContext($ticketId),
             default => [],
         };
+        $attachmentsCount = $this->outbox->countAttachments($ticketId);
         $payload = $this->payloadBuilder->build(
             $event,
             $ticket,
             $lines,
-            $this->outbox->countAttachments($ticketId)
+            $attachmentsCount
         );
         $rendered = $this->renderer->render($event, $payload);
 
@@ -200,6 +245,40 @@ final class ProductTicketEmailOutboxService
             'notification_reason' => 'pending_created',
             'outbox' => $row,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $ticket
+     * @throws QaMailValidationException
+     */
+    private function assertQaTicket(
+        int $ticketId,
+        array $ticket,
+        QaMailContext $context
+    ): void {
+        if ($this->outbox->currentDatabaseName() !== $context->databaseName()) {
+            throw new QaMailValidationException('SMTP QA active database does not match the validated context.');
+        }
+        if ($ticketId === 34 || (string) ($ticket['folio'] ?? '') === 'QASMTP-000001') {
+            throw new QaMailValidationException('Protected SMTP QA evidence cannot be reused.');
+        }
+        if (
+            preg_match('/^QASMTP-[0-9]{6}$/D', (string) ($ticket['folio'] ?? '')) !== 1
+            || (string) ($ticket['observaciones_generales'] ?? '') !== '[QA_FIXTURE:CORREO_SMTP]'
+            || (string) ($ticket['estado'] ?? '') !== 'EN_REVISION'
+            || (int) ($ticket['total_partidas'] ?? -1) !== 0
+            || (int) ($ticket['partidas_en_revision'] ?? -1) !== 0
+            || (int) ($ticket['partidas_aprobadas'] ?? -1) !== 0
+            || (int) ($ticket['partidas_rechazadas'] ?? -1) !== 0
+            || ($ticket['cancelado_at'] ?? null) !== null
+        ) {
+            throw new QaMailValidationException('SMTP QA ticket fixture validation failed.');
+        }
+
+        $relations = $this->outbox->qaFixtureRelationCounts($ticketId);
+        if ($relations['lines'] !== 0 || $relations['attachments'] !== 0) {
+            throw new QaMailValidationException('SMTP QA ticket fixture has operational relations.');
+        }
     }
 
     /**
