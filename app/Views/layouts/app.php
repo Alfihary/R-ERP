@@ -26,6 +26,17 @@ $appName = trim($appName, " \t\n\r\0\x0B\"'");
 $activeNavigation = is_string($activeNavigation ?? null)
     ? $activeNavigation
     : 'home';
+$activeSidebarGroup = match ($activeNavigation) {
+    'product-tickets' => 'operation',
+    'products', 'product-prices', 'inventory', 'inventory-stock',
+    'inventory-serial-stock', 'inventory-kardex', 'inventory-serial-kardex',
+    'inventory-transfers', 'configuration-price-lists' => 'inventory',
+    'catalogs' => 'catalogs',
+    'configuration-companies', 'configuration-warehouses' => 'organization',
+    'configuration-folios', 'configuration-mail', 'mail-outbox', 'audit' => 'administration',
+    'profile', 'credential' => 'account',
+    default => null,
+};
 $canAccessProfile = ($canAccessProfile ?? false) === true;
 $canAccessCredential = ($canAccessCredential ?? false) === true;
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
@@ -48,6 +59,9 @@ $canAccessMailOutbox = ($canAccessMailOutbox ?? false) === true;
 $canAccessAudit = ($canAccessAudit ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
+if (!in_array('/js/sidebar-collapse.js', $scripts, true)) {
+    $scripts[] = '/js/sidebar-collapse.js';
+}
 $activeCompany = is_array($context['active_company'] ?? null)
     ? $context['active_company']
     : null;
@@ -112,7 +126,12 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     || $canAccessAudit; ?>
 
                 <?php if ($showOperation): ?>
-                    <span class="app-navigation__section">Operación</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'operation' ? ' has-active-item' : '' ?>" data-sidebar-group="operation">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-operation">
+                            <span class="app-navigation__section">Operación</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-operation">
                     <a
                         class="app-navigation__item<?= $activeNavigation === 'product-tickets' ? ' is-active' : '' ?>"
                         href="/tickets/productos"
@@ -121,10 +140,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                         <span aria-hidden="true">✉</span>
                         Tickets de producto
                     </a>
+                        </div>
+                    </section>
                 <?php endif; ?>
 
                 <?php if ($showInventory): ?>
-                    <span class="app-navigation__section">Inventario</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'inventory' ? ' has-active-item' : '' ?>" data-sidebar-group="inventory">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-inventory">
+                            <span class="app-navigation__section">Inventario</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-inventory">
                     <?php if ($canAccessProducts): ?>
                         <a
                             class="app-navigation__item<?= $activeNavigation === 'products' ? ' is-active' : '' ?>"
@@ -215,10 +241,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                             Listas de precios
                         </a>
                     <?php endif; ?>
+                        </div>
+                    </section>
                 <?php endif; ?>
 
                 <?php if ($canAccessCatalogs): ?>
-                    <span class="app-navigation__section">Catálogos</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'catalogs' ? ' has-active-item' : '' ?>" data-sidebar-group="catalogs">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-catalogs">
+                            <span class="app-navigation__section">Catálogos</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-catalogs">
                     <a
                         class="app-navigation__item<?= $activeNavigation === 'catalogs' ? ' is-active' : '' ?>"
                         href="/catalogos"
@@ -227,10 +260,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                         <span aria-hidden="true">▦</span>
                         Catálogos
                     </a>
+                        </div>
+                    </section>
                 <?php endif; ?>
 
                 <?php if ($showOrganization): ?>
-                    <span class="app-navigation__section">Organización</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'organization' ? ' has-active-item' : '' ?>" data-sidebar-group="organization">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-organization">
+                            <span class="app-navigation__section">Organización</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-organization">
                     <?php if ($canAccessConfigCompanies): ?>
                         <a
                             class="app-navigation__item<?= $activeNavigation === 'configuration-companies' ? ' is-active' : '' ?>"
@@ -251,10 +291,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                             Almacenes
                         </a>
                     <?php endif; ?>
+                        </div>
+                    </section>
                 <?php endif; ?>
 
                 <?php if ($showAdministration): ?>
-                    <span class="app-navigation__section">Administración</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'administration' ? ' has-active-item' : '' ?>" data-sidebar-group="administration">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-administration">
+                            <span class="app-navigation__section">Administración</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-administration">
                     <?php if ($canAccessConfigFolios): ?>
                         <a
                             class="app-navigation__item<?= $activeNavigation === 'configuration-folios' ? ' is-active' : '' ?>"
@@ -295,10 +342,17 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                             Auditoría
                         </a>
                     <?php endif; ?>
+                        </div>
+                    </section>
                 <?php endif; ?>
 
                 <?php if ($showAccount): ?>
-                    <span class="app-navigation__section">Mi cuenta</span>
+                    <section class="app-navigation__group<?= $activeSidebarGroup === 'account' ? ' has-active-item' : '' ?>" data-sidebar-group="account">
+                        <button class="app-navigation__toggle" type="button" aria-expanded="true" aria-controls="sidebar-group-account">
+                            <span class="app-navigation__section">Mi cuenta</span>
+                            <span class="app-navigation__chevron" aria-hidden="true">⌄</span>
+                        </button>
+                        <div class="app-navigation__group-content" id="sidebar-group-account">
                     <?php if ($canAccessProfile): ?>
                         <a
                             class="app-navigation__item<?= $activeNavigation === 'profile' ? ' is-active' : '' ?>"
@@ -319,6 +373,8 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                             Mi credencial
                         </a>
                     <?php endif; ?>
+                        </div>
+                    </section>
                 <?php endif; ?>
             </nav>
 

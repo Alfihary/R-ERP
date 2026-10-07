@@ -86,8 +86,10 @@ a {
 
 .app-sidebar {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    min-height: 0;
     flex-direction: column;
+    overflow: hidden;
     padding: 1.25rem 1rem;
     color: var(--color-sidebar-text);
     background: var(--color-sidebar);
@@ -131,7 +133,35 @@ a {
 }
 
 .app-navigation {
+    flex: 1 1 auto;
+    min-height: 0;
     margin-top: 2rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--color-sidebar-muted) transparent;
+    scrollbar-width: thin;
+}
+
+.app-navigation__group {
+    margin: 1rem 0 0;
+}
+
+.app-navigation__group:first-child {
+    margin-top: 0;
+}
+
+.app-navigation__toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
 }
 
 .app-navigation__section {
@@ -140,8 +170,31 @@ a {
     font-size: 0.6875rem;
     font-weight: 800;
     letter-spacing: 0.08em;
-    margin: 1rem 0 0.35rem;
+    margin: 0 0 0.35rem;
     text-transform: uppercase;
+}
+
+.app-navigation__chevron {
+    color: var(--color-sidebar-muted);
+    font-size: 1rem;
+    line-height: 1;
+    transition: transform 160ms ease;
+}
+
+.app-navigation__toggle[aria-expanded="false"] .app-navigation__chevron {
+    transform: rotate(-90deg);
+}
+
+.app-navigation__group-content {
+    overflow: hidden;
+}
+
+.app-navigation__group-content[hidden] {
+    display: none;
+}
+
+.app-navigation__group.has-active-item > .app-navigation__toggle .app-navigation__section {
+    color: var(--color-sidebar-text);
 }
 
 .app-navigation__item {
@@ -793,7 +846,9 @@ a {
     }
 
     .app-sidebar {
-        min-height: auto;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
         padding: 0.875rem 1rem;
     }
 
@@ -803,6 +858,8 @@ a {
     }
 
     .app-navigation {
+        flex: 0 1 auto;
+        max-height: calc(100vh - 7rem);
         margin-top: 0.75rem;
     }
 
