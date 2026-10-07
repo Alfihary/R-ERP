@@ -357,6 +357,80 @@ final class ProductTicketEmailOutboxRepository
     }
 
     /**
+     * Atomically claims exactly the requested eligible row.
+     *
+     * Unlike claimNextEligible(), this method never selects another row and
+     * never applies stale recovery. It is intended for explicitly scoped
+     * one-off operations such as a controlled QA send.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function claimEligibleById(int $expectedId): ?array
+    {
+        if ($expectedId < 1) {
+            throw new \InvalidArgumentException('A positive outbox ID is required.');
+        }
+
+        $pdo = $this->pdo();
+        if ($pdo->inTransaction()) {
+            throw new \RuntimeException('Mail outbox claim requires its own short transaction.');
+        }
+
+        $pdo->beginTransaction();
+
+        try {
+            $forUpdate = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+            $statement = $pdo->prepare(
+                "SELECT id
+                 FROM tickets_productos_correos
+                 WHERE id = :id
+                   AND (
+                        status = 'PENDIENTE'
+                        OR (status = 'ERROR' AND intentos < max_intentos)
+                   )
+                 LIMIT 1{$forUpdate}"
+            );
+            $statement->execute(['id' => $expectedId]);
+
+            if ($statement->fetchColumn() === false) {
+                $pdo->commit();
+                return null;
+            }
+
+            $update = $pdo->prepare(
+                "UPDATE tickets_productos_correos
+                 SET status = 'ENVIANDO',
+                     intentos = intentos + 1,
+                     ultimo_intento_at = CURRENT_TIMESTAMP,
+                     enviado_at = NULL,
+                     error_mensaje_seguro = NULL
+                 WHERE id = :id
+                   AND (
+                        status = 'PENDIENTE'
+                        OR (status = 'ERROR' AND intentos < max_intentos)
+                   )"
+            );
+            $update->execute(['id' => $expectedId]);
+
+            if ($update->rowCount() !== 1) {
+                $pdo->rollBack();
+                return null;
+            }
+
+            $row = $this->findById($expectedId);
+            $pdo->commit();
+
+            return $row;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
      * @return array{result:string,row:array<string,mixed>|null}
      */
     public function markClaimSent(

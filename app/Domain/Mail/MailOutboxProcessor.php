@@ -70,6 +70,27 @@ final class MailOutboxProcessor
         return ['recovered_stale' => $recovered, 'processed' => $processed];
     }
 
+    /**
+     * Processes exactly one requested outbox row and never performs stale
+     * recovery or a second claim. The optional callback runs immediately
+     * before transport.send(), allowing a tightly scoped caller to verify the
+     * final envelope without exposing the SMTP secret.
+     *
+     * @return array{recovered_stale:int,processed:list<array<string,mixed>>}
+     */
+    public function processOne(int $expectedId, ?callable $beforeSend = null): array
+    {
+        $row = $this->outbox->claimEligibleById($expectedId);
+        if ($row === null) {
+            return ['recovered_stale' => 0, 'processed' => []];
+        }
+
+        return [
+            'recovered_stale' => 0,
+            'processed' => [$this->deliverClaimed($row, $beforeSend)],
+        ];
+    }
+
     public function recoverStaleProcessing(): int
     {
         return $this->outbox->recoverStale(
@@ -79,7 +100,7 @@ final class MailOutboxProcessor
     }
 
     /** @param array<string, mixed> $row @return array<string, mixed> */
-    private function deliverClaimed(array $row): array
+    private function deliverClaimed(array $row, ?callable $beforeSend = null): array
     {
         $id = (int) $row['id'];
         $claim = $this->claimIdentity($row);
@@ -93,6 +114,10 @@ final class MailOutboxProcessor
 
             if ($this->transport->requiresSecret()) {
                 $account['smtp_password'] = $this->resolveSecret((string) $account['smtp_secret_ref']);
+            }
+
+            if ($beforeSend !== null) {
+                $beforeSend($row, $message, $account);
             }
 
             $result = $this->transport->send($message, $account);
