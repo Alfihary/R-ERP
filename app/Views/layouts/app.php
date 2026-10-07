@@ -94,27 +94,131 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     <span aria-hidden="true">⌂</span>
                     Inicio
                 </a>
-                <?php if ($canAccessProfile): ?>
+                <?php $showAccount = $canAccessProfile || $canAccessCredential; ?>
+                <?php $showOperation = $canAccessProductTickets; ?>
+                <?php $showInventory = $canAccessProducts
+                    || $canAccessProductPrices
+                    || $canAccessInventory
+                    || $canAccessInventoryStock
+                    || $canAccessInventorySerialStock
+                    || $canAccessInventoryKardex
+                    || $canAccessInventorySerialKardex
+                    || $canAccessInventoryTransfers
+                    || $canAccessPriceLists; ?>
+                <?php $showOrganization = $canAccessConfigCompanies || $canAccessConfigWarehouses; ?>
+                <?php $showAdministration = $canAccessConfigFolios
+                    || $canAccessMailConfiguration
+                    || $canAccessMailOutbox
+                    || $canAccessAudit; ?>
+
+                <?php if ($showOperation): ?>
+                    <span class="app-navigation__section">Operación</span>
                     <a
-                        class="app-navigation__item<?= $activeNavigation === 'profile' ? ' is-active' : '' ?>"
-                        href="/perfil"
-                        <?= $activeNavigation === 'profile' ? 'aria-current="page"' : '' ?>
+                        class="app-navigation__item<?= $activeNavigation === 'product-tickets' ? ' is-active' : '' ?>"
+                        href="/tickets/productos"
+                        <?= $activeNavigation === 'product-tickets' ? 'aria-current="page"' : '' ?>
                     >
-                        <span aria-hidden="true">◌</span>
-                        Mi perfil
+                        <span aria-hidden="true">✉</span>
+                        Tickets de producto
                     </a>
                 <?php endif; ?>
-                <?php if ($canAccessCredential): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'credential' ? ' is-active' : '' ?>"
-                        href="/perfil/credencial"
-                        <?= $activeNavigation === 'credential' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">▣</span>
-                        Mi credencial
-                    </a>
+
+                <?php if ($showInventory): ?>
+                    <span class="app-navigation__section">Inventario</span>
+                    <?php if ($canAccessProducts): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'products' ? ' is-active' : '' ?>"
+                            href="/productos"
+                            <?= $activeNavigation === 'products' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">▤</span>
+                            Productos
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessProductPrices): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'product-prices' ? ' is-active' : '' ?>"
+                            href="/precios/productos"
+                            <?= $activeNavigation === 'product-prices' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">$</span>
+                            Precios por producto
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventory): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory' ? ' is-active' : '' ?>"
+                            href="/inventario/movimientos"
+                            <?= $activeNavigation === 'inventory' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">⇄</span>
+                            Movimientos
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventoryStock): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory-stock' ? ' is-active' : '' ?>"
+                            href="/inventario/existencias"
+                            <?= $activeNavigation === 'inventory-stock' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">≡</span>
+                            Existencias
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventorySerialStock): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory-serial-stock' ? ' is-active' : '' ?>"
+                            href="/inventario/existencias-series"
+                            <?= $activeNavigation === 'inventory-serial-stock' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">#</span>
+                            Existencias por serie
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventoryKardex): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory-kardex' ? ' is-active' : '' ?>"
+                            href="/inventario/kardex"
+                            <?= $activeNavigation === 'inventory-kardex' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">↕</span>
+                            Kardex
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventorySerialKardex): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory-serial-kardex' ? ' is-active' : '' ?>"
+                            href="/inventario/kardex-series"
+                            <?= $activeNavigation === 'inventory-serial-kardex' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">⌁</span>
+                            Kardex por serie
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessInventoryTransfers): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'inventory-transfers' ? ' is-active' : '' ?>"
+                            href="/inventario/transferencias"
+                            <?= $activeNavigation === 'inventory-transfers' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">⇆</span>
+                            Transferencias
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessPriceLists): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'configuration-price-lists' ? ' is-active' : '' ?>"
+                            href="/configuracion/listas-precios"
+                            <?= $activeNavigation === 'configuration-price-lists' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">$</span>
+                            Listas de precios
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
+
                 <?php if ($canAccessCatalogs): ?>
+                    <span class="app-navigation__section">Catálogos</span>
                     <a
                         class="app-navigation__item<?= $activeNavigation === 'catalogs' ? ' is-active' : '' ?>"
                         href="/catalogos"
@@ -124,170 +228,97 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                         Catálogos
                     </a>
                 <?php endif; ?>
-                <?php if ($canAccessProducts): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'products' ? ' is-active' : '' ?>"
-                        href="/productos"
-                        <?= $activeNavigation === 'products' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">▤</span>
-                        Productos
-                    </a>
+
+                <?php if ($showOrganization): ?>
+                    <span class="app-navigation__section">Organización</span>
+                    <?php if ($canAccessConfigCompanies): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'configuration-companies' ? ' is-active' : '' ?>"
+                            href="/configuracion/empresas"
+                            <?= $activeNavigation === 'configuration-companies' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">▧</span>
+                            Empresas
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessConfigWarehouses): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'configuration-warehouses' ? ' is-active' : '' ?>"
+                            href="/configuracion/almacenes"
+                            <?= $activeNavigation === 'configuration-warehouses' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">▣</span>
+                            Almacenes
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
-                <?php if ($canAccessProductPrices): ?>
-                    <span class="app-navigation__section">Precios</span>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'product-prices' ? ' is-active' : '' ?>"
-                        href="/precios/productos"
-                        <?= $activeNavigation === 'product-prices' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">$</span>
-                        Precios por producto
-                    </a>
+
+                <?php if ($showAdministration): ?>
+                    <span class="app-navigation__section">Administración</span>
+                    <?php if ($canAccessConfigFolios): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'configuration-folios' ? ' is-active' : '' ?>"
+                            href="/configuracion/folios"
+                            <?= $activeNavigation === 'configuration-folios' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">№</span>
+                            Folios
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessMailConfiguration): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'configuration-mail' ? ' is-active' : '' ?>"
+                            href="/admin/correo"
+                            <?= $activeNavigation === 'configuration-mail' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">@</span>
+                            Correo
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessMailOutbox): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'mail-outbox' ? ' is-active' : '' ?>"
+                            href="/admin/correo/cola"
+                            <?= $activeNavigation === 'mail-outbox' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">✉</span>
+                            Cola de correo
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessAudit): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'audit' ? ' is-active' : '' ?>"
+                            href="/auditoria"
+                            <?= $activeNavigation === 'audit' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">!</span>
+                            Auditoría
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
-                <?php if ($canAccessProductTickets): ?>
-                    <span class="app-navigation__section">Tickets</span>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'product-tickets' ? ' is-active' : '' ?>"
-                        href="/tickets/productos"
-                        <?= $activeNavigation === 'product-tickets' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">✉</span>
-                        Tickets de productos
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventory): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory' ? ' is-active' : '' ?>"
-                        href="/inventario/movimientos"
-                        <?= $activeNavigation === 'inventory' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">⇄</span>
-                        Inventario · Movimientos
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventoryStock): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory-stock' ? ' is-active' : '' ?>"
-                        href="/inventario/existencias"
-                        <?= $activeNavigation === 'inventory-stock' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">≡</span>
-                        Inventario · Existencias
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventorySerialStock): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-stock' ? ' is-active' : '' ?>"
-                        href="/inventario/existencias-series"
-                        <?= $activeNavigation === 'inventory-serial-stock' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">#</span>
-                        Inventario · Existencias por serie
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventoryKardex): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory-kardex' ? ' is-active' : '' ?>"
-                        href="/inventario/kardex"
-                        <?= $activeNavigation === 'inventory-kardex' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">↕</span>
-                        Inventario · Kardex
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventorySerialKardex): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-kardex' ? ' is-active' : '' ?>"
-                        href="/inventario/kardex-series"
-                        <?= $activeNavigation === 'inventory-serial-kardex' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">⌁</span>
-                        Inventario · Kardex por serie
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessInventoryTransfers): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'inventory-transfers' ? ' is-active' : '' ?>"
-                        href="/inventario/transferencias"
-                        <?= $activeNavigation === 'inventory-transfers' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">⇆</span>
-                        Inventario · Transferencias
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessConfiguration): ?>
-                    <span class="app-navigation__section">Configuración</span>
-                <?php endif; ?>
-                <?php if ($canAccessConfigCompanies): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'configuration-companies' ? ' is-active' : '' ?>"
-                        href="/configuracion/empresas"
-                        <?= $activeNavigation === 'configuration-companies' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">▧</span>
-                        Empresas
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessConfigWarehouses): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'configuration-warehouses' ? ' is-active' : '' ?>"
-                        href="/configuracion/almacenes"
-                        <?= $activeNavigation === 'configuration-warehouses' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">▣</span>
-                        Almacenes
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessConfigFolios): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'configuration-folios' ? ' is-active' : '' ?>"
-                        href="/configuracion/folios"
-                        <?= $activeNavigation === 'configuration-folios' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">№</span>
-                        Folios
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessPriceLists): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'configuration-price-lists' ? ' is-active' : '' ?>"
-                        href="/configuracion/listas-precios"
-                        <?= $activeNavigation === 'configuration-price-lists' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">$</span>
-                        Listas de precios
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessMailConfiguration): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'configuration-mail' ? ' is-active' : '' ?>"
-                        href="/admin/correo"
-                        <?= $activeNavigation === 'configuration-mail' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">@</span>
-                        Correo
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessMailOutbox): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'mail-outbox' ? ' is-active' : '' ?>"
-                        href="/admin/correo/cola"
-                        <?= $activeNavigation === 'mail-outbox' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">✉</span>
-                        Cola de correo
-                    </a>
-                <?php endif; ?>
-                <?php if ($canAccessAudit): ?>
-                    <a
-                        class="app-navigation__item<?= $activeNavigation === 'audit' ? ' is-active' : '' ?>"
-                        href="/auditoria"
-                        <?= $activeNavigation === 'audit' ? 'aria-current="page"' : '' ?>
-                    >
-                        <span aria-hidden="true">!</span>
-                        Auditoria
-                    </a>
+
+                <?php if ($showAccount): ?>
+                    <span class="app-navigation__section">Mi cuenta</span>
+                    <?php if ($canAccessProfile): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'profile' ? ' is-active' : '' ?>"
+                            href="/perfil"
+                            <?= $activeNavigation === 'profile' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">◌</span>
+                            Mi perfil
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessCredential): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'credential' ? ' is-active' : '' ?>"
+                            href="/perfil/credencial"
+                            <?= $activeNavigation === 'credential' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">▣</span>
+                            Mi credencial
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
             </nav>
 

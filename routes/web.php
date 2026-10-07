@@ -188,6 +188,26 @@ return static function (
             (int) ($user['user_id'] ?? 0),
             'inventario.transferencias.acceder'
         );
+        $canAccessInventoryStock = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.existencias.acceder'
+        );
+        $canAccessInventorySerialStock = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.existencias_series.acceder'
+        );
+        $canAccessInventoryKardex = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.kardex.acceder'
+        );
+        $canAccessInventorySerialKardex = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'inventario.kardex_series.acceder'
+        );
+        $canAccessProductTickets = $permissions->allows(
+            (int) ($user['user_id'] ?? 0),
+            'tickets_productos.ver'
+        );
         $canAccessConfiguration = $permissions->allows(
             (int) ($user['user_id'] ?? 0),
             'configuracion.empresas.acceder'
@@ -219,7 +239,12 @@ return static function (
             'canAccessCredential' => $canAccessCredential,
             'canAccessProducts' => $canAccessProducts,
             'canAccessProductPrices' => $canAccessProductPrices,
+            'canAccessProductTickets' => $canAccessProductTickets,
             'canAccessInventory' => $canAccessInventory,
+            'canAccessInventoryStock' => $canAccessInventoryStock,
+            'canAccessInventorySerialStock' => $canAccessInventorySerialStock,
+            'canAccessInventoryKardex' => $canAccessInventoryKardex,
+            'canAccessInventorySerialKardex' => $canAccessInventorySerialKardex,
             'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
             'canAccessConfiguration' => $canAccessConfiguration,
             'canAccessConfigCompanies' => $permissions->allows(
@@ -253,7 +278,12 @@ return static function (
             'contentData' => [
                 'canAccessCatalogs' => $canAccessCatalogs,
                 'canAccessProducts' => $canAccessProducts,
+                'canAccessProductTickets' => $canAccessProductTickets,
                 'canAccessInventory' => $canAccessInventory,
+                'canAccessInventoryStock' => $canAccessInventoryStock,
+                'canAccessInventorySerialStock' => $canAccessInventorySerialStock,
+                'canAccessInventoryKardex' => $canAccessInventoryKardex,
+                'canAccessInventorySerialKardex' => $canAccessInventorySerialKardex,
                 'canAccessInventoryTransfers' => $canAccessInventoryTransfers,
             ],
             'context' => $context->toArray(),
