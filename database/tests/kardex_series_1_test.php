@@ -646,24 +646,36 @@ return new class implements DatabaseTest {
 
     private function routeFileContainsGet(): bool
     {
-        $routes = file_get_contents(BASE_PATH . '/routes/web.php');
+        $app = require BASE_PATH . '/bootstrap/app.php';
+        $appReflection = new ReflectionClass($app);
+        $routerProperty = $appReflection->getProperty('router');
+        $routerProperty->setAccessible(true);
+        $router = $routerProperty->getValue($app);
+        $response = $router->dispatch(
+            new \App\Core\Request('GET', '/inventario/kardex-series')
+        );
 
-        if ($routes === false) {
-            throw new RuntimeException('Unable to read routes file.');
-        }
-
-        return str_contains($routes, "\$router->get(\n        '/inventario/kardex-series'");
+        return $response->status() !== 404;
     }
 
     private function routeFileContainsPost(): bool
     {
-        $routes = file_get_contents(BASE_PATH . '/routes/web.php');
+        return $this->registeredRoute('POST', '/inventario/kardex-series');
+    }
 
-        if ($routes === false) {
-            throw new RuntimeException('Unable to read routes file.');
-        }
+    private function registeredRoute(string $method, string $path): bool
+    {
+        $app = require BASE_PATH . '/bootstrap/app.php';
+        $appReflection = new ReflectionClass($app);
+        $routerProperty = $appReflection->getProperty('router');
+        $routerProperty->setAccessible(true);
+        $router = $routerProperty->getValue($app);
+        $routerReflection = new ReflectionClass($router);
+        $routesProperty = $routerReflection->getProperty('routes');
+        $routesProperty->setAccessible(true);
+        $routes = $routesProperty->getValue($router);
 
-        return str_contains($routes, "\$router->post(\n        '/inventario/kardex-series'");
+        return isset($routes[$method][$path]);
     }
 
     /**
