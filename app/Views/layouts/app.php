@@ -37,6 +37,31 @@ $activeSidebarGroup = match ($activeNavigation) {
     'profile', 'credential' => 'account',
     default => null,
 };
+$centralSidebar = View::sidebarNavigationForUser((int) ($user['user_id'] ?? 0));
+if (is_array($centralSidebar)) {
+    $sidebarPermissions = is_array($centralSidebar['permissions'] ?? null)
+        ? $centralSidebar['permissions']
+        : [];
+    $canAccessProfile = ($sidebarPermissions['perfil.ver'] ?? false) === true;
+    $canAccessCredential = ($sidebarPermissions['credencial.ver'] ?? false) === true;
+    $canAccessCatalogs = ($sidebarPermissions['catalogos.acceder'] ?? false) === true;
+    $canAccessProducts = ($sidebarPermissions['productos.acceder'] ?? false) === true;
+    $canAccessProductPrices = ($sidebarPermissions['precios.productos.acceder'] ?? false) === true;
+    $canAccessProductTickets = ($sidebarPermissions['tickets_productos.ver'] ?? false) === true;
+    $canAccessInventory = ($sidebarPermissions['inventario.movimientos.acceder'] ?? false) === true;
+    $canAccessInventoryStock = ($sidebarPermissions['inventario.existencias.acceder'] ?? false) === true;
+    $canAccessInventorySerialStock = ($sidebarPermissions['inventario.existencias_series.acceder'] ?? false) === true;
+    $canAccessInventoryKardex = ($sidebarPermissions['inventario.kardex.acceder'] ?? false) === true;
+    $canAccessInventorySerialKardex = ($sidebarPermissions['inventario.kardex_series.acceder'] ?? false) === true;
+    $canAccessInventoryTransfers = ($sidebarPermissions['inventario.transferencias.acceder'] ?? false) === true;
+    $canAccessConfigCompanies = ($sidebarPermissions['configuracion.empresas.acceder'] ?? false) === true;
+    $canAccessConfigWarehouses = ($sidebarPermissions['configuracion.almacenes.acceder'] ?? false) === true;
+    $canAccessConfigFolios = ($sidebarPermissions['configuracion.folios.acceder'] ?? false) === true;
+    $canAccessPriceLists = ($sidebarPermissions['precios.listas.acceder'] ?? false) === true;
+    $canAccessMailConfiguration = ($sidebarPermissions['configuracion.correo.administrar'] ?? false) === true;
+    $canAccessMailOutbox = ($sidebarPermissions['correos.cola.ver'] ?? false) === true;
+    $canAccessAudit = ($sidebarPermissions['auditoria.ver'] ?? false) === true;
+}
 $canAccessProfile = ($canAccessProfile ?? false) === true;
 $canAccessCredential = ($canAccessCredential ?? false) === true;
 $canAccessCatalogs = ($canAccessCatalogs ?? false) === true;

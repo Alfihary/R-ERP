@@ -86,7 +86,11 @@ a {
 
 .app-sidebar {
     display: flex;
+    position: sticky;
+    top: 0;
+    align-self: start;
     height: 100vh;
+    height: 100dvh;
     min-height: 0;
     flex-direction: column;
     overflow: hidden;
@@ -846,8 +850,11 @@ a {
     }
 
     .app-sidebar {
+        position: static;
+        top: auto;
+        align-self: auto;
         height: auto;
-        min-height: 100vh;
+        min-height: auto;
         overflow: visible;
         padding: 0.875rem 1rem;
     }

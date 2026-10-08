@@ -52,6 +52,20 @@ if (!str_contains($css, '.app-navigation {')
     throw new RuntimeException('Vertical scroll or no-JS fallback contract is missing.');
 }
 
+if (!preg_match('/\.app-sidebar\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;[^}]*align-self:\s*start;[^}]*height:\s*100vh;[^}]*height:\s*100dvh;/s', $css)) {
+    throw new RuntimeException('Desktop sidebar sticky viewport contract is missing.');
+}
+
+if (!preg_match('/@media\s*\(max-width:\s*48rem\)\s*\{.*?\.app-sidebar\s*\{[^}]*position:\s*static;[^}]*height:\s*auto;[^}]*min-height:\s*auto;/s', $css)) {
+    throw new RuntimeException('Responsive sidebar sticky override is missing.');
+}
+
+if (preg_match('/\.app-shell\s*\{[^}]*overflow\s*:/s', $css)
+    || preg_match('/body\s*\{[^}]*overflow\s*:/s', $css)
+) {
+    throw new RuntimeException('A layout ancestor may block sticky positioning.');
+}
+
 foreach ([
     "r_erp_sidebar_groups_v1",
     "localStorage.setItem",
@@ -69,4 +83,4 @@ if (str_contains($js, 'fetch(')
     throw new RuntimeException('Sidebar JS must remain presentation-only.');
 }
 
-echo 'PASS collapse groups=6 root=1 items=20 accessible=6 scroll=auto storage=ux-only' . PHP_EOL;
+echo 'PASS collapse groups=6 root=1 items=20 accessible=6 scroll=auto storage=ux-only sticky=desktop responsive=static' . PHP_EOL;

@@ -8,6 +8,7 @@ use App\Core\Env;
 use App\Core\ErrorHandler;
 use App\Core\Router;
 use App\Core\Session;
+use App\Core\View;
 use App\Domain\Audit\AuditService;
 use App\Domain\Auth\AuthService;
 use App\Domain\Catalogs\CatalogService;
@@ -27,6 +28,7 @@ use App\Domain\Mail\MailConfigurationService;
 use App\Domain\Mail\MailOutboxActionService;
 use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
 use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
+use App\Domain\Navigation\SidebarNavigationService;
 use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
@@ -162,6 +164,8 @@ $auditRepository = new AuditRepository($connection);
 $audit = new AuditService($auditRepository);
 $auth = new AuthService(new UserRepository($connection), $session);
 $permissions = new PermissionService(new PermissionRepository($connection));
+$sidebarNavigation = new SidebarNavigationService($permissions);
+View::setSidebarNavigation($sidebarNavigation);
 $catalogs = new CatalogService(new CatalogRepository($connection));
 $classifications = new ClassificationService(
     new ClassificationRepository($connection)
