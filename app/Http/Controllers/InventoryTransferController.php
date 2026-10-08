@@ -348,6 +348,7 @@ final class InventoryTransferController
         $parts = $this->formParts($parts);
 
         return [
+            'idempotency_key' => $this->text($input, 'idempotency_key'),
             'almacen_origen_id' => $this->text($input, 'almacen_origen_id'),
             'almacen_destino_id' => $this->text($input, 'almacen_destino_id'),
             'fecha_movimiento' => $this->text($input, 'fecha_movimiento'),

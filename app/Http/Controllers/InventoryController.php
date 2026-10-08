@@ -752,6 +752,7 @@ final class InventoryController
         $parts = $this->formParts($parts);
 
         return [
+            'idempotency_key' => $this->text($input, 'idempotency_key'),
             'concepto_codigo' => $this->text($input, 'concepto_codigo'),
             'fecha_movimiento' => $this->text($input, 'fecha_movimiento'),
             'referencia' => $this->text($input, 'referencia'),
