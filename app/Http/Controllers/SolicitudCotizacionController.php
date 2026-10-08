@@ -49,7 +49,23 @@ final class SolicitudCotizacionController
     }
 
     public function saveCommercial(Request $request,array $params):Response
-    { $user=$this->auth->user();try{$draft=$this->quote($this->solicitudes->findForUser((int)$params['id'],(int)$user['user_id']), (int)$user['user_id']);$this->quotations->saveCommercial((int)$draft['id'],(int)$user['user_id'],$request->body());return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?commercial=1');}catch(\Throwable $e){return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?commercial_error='.rawurlencode($e->getMessage()));}}
+    {
+        $user = $this->auth->user();
+        $uid = (int)($user['user_id'] ?? 0);
+        try {
+            $solicitud = $this->solicitudes->findForUser((int)$params['id'], $uid);
+            $draft = $this->quote($solicitud, $uid);
+            $context = $this->scopeContext->resolveForUser($uid);
+            $company = $context->activeCompany();
+            if (!$company) throw new \RuntimeException('No hay empresa emisora activa.');
+            $data = $request->body();
+            $data['empresa_id'] = (int)$company['id'];
+            $this->quotations->saveCommercial((int)$draft['id'], $uid, $data);
+            return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?commercial=1');
+        } catch (\Throwable $e) {
+            return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?commercial_error='.rawurlencode($e->getMessage()));
+        }
+    }
     public function emitCommercial(Request $request,array $params):Response
     { $user=$this->auth->user();try{$draft=$this->quote($this->solicitudes->findForUser((int)$params['id'],(int)$user['user_id']), (int)$user['user_id']);$this->quotations->emit((int)$draft['id'],(int)$user['user_id']);return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?emitted=1');}catch(\Throwable $e){return Response::redirect('/app/solicitudes-cotizacion/'.(int)$params['id'].'?commercial_error='.rawurlencode($e->getMessage()));}}
 
