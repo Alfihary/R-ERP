@@ -49,6 +49,7 @@ $parts = is_array($values['partidas'] ?? null) ? $values['partidas'] : [];
     data-product-search-endpoint="/inventario/transferencias/productos/buscar"
 >
     <?= csrf_field($csrf) ?>
+    <input type="hidden" name="idempotency_key" value="<?= e((string) ($values['idempotency_key'] ?? '')) ?>">
 
     <section class="transfer-form-section" aria-labelledby="transfer-context-title">
         <div class="transfer-section-heading">

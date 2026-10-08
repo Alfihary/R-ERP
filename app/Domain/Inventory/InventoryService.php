@@ -6,6 +6,8 @@ namespace App\Domain\Inventory;
 
 use App\Domain\Folios\FolioService;
 use App\Domain\Folios\FolioValidationException;
+use App\Infrastructure\Repositories\AuditRepository;
+use App\Infrastructure\Repositories\InventoryIdempotencyRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
 
 final class InventoryService
@@ -18,7 +20,9 @@ final class InventoryService
 
     public function __construct(
         private readonly InventoryRepository $inventory,
-        private readonly ?FolioService $folios = null
+        private readonly ?FolioService $folios = null,
+        private readonly ?InventoryIdempotencyRepository $idempotency = null,
+        private readonly ?AuditRepository $audit = null
     )
     {
     }
@@ -36,6 +40,14 @@ final class InventoryService
             $this->assertScope($request['empresa_id'], $request['almacen_id']);
             $concept = $this->assertConcept($request['concepto_codigo']);
             $parts = $this->assertProducts($request['partidas']);
+            $idempotency = $this->reserveIdempotency(
+                'movimiento:' . $request['empresa_id'],
+                $request['idempotency_key'],
+                $this->fingerprint($request)
+            );
+            if ($idempotency['replay'] !== null) {
+                return $idempotency['replay'];
+            }
             $folio = $this->emitMovementFolio($request);
 
             if (!empty($request['simulate_failure_after_folio'])) {
@@ -143,8 +155,7 @@ final class InventoryService
                 $request['usuario_id']
             );
             $movement = $this->inventory->movementResult($movementId);
-
-            return [
+            $result = [
                 'movimiento_id' => (int) $movement['id'],
                 'estado' => (string) $movement['estado'],
                 'empresa_id' => (int) $movement['empresa_id'],
@@ -163,6 +174,14 @@ final class InventoryService
                     : (string) $movement['referencia'],
                 'partidas_aplicadas' => $appliedParts,
             ];
+            $this->recordAudit(
+                $request,
+                $movement,
+                $appliedParts
+            );
+            $this->completeIdempotency($idempotency['id'], $result);
+
+            return $result;
         });
     }
 
@@ -178,6 +197,7 @@ final class InventoryService
      *     simulate_failure_after_folio: bool,
      *     observaciones: string|null,
      *     usuario_id: int,
+     *     idempotency_key: string,
      *     partidas: list<array{
      *         id_producto: string,
      *         cantidad: string,
@@ -298,6 +318,11 @@ final class InventoryService
                 strcmp($a['id_producto'], $b['id_producto'])
         );
 
+        $idempotencyKey = $this->idempotencyKey($input['idempotency_key'] ?? null);
+        if ($idempotencyKey === null) {
+            $errors['idempotency_key'] = 'La clave de idempotencia no es válida.';
+        }
+
         return [
             'empresa_id' => $companyId,
             'almacen_id' => $warehouseId,
@@ -309,8 +334,78 @@ final class InventoryService
                 !empty($input['__simulate_failure_after_folio']),
             'observaciones' => $notes,
             'usuario_id' => $actorId,
+            'idempotency_key' => $idempotencyKey ?? '',
             'partidas' => $parts,
         ];
+    }
+
+    /** @return array{id: int, replay: array<string, mixed>|null} */
+    private function reserveIdempotency(string $scope, string $key, string $hash): array
+    {
+        if ($this->idempotency === null) {
+            return ['id' => 0, 'replay' => null];
+        }
+        $row = $this->idempotency->reserve($scope, $key, $hash);
+        if ($row['estado'] === 'COMPLETADA' && $row['resultado_json'] !== null) {
+            $decoded = json_decode($row['resultado_json'], true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($decoded)) {
+                throw new \RuntimeException('Resultado idempotente inválido.');
+            }
+            return ['id' => $row['id'], 'replay' => $decoded];
+        }
+        return ['id' => $row['id'], 'replay' => null];
+    }
+
+    /** @param array<string, mixed> $result */
+    private function completeIdempotency(int $id, array $result): void
+    {
+        if ($this->idempotency !== null) {
+            $this->idempotency->complete($id, $result);
+        }
+    }
+
+    /** @param array<string, mixed> $request */
+    private function fingerprint(array $request): string
+    {
+        unset($request['idempotency_key']);
+        return hash('sha256', json_encode($request, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function idempotencyKey(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $this->idempotency === null ? bin2hex(random_bytes(16)) : null;
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+        $value = trim($value);
+        return preg_match('/^[A-Za-z0-9._~-]{16,128}$/', $value) === 1 ? $value : null;
+    }
+
+    /** @param array<string, mixed> $request @param array<string, mixed> $movement @param array<int, mixed> $parts */
+    private function recordAudit(array $request, array $movement, array $parts): void
+    {
+        if ($this->audit === null) {
+            return;
+        }
+        $this->audit->insertRequired(
+            (int) $request['usuario_id'],
+            'inventario.movimiento.creado',
+            'movimientos_inventario',
+            (string) $movement['id'],
+            'ok',
+            null,
+            null,
+            [
+                'empresa_id' => $request['empresa_id'],
+                'almacen_id' => $request['almacen_id'],
+                'concepto_codigo' => $movement['concepto_codigo'],
+                'referencia' => $request['referencia'],
+                'idempotency_key' => $request['idempotency_key'],
+                'partidas' => $parts,
+            ]
+        );
     }
 
     private function assertUser(int $userId): void

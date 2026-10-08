@@ -80,6 +80,7 @@ use App\Infrastructure\Repositories\ExchangeRateRepository;
 use App\Infrastructure\Repositories\FolioRepository;
 use App\Infrastructure\Repositories\FolioSeriesRepository;
 use App\Infrastructure\Repositories\InventoryQueryRepository;
+use App\Infrastructure\Repositories\InventoryIdempotencyRepository;
 use App\Infrastructure\Repositories\InventoryRepository;
 use App\Infrastructure\Repositories\MailConfigurationRepository;
 use App\Infrastructure\Repositories\MailOutboxQueryRepository;
@@ -228,8 +229,19 @@ $productImages = new ProductImageService(
     (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
 );
 $inventoryRepository = new InventoryRepository($connection);
-$inventory = new InventoryService($inventoryRepository, $folioService);
-$inventoryTransfers = new InventoryTransferService($inventoryRepository, $folioService);
+$inventoryIdempotency = new InventoryIdempotencyRepository($connection);
+$inventory = new InventoryService(
+    $inventoryRepository,
+    $folioService,
+    $inventoryIdempotency,
+    $auditRepository
+);
+$inventoryTransfers = new InventoryTransferService(
+    $inventoryRepository,
+    $folioService,
+    $inventoryIdempotency,
+    $auditRepository
+);
 $inventoryQueries = new InventoryQueryRepository($connection);
 $mailConfiguration = new MailConfigurationService(
     new MailConfigurationRepository($connection)

@@ -48,6 +48,7 @@ $parts = is_array($values['partidas'] ?? null) ? $values['partidas'] : [];
     data-product-search-endpoint="/inventario/productos/buscar"
 >
     <?= csrf_field($csrf) ?>
+    <input type="hidden" name="idempotency_key" value="<?= e((string) ($values['idempotency_key'] ?? '')) ?>">
 
     <section class="inventory-form-section" aria-labelledby="inventory-context-title">
         <div class="inventory-section-heading">

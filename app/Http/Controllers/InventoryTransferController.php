@@ -10,6 +10,7 @@ use App\Core\Response;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Inventory\InventoryTransferService;
+use App\Domain\Inventory\InventoryIdempotencyConflictException;
 use App\Domain\Inventory\InventoryValidationException;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContext;
@@ -101,6 +102,14 @@ final class InventoryTransferController
 
         $company = $context->activeCompany();
         $user = $this->user();
+        $idempotencyKey = $this->idempotencyKey($request->body()['idempotency_key'] ?? null);
+        if ($idempotencyKey === null) {
+            return $this->renderForm(
+                $request->body(),
+                ['idempotency_key' => 'La clave de operación no es válida.'],
+                422
+            );
+        }
 
         try {
             $result = $this->transfers->transferir([
@@ -118,7 +127,14 @@ final class InventoryTransferController
                 'observaciones' => $this->text($request->body(), 'observaciones'),
                 'usuario_id' => $user['user_id'],
                 'partidas' => $this->parts($request->body()),
+                'idempotency_key' => $idempotencyKey,
             ]);
+        } catch (InventoryIdempotencyConflictException) {
+            return $this->renderForm(
+                $request->body(),
+                ['idempotency_key' => 'La clave ya fue usada con datos distintos.'],
+                409
+            );
         } catch (InventoryValidationException $exception) {
             return $this->renderForm(
                 $request->body(),
@@ -347,6 +363,7 @@ final class InventoryTransferController
     private function defaultValues(): array
     {
         return [
+            'idempotency_key' => bin2hex(random_bytes(16)),
             'almacen_origen_id' => '',
             'almacen_destino_id' => '',
             'fecha_movimiento' => date('Y-m-d\TH:i'),
@@ -356,6 +373,15 @@ final class InventoryTransferController
                 $this->emptyPart(),
             ],
         ];
+    }
+
+    private function idempotencyKey(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $value = trim($value);
+        return preg_match('/^[A-Za-z0-9._~-]{16,128}$/', $value) === 1 ? $value : null;
     }
 
     /**
