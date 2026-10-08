@@ -1,0 +1,186 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\DatabaseTest;
+use App\Infrastructure\Database\Migration;
+use App\Infrastructure\Database\MigrationRunner;
+use App\Infrastructure\Database\Seed;
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit(1);
+}
+
+define('BASE_PATH', dirname(__DIR__));
+
+try {
+    $command = $argv[1] ?? '';
+    $options = [];
+
+    foreach (array_slice($argv, 2) as $argument) {
+        if (!str_starts_with($argument, '--')) {
+            throw new RuntimeException('Unexpected CLI argument.');
+        }
+
+        [$name, $value] = array_pad(
+            explode('=', substr($argument, 2), 2),
+            2,
+            ''
+        );
+        $options[$name] = $value;
+    }
+
+    $allowed = [
+        'migrate',
+        'rollback',
+        'db:migrate',
+        'db:rollback',
+        'db:test',
+        'seed',
+        'status',
+    ];
+
+    if (!in_array($command, $allowed, true)) {
+        throw new RuntimeException('Unknown SERIES-DB-1 CLI command.');
+    }
+
+    $expectedDatabase = trim($options['database'] ?? '');
+    $confirmedDatabase = trim($options['confirm-database'] ?? '');
+
+    if (
+        $expectedDatabase === ''
+        || $expectedDatabase !== $confirmedDatabase
+        || $expectedDatabase !== 'r_erp_db_core_0_test'
+    ) {
+        throw new RuntimeException(
+            'The SERIES-DB-1 test database name must be confirmed exactly.'
+        );
+    }
+
+    $config = require BASE_PATH . '/bootstrap/database.php';
+
+    if (
+        strtolower((string) $config->get('app.env', 'production'))
+        === 'production'
+    ) {
+        throw new RuntimeException(
+            'SERIES-DB-1 CLI commands are disabled in production.'
+        );
+    }
+
+    $databaseConfig = $config->get('database', []);
+
+    if (
+        !is_array($databaseConfig)
+        || ($databaseConfig['name'] ?? '') !== $expectedDatabase
+    ) {
+        throw new RuntimeException(
+            'SERIES-DB-1 configuration does not match the confirmed database.'
+        );
+    }
+
+    $pdo = (new ConnectionProvider($databaseConfig))->pdo();
+    $migration = require BASE_PATH
+        . '/database/migrations/'
+        . 'series_1_001_create_inventory_series_tables.php';
+    $test = require BASE_PATH . '/database/tests/series_1_test.php';
+    $serviceTest = require BASE_PATH
+        . '/database/tests/series_service_1_test.php';
+    $uiTest = require BASE_PATH
+        . '/database/tests/series_ui_1_test.php';
+    $serialStockSeed = require BASE_PATH
+        . '/database/seeds/existencias_series_1_seed_permissions.php';
+    $serialStockTest = require BASE_PATH
+        . '/database/tests/existencias_series_1_test.php';
+    $serialKardexSeed = require BASE_PATH
+        . '/database/seeds/kardex_series_1_seed_permissions.php';
+    $serialKardexTest = require BASE_PATH
+        . '/database/tests/kardex_series_1_test.php';
+
+    if (
+        !$migration instanceof Migration
+        || !$test instanceof DatabaseTest
+        || !$serviceTest instanceof DatabaseTest
+        || !$uiTest instanceof DatabaseTest
+        || !$serialStockSeed instanceof Seed
+        || !$serialStockTest instanceof DatabaseTest
+        || !$serialKardexSeed instanceof Seed
+        || !$serialKardexTest instanceof DatabaseTest
+    ) {
+        throw new RuntimeException(
+            'A SERIES database artifact has an invalid contract.'
+        );
+    }
+
+    $runner = new MigrationRunner($pdo);
+    $result = match ($command) {
+        'migrate', 'db:migrate' => [
+            'migration' => $migration->id(),
+            'result' => $runner->migrate($migration),
+        ],
+        'rollback', 'db:rollback' => [
+            'migration' => $migration->id(),
+            'result' => $runner->rollback($migration),
+        ],
+        'seed' => (static function () use (
+            $serialStockSeed,
+            $serialKardexSeed,
+            $pdo
+        ): array {
+            $serialStockSeed->run($pdo);
+            $serialKardexSeed->run($pdo);
+            return [
+                'seeds' => [
+                    $serialStockSeed->id(),
+                    $serialKardexSeed->id(),
+                ],
+                'result' => 'applied',
+            ];
+        })(),
+        'db:test' => [
+            'schema' => $test->run($pdo, $expectedDatabase),
+            'service' => $serviceTest->run($pdo, $expectedDatabase),
+            'ui' => $uiTest->run($pdo, $expectedDatabase),
+            'serial_stock' => (static function () use (
+                $serialStockSeed,
+                $serialStockTest,
+                $pdo,
+                $expectedDatabase
+            ): array {
+                $serialStockSeed->run($pdo);
+                $serialStockSeed->run($pdo);
+                return $serialStockTest->run($pdo, $expectedDatabase);
+            })(),
+            'serial_kardex' => (static function () use (
+                $serialKardexSeed,
+                $serialKardexTest,
+                $pdo,
+                $expectedDatabase
+            ): array {
+                $serialKardexSeed->run($pdo);
+                $serialKardexSeed->run($pdo);
+                return $serialKardexTest->run($pdo, $expectedDatabase);
+            })(),
+        ],
+        'status' => ['migrations' => $runner->status()],
+    };
+
+    echo json_encode(
+        ['command' => $command, 'result' => $result],
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+    ) . PHP_EOL;
+} catch (PDOException $exception) {
+    fwrite(
+        STDERR,
+        'SERIES-DB-1 database operation failed with SQLSTATE['
+        . $exception->getCode()
+        . '].'
+        . PHP_EOL
+    );
+    exit(1);
+} catch (Throwable $exception) {
+    fwrite(STDERR, $exception->getMessage() . PHP_EOL);
+    exit(1);
+}

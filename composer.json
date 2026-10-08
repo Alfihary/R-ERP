@@ -1,0 +1,13 @@
+{
+    "name": "soportegr/r-erp",
+    "description": "ERP modular de SoporteGR.",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2",
+        "phpmailer/phpmailer": "^6.12",
+        "lbuchs/webauthn": "^2.2",
+        "bacon/bacon-qr-code": "^3.1",
+        "minishlink/web-push": "^9.0"
+    }
+}

@@ -1,0 +1,53 @@
+Options -Indexes
+
+<FilesMatch "^(\.env|composer\.json|composer\.lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+RewriteEngine On
+
+# ---------------------------------------------------------
+# RUTA PRINCIPAL DEL ERP
+# ---------------------------------------------------------
+
+# Permitir:
+# /app
+# /app/
+RewriteRule ^app/?$ public/index.php [L]
+
+# Proteger el código fuente real:
+# /app/Core/...
+# /app/Domain/...
+# /app/Infrastructure/...
+RewriteRule ^app/.+ - [F,L]
+
+# ---------------------------------------------------------
+# DIRECTORIOS PRIVADOS
+# ---------------------------------------------------------
+
+RewriteRule ^(bootstrap|config|database|docs|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+
+# ---------------------------------------------------------
+# ARCHIVOS PÚBLICOS
+# ---------------------------------------------------------
+
+RewriteRule ^public/ - [L]
+
+RewriteRule ^icons/(.*)$ public/icons/$1 [L]
+RewriteRule ^css/(.*)$ public/css/$1 [L]
+RewriteRule ^js/(.*)$ public/js/$1 [L]
+RewriteRule ^img/(.*)$ public/img/$1 [L]
+RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+RewriteRule ^favicon\.ico$ public/favicon.ico [L]
+RewriteRule ^manifest\.webmanifest$ public/manifest.webmanifest [L]
+RewriteRule ^sw\.js$ public/sw.js [L]
+RewriteRule ^offline\.html$ public/offline.html [L]
+
+# ---------------------------------------------------------
+# FRONT CONTROLLER
+# ---------------------------------------------------------
+
+RewriteRule ^$ public/index.php [L]
+RewriteRule ^(.+)$ public/index.php [L]

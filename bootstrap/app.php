@@ -1,0 +1,547 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Core\App;
+use App\Core\Config;
+use App\Core\Env;
+use App\Core\ErrorHandler;
+use App\Core\Router;
+use App\Core\Session;
+use App\Domain\Audit\AuditService;
+use App\Domain\Auth\AuthService;
+use App\Domain\Catalogs\CatalogService;
+use App\Domain\Catalogs\ClassificationService;
+use App\Domain\Catalogs\ExchangeRateService;
+use App\Domain\Catalogs\SatCatalogService;
+use App\Domain\Configuration\CompanyService;
+use App\Domain\Configuration\WarehouseService;
+use App\Domain\Credentials\CredentialQrService;
+use App\Domain\Credentials\CredentialService;
+use App\Domain\Credentials\CredentialTokenService;
+use App\Domain\Credentials\CredentialVerificationService;
+use App\Domain\Folios\FolioService;
+use App\Domain\Inventory\InventoryService;
+use App\Domain\Inventory\InventoryTransferService;
+use App\Domain\Mail\MailConfigurationService;
+use App\Domain\Notifications\NotificationService;
+use App\Domain\Notifications\NotificationPushService;
+use App\Domain\Pricing\PriceListService;
+use App\Domain\Pricing\ProductPriceService;
+use App\Domain\Profile\ProfileService;
+use App\Domain\Solicitudes\SolicitudCotizacionService;
+use App\Domain\Products\ProductImageService;
+use App\Domain\Products\ProductService;
+use App\Domain\Security\PermissionService;
+use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\UserScopeService;
+use App\Domain\Tickets\ProductRequestTicketService;
+use App\Domain\Tickets\ProductTicketEmailNotificationService;
+use App\Domain\Tickets\ProductTicketEmailOutboxService;
+use App\Domain\Vcards\VcardPrivacyService;
+use App\Domain\Vcards\VcardProductService;
+use App\Domain\Vcards\VcardQrService;
+use App\Domain\Vcards\VcardService;
+use App\Domain\Vcards\VcardVcfService;
+use App\Http\Middlewares\CsrfMiddleware;
+use App\Http\Middlewares\ErrorHandlingMiddleware;
+use App\Http\Middlewares\SecurityHeadersMiddleware;
+use App\Http\Controllers\AuditController;
+use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\ClassificationController;
+use App\Http\Controllers\CompanyController;
+use App\Http\Controllers\CredentialController;
+use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\FolioSeriesController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryTransferController;
+use App\Http\Controllers\MailConfigurationController;
+use App\Http\Controllers\N8nProductSearchController;
+use App\Http\Controllers\N8nNotificationController;
+use App\Http\Controllers\NotificationCenterController;
+use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\PriceListController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProductPriceController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductRequestTicketController;
+use App\Http\Controllers\PublicCredentialController;
+use App\Http\Controllers\PublicVcardController;
+use App\Http\Controllers\SatCatalogController;
+use App\Http\Controllers\WarehouseController;
+use App\Support\Security\CsrfTokenService;
+use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Repositories\AuditRepository;
+use App\Infrastructure\Repositories\AuditQueryRepository;
+use App\Infrastructure\Repositories\PermissionRepository;
+use App\Infrastructure\Repositories\CatalogRepository;
+use App\Infrastructure\Repositories\ClassificationRepository;
+use App\Infrastructure\Repositories\CompanyRepository;
+use App\Infrastructure\Repositories\ExchangeRateRepository;
+use App\Infrastructure\Repositories\FolioRepository;
+use App\Infrastructure\Repositories\FolioSeriesRepository;
+use App\Infrastructure\Repositories\InventoryQueryRepository;
+use App\Infrastructure\Repositories\InventoryRepository;
+use App\Infrastructure\Repositories\MailConfigurationRepository;
+use App\Infrastructure\Repositories\N8nProductSearchRepository;
+use App\Infrastructure\Repositories\NotificationRepository;
+use App\Infrastructure\Repositories\NotificationPushDeliveryRepository;
+use App\Infrastructure\Repositories\PushSubscriptionRepository;
+use App\Infrastructure\Repositories\PriceListRepository;
+use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\ProductDocumentRepository;
+use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
+use App\Infrastructure\Repositories\ProductPriceRepository;
+use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
+use App\Infrastructure\Repositories\ProfileRepository;
+use App\Infrastructure\Repositories\SatCatalogRepository;
+use App\Infrastructure\Repositories\ScopeRepository;
+use App\Infrastructure\Repositories\SolicitudCotizacionRepository;
+use App\Infrastructure\Repositories\UserPhotoRepository;
+use App\Infrastructure\Repositories\UserCredentialRepository;
+use App\Infrastructure\Repositories\CredentialTokenRepository;
+use App\Infrastructure\Repositories\UserRepository;
+use App\Infrastructure\Repositories\UserVcardRepository;
+use App\Infrastructure\Repositories\VcardPrivacyRepository;
+use App\Infrastructure\Repositories\VcardProductRepository;
+use App\Infrastructure\Repositories\WarehouseRepository;
+use App\Infrastructure\Storage\UserPhotoStorage;
+
+if (!defined('BASE_PATH')) {
+    throw new RuntimeException('BASE_PATH must be defined before bootstrapping the application.');
+}
+
+require BASE_PATH . '/bootstrap/autoload.php';
+
+require BASE_PATH . '/app/Support/Security/helpers.php';
+
+Env::load(BASE_PATH . '/.env');
+
+$paths = require BASE_PATH . '/config/paths.php';
+
+foreach ($paths as $constant => $path) {
+    if (!defined($constant)) {
+        define($constant, $path);
+    }
+}
+
+$config = new Config([
+    'app' => require CONFIG_PATH . '/app.php',
+    'auth' => require CONFIG_PATH . '/auth.php',
+    'database' => require CONFIG_PATH . '/database.php',
+    'paths' => $paths,
+    'security' => require CONFIG_PATH . '/security.php',
+    'session' => require CONFIG_PATH . '/session.php',
+    'vcard_leads' => require CONFIG_PATH . '/vcard-leads.php',
+]);
+
+$timezone = (string) $config->get('app.timezone', 'UTC');
+new DateTimeZone($timezone);
+date_default_timezone_set($timezone);
+
+$environment = strtolower((string) $config->get('app.env', 'production'));
+$debug = $environment !== 'production' && (bool) $config->get('app.debug', false);
+
+ini_set('display_errors', $debug ? '1' : '0');
+ini_set('display_startup_errors', $debug ? '1' : '0');
+
+$sessionConfig = $config->get('session', []);
+
+if (!is_array($sessionConfig)) {
+    throw new RuntimeException('Session configuration must be an array.');
+}
+
+$session = new Session($sessionConfig);
+$session->start();
+
+$csrfTtl = (int) $config->get('security.csrf_ttl_seconds', 7200);
+$csrf = new CsrfTokenService($session, $csrfTtl);
+$errorHandler = new ErrorHandler($debug);
+$databaseConfig = $config->get('database', []);
+
+if (!is_array($databaseConfig)) {
+    throw new RuntimeException('Database configuration must be an array.');
+}
+
+$connection = new ConnectionProvider($databaseConfig);
+$audit = new AuditService(new AuditRepository($connection));
+$auth = new AuthService(
+    new UserRepository($connection),
+    $session
+);
+
+$webauthnConfig = require CONFIG_PATH . '/webauthn.php';
+
+$permissions = new PermissionService(
+    new PermissionRepository($connection)
+);
+$catalogs = new CatalogService(new CatalogRepository($connection));
+$classifications = new ClassificationService(
+    new ClassificationRepository($connection)
+);
+$exchangeRates = new ExchangeRateService(
+    new ExchangeRateRepository($connection)
+);
+$satCatalogs = new SatCatalogService(new SatCatalogRepository($connection));
+$companyRepository = new CompanyRepository($connection);
+$warehouseRepository = new WarehouseRepository($connection);
+$folioSeriesRepository = new FolioSeriesRepository($connection);
+$folioService = new FolioService(new FolioRepository($connection));
+$companies = new CompanyService($companyRepository);
+$warehouses = new WarehouseService($warehouseRepository);
+$credentials = new CredentialService(
+    new UserCredentialRepository($connection)
+);
+$credentialTokens = new CredentialTokenService(
+    $credentials,
+    new CredentialTokenRepository($connection),
+    $audit
+);
+$credentialQr = new CredentialQrService();
+$credentialVerification = new CredentialVerificationService(
+    $connection,
+    $audit
+);
+$productRepository = new ProductRepository($connection);
+$n8nProductSearchController = new N8nProductSearchController(
+    new N8nProductSearchRepository($connection),
+    (string) Env::get('N8N_ERP_API_SECRET', '')
+);
+$pushSubscriptions = new PushSubscriptionRepository($connection);
+$pushDeliveries = new NotificationPushDeliveryRepository($connection);
+$notificationPush = new NotificationPushService(
+    $pushSubscriptions,
+    $pushDeliveries,
+    (string) Env::get('VAPID_PUBLIC_KEY', ''),
+    (string) Env::get('VAPID_PRIVATE_KEY', ''),
+    (string) Env::get('VAPID_SUBJECT', '')
+);
+$notificationService = new NotificationService(
+    new NotificationRepository($connection),
+    $notificationPush
+);
+$solicitudCotizacionService = new SolicitudCotizacionService(
+    new SolicitudCotizacionRepository($connection)
+);
+$n8nNotificationController = new N8nNotificationController(
+    $notificationService,
+    (string) Env::get('N8N_ERP_API_SECRET', ''),
+    $solicitudCotizacionService
+);
+$notificationCenterController = new NotificationCenterController($auth, $notificationService);
+$pushSubscriptionController = new PushSubscriptionController($auth, $pushSubscriptions);
+\App\Core\View::shareWithLayout([
+    'notificationCenterController' => $notificationCenterController,
+    'pushPublicKey' => (string) Env::get('VAPID_PUBLIC_KEY', ''),
+]);
+$productDocuments = new ProductDocumentRepository($connection);
+$profiles = new ProfileService(
+    new ProfileRepository($connection),
+    new UserPhotoRepository($connection)
+);
+$userPhotoStorage = new UserPhotoStorage(
+    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+);
+$vcardPrivacyRepository = new VcardPrivacyRepository($connection);
+$vcardPrivacy = new VcardPrivacyService($vcardPrivacyRepository);
+$vcards = new VcardService(
+    new UserVcardRepository($connection),
+    $vcardPrivacyRepository,
+    $vcardPrivacy
+);
+$vcardVcf = new VcardVcfService();
+$vcardQr = new VcardQrService();
+$vcardProducts = new VcardProductService(
+    new VcardProductRepository($connection),
+    $vcards
+);
+$productPrices = new ProductPriceService(
+    new ProductPriceRepository($connection),
+    new PriceListRepository($connection),
+    new ProductPriceHistoryRepository($connection)
+);
+$priceLists = new PriceListService(new PriceListRepository($connection));
+$products = new ProductService($productRepository, $productPrices);
+$productImages = new ProductImageService(
+    $productRepository,
+    $productDocuments,
+    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+);
+$inventoryRepository = new InventoryRepository($connection);
+$inventory = new InventoryService($inventoryRepository, $folioService);
+$inventoryTransfers = new InventoryTransferService($inventoryRepository, $folioService);
+$inventoryQueries = new InventoryQueryRepository($connection);
+$mailConfiguration = new MailConfigurationService(
+    new MailConfigurationRepository($connection)
+);
+$productTicketEmailNotifications = new ProductTicketEmailNotificationService(
+    $mailConfiguration,
+    new ProductTicketEmailOutboxService(
+        new ProductTicketEmailOutboxRepository($connection)
+    )
+);
+$productRequestTickets = new ProductRequestTicketService(
+    new ProductRequestTicketRepository($connection),
+    $productTicketEmailNotifications
+);
+$userScope = new UserScopeService(new ScopeRepository($connection));
+$scopeContext = new ScopeContextService($userScope, $session);
+$legacyQuotationRepository = new \App\Infrastructure\Repositories\LegacyQuotationRepository($connection);
+$solicitudCotizacionController = new \App\Http\Controllers\SolicitudCotizacionController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $solicitudCotizacionService,
+    $legacyQuotationRepository,
+    $notificationService
+);
+$catalogController = new CatalogController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs
+);
+$classificationController = new ClassificationController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $classifications
+);
+$exchangeRateController = new ExchangeRateController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $exchangeRates
+);
+$satCatalogController = new SatCatalogController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogs,
+    $satCatalogs
+);
+$companyController = new CompanyController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $companies
+);
+$warehouseController = new WarehouseController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $warehouses,
+    $companies
+);
+$folioSeriesController = new FolioSeriesController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $folioSeriesRepository
+);
+$profileController = new ProfileController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $profiles,
+    $userPhotoStorage,
+    $vcards,
+    $vcardPrivacy,
+    $vcardProducts
+);
+$credentialController = new CredentialController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $credentials,
+    $credentialTokens,
+    $credentialQr,
+    $vcards,
+    $session,
+    $audit
+);
+$publicVcardController = new PublicVcardController(
+    $config,
+    $vcards,
+    $vcardVcf,
+    $vcardQr,
+    $vcardProducts,
+    $csrf,
+    $session
+);
+$publicCredentialController = new PublicCredentialController(
+    $config,
+    $credentialVerification
+);
+$productController = new ProductController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $products,
+    $productImages
+);
+$priceListController = new PriceListController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $priceLists
+);
+$productPriceController = new ProductPriceController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productPrices
+);
+$inventoryController = new InventoryController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $inventory,
+    $inventoryQueries
+);
+$inventoryTransferController = new InventoryTransferController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $inventoryTransfers,
+    $inventoryQueries
+);
+$mailConfigurationController = new MailConfigurationController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $mailConfiguration
+);
+$auditController = new AuditController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    new AuditQueryRepository($connection)
+);
+$productRequestTicketController = new ProductRequestTicketController(
+    $auth,
+    $productRequestTickets,
+    $permissions,
+    null,
+    $config,
+    $scopeContext,
+    $csrf
+);
+
+$router = new Router();
+$router->middleware(new SecurityHeadersMiddleware());
+$router->middleware(new ErrorHandlingMiddleware($errorHandler));
+$router->middleware(new CsrfMiddleware($csrf));
+
+$registerRoutes = require ROUTES_PATH . '/web.php';
+$registerRoutes(
+    $router,
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $catalogController,
+    $classificationController,
+    $exchangeRateController,
+    $satCatalogController,
+    $companyController,
+    $warehouseController,
+    $folioSeriesController,
+    $profileController,
+    $credentialController,
+    $publicVcardController,
+    $publicCredentialController,
+    $productController,
+    $priceListController,
+    $productPriceController,
+    $inventoryController,
+    $inventoryTransferController,
+    $mailConfigurationController,
+    $auditController,
+    $productRequestTicketController,
+    $n8nProductSearchController,
+    $notificationCenterController,
+    $n8nNotificationController,
+    $pushSubscriptionController,
+    $solicitudCotizacionController
+);
+
+$passkeys = new \App\Domain\Auth\PasskeyService(
+    $session,
+    new \App\Infrastructure\Repositories\PasskeyRepository(
+        $connection
+    ),
+    $webauthnConfig['origin']
+);
+
+$passkeyController =
+    new \App\Http\Controllers\PasskeyController(
+        $auth,
+        $passkeys,
+        $permissions,
+        $csrf,
+        $audit
+    );
+
+$registerPasskeys = require ROUTES_PATH . '/passkeys.php';
+
+$registerPasskeys(
+    $router,
+    $auth,
+    $permissions,
+    $passkeyController
+);
+
+return new App(
+    $router,
+    $config,
+    $debug,
+    $errorHandler
+);
+
+return new App($router, $config, $debug, $errorHandler);
+
+
+
+
+
+
+

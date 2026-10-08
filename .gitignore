@@ -1,0 +1,58 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local dependencies and package-manager caches
+/node_modules/
+/vendor/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Runtime and private storage
+/storage/private/
+/storage/uploads/*
+!/storage/uploads/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/cache/*
+!/storage/cache/.gitkeep
+/storage/temp/*
+!/storage/temp/.gitkeep
+/storage/mail/previews/*
+!/storage/mail/previews/.gitkeep
+/storage/mail/logs/*
+!/storage/mail/logs/.gitkeep
+
+# Generated frontend artifacts not intended for version control
+/public/css/generated/
+*.map
+
+# Database dumps, backups and deployment packages
+/backups/
+/dumps/
+/database/dumps/
+/*.sql
+/*.dump
+/*.bak
+/*.zip
+/*.tar
+/*.tar.gz
+
+# Logs, caches and temporary files
+*.log
+*.tmp
+*.temp
+*.cache
+.phpunit.result.cache
+coverage/
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,215 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Infrastructure\Repositories;
+
+use App\Infrastructure\Database\ConnectionProvider;
+use PDO;
+
+final class VcardPrivacyRepository
+{
+    public function __construct(
+        private readonly ConnectionProvider $connection
+    ) {
+    }
+
+    /**
+     * Obtiene la configuración de privacidad desde usuario_vcards.
+     *
+     * La BD actual no usa una tabla vcard_privacidad.
+     *
+     * @return array<string, bool>
+     */
+    public function listByVcard(int $vcardId): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            SELECT
+                mostrar_foto,
+                mostrar_email,
+                mostrar_telefono,
+                mostrar_telefono_movil,
+                mostrar_puesto,
+                mostrar_empresa,
+                mostrar_almacen,
+                mostrar_ubicacion,
+                mostrar_website,
+                mostrar_linkedin,
+                mostrar_facebook,
+                mostrar_instagram,
+                mostrar_whatsapp,
+                mostrar_google_maps,
+                mostrar_productos_publicos
+            FROM usuario_vcards
+            WHERE id = :vcard_id
+              AND deleted_at IS NULL
+            LIMIT 1
+            SQL
+        );
+
+        $statement->execute([
+            'vcard_id' => $vcardId,
+        ]);
+
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        if (!is_array($row)) {
+            return [];
+        }
+
+        /*
+         * Traducimos los nombres usados por VcardPrivacyService
+         * a las columnas que realmente existen en la BD.
+         */
+        return [
+            'foto' => (int) $row['mostrar_foto'] === 1,
+            'correo' => (int) $row['mostrar_email'] === 1,
+
+            'telefono_fijo' =>
+                (int) $row['mostrar_telefono'] === 1,
+
+            'telefono_movil' =>
+                (int) $row['mostrar_telefono_movil'] === 1,
+
+            'puesto' => (int) $row['mostrar_puesto'] === 1,
+            'empresa' => (int) $row['mostrar_empresa'] === 1,
+            'almacen' => (int) $row['mostrar_almacen'] === 1,
+
+            'ubicacion' =>
+                (int) $row['mostrar_ubicacion'] === 1,
+
+            'sitio_web' =>
+                (int) $row['mostrar_website'] === 1,
+
+            'linkedin' =>
+                (int) $row['mostrar_linkedin'] === 1,
+
+            'facebook' =>
+                (int) $row['mostrar_facebook'] === 1,
+
+            'instagram' =>
+                (int) $row['mostrar_instagram'] === 1,
+
+            'whatsapp' =>
+                (int) $row['mostrar_whatsapp'] === 1,
+
+            'google_maps' =>
+                (int) $row['mostrar_google_maps'] === 1,
+
+            'productos' =>
+                (int) $row['mostrar_productos_publicos'] === 1,
+        ];
+    }
+
+    /**
+     * La tabla usuario_vcards ya contiene todas las columnas
+     * de privacidad y además define sus propios valores por defecto.
+     *
+     * VcardService llama este método para garantizar registros
+     * predeterminados en el esquema nuevo. En nuestra BD no hay
+     * registros separados que crear.
+     *
+     * IMPORTANTE:
+     * No actualizamos nada aquí porque este método se ejecuta
+     * también al abrir una vCard existente. Si escribiéramos
+     * los defaults, destruiríamos la configuración guardada
+     * del usuario.
+     *
+     * @param array<string, bool> $defaults
+     */
+    public function ensureDefaults(
+        int $vcardId,
+        array $defaults
+    ): void {
+        // Intencionalmente vacío.
+        //
+        // Los defaults ya están definidos directamente
+        // en las columnas mostrar_* de usuario_vcards.
+    }
+
+    /**
+     * Guarda la privacidad directamente sobre usuario_vcards.
+     *
+     * @param array<string, bool> $visibility
+     */
+    public function upsertVisibility(
+        int $vcardId,
+        array $visibility
+    ): void {
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            UPDATE usuario_vcards
+            SET
+                mostrar_foto = :mostrar_foto,
+                mostrar_email = :mostrar_email,
+                mostrar_telefono = :mostrar_telefono,
+                mostrar_telefono_movil = :mostrar_telefono_movil,
+                mostrar_puesto = :mostrar_puesto,
+                mostrar_empresa = :mostrar_empresa,
+                mostrar_almacen = :mostrar_almacen,
+                mostrar_ubicacion = :mostrar_ubicacion,
+                mostrar_website = :mostrar_website,
+                mostrar_linkedin = :mostrar_linkedin,
+                mostrar_facebook = :mostrar_facebook,
+                mostrar_instagram = :mostrar_instagram,
+                mostrar_whatsapp = :mostrar_whatsapp,
+                mostrar_google_maps = :mostrar_google_maps,
+                mostrar_productos_publicos = :mostrar_productos_publicos,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :vcard_id
+              AND deleted_at IS NULL
+            SQL
+        );
+
+        $statement->execute([
+            'vcard_id' => $vcardId,
+
+            'mostrar_foto' =>
+                ($visibility['foto'] ?? false) ? 1 : 0,
+
+            'mostrar_email' =>
+                ($visibility['correo'] ?? false) ? 1 : 0,
+
+            'mostrar_telefono' =>
+                ($visibility['telefono_fijo'] ?? false) ? 1 : 0,
+
+            'mostrar_telefono_movil' =>
+                ($visibility['telefono_movil'] ?? false) ? 1 : 0,
+
+            'mostrar_puesto' =>
+                ($visibility['puesto'] ?? false) ? 1 : 0,
+
+            'mostrar_empresa' =>
+                ($visibility['empresa'] ?? false) ? 1 : 0,
+
+            'mostrar_almacen' =>
+                ($visibility['almacen'] ?? false) ? 1 : 0,
+
+            'mostrar_ubicacion' =>
+                ($visibility['ubicacion'] ?? false) ? 1 : 0,
+
+            'mostrar_website' =>
+                ($visibility['sitio_web'] ?? false) ? 1 : 0,
+
+            'mostrar_linkedin' =>
+                ($visibility['linkedin'] ?? false) ? 1 : 0,
+
+            'mostrar_facebook' =>
+                ($visibility['facebook'] ?? false) ? 1 : 0,
+
+            'mostrar_instagram' =>
+                ($visibility['instagram'] ?? false) ? 1 : 0,
+
+            'mostrar_whatsapp' =>
+                ($visibility['whatsapp'] ?? false) ? 1 : 0,
+
+            'mostrar_google_maps' =>
+                ($visibility['google_maps'] ?? false) ? 1 : 0,
+
+            'mostrar_productos_publicos' =>
+                ($visibility['productos'] ?? false) ? 1 : 0,
+        ]);
+
+    }
+}

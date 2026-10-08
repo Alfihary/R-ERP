@@ -1,0 +1,389 @@
+.transfer-heading {
+    display: flex;
+    max-width: 76rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.transfer-heading p {
+    max-width: 72ch;
+    margin: 0.75rem 0 0;
+    color: var(--color-muted);
+}
+
+.transfer-heading p:first-child {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.transfer-heading p:first-child a {
+    color: var(--color-primary-strong);
+    font-weight: 700;
+}
+
+.transfer-heading h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+}
+
+.transfer-heading-action {
+    flex: 0 0 auto;
+    text-decoration: none;
+}
+
+.transfer-panel,
+.transfer-form,
+.transfer-detail {
+    max-width: 76rem;
+    margin-top: 1.5rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+}
+
+.transfer-section-heading {
+    display: flex;
+    min-height: 4rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--color-line);
+}
+
+.transfer-section-heading h2 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.transfer-section-heading p {
+    margin: 0.25rem 0 0;
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+}
+
+.transfer-notice,
+.transfer-alert {
+    max-width: 76rem;
+    margin: 1rem 0 0;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    color: var(--color-primary-strong);
+    background: var(--color-bg);
+    font-size: 0.875rem;
+}
+
+.transfer-alert {
+    border-color: oklch(0.63 0.14 28);
+    color: oklch(0.36 0.11 28);
+    background: oklch(0.97 0.025 28);
+}
+
+.transfer-alert p {
+    margin: 0.25rem 0 0;
+}
+
+.transfer-filters,
+.transfer-form-grid,
+.transfer-context-grid {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1rem 1.25rem 1.25rem;
+}
+
+.transfer-filters {
+    grid-template-columns: minmax(13rem, 2fr) minmax(12rem, 1.25fr) repeat(2, minmax(9rem, 1fr)) auto;
+}
+
+.transfer-form-grid {
+    grid-template-columns: repeat(4, minmax(12rem, 1fr));
+}
+
+.transfer-context-grid {
+    grid-template-columns: repeat(2, minmax(12rem, 1fr));
+}
+
+.transfer-context-grid div {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.transfer-context-grid span,
+.transfer-field span {
+    color: var(--color-muted);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.transfer-field {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 0.375rem;
+}
+
+.transfer-field--wide {
+    grid-column: 1 / -1;
+}
+
+.transfer-field input,
+.transfer-field select,
+.transfer-field textarea {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    background: var(--color-bg);
+    font: inherit;
+}
+
+.transfer-field textarea {
+    min-height: 5.5rem;
+    resize: vertical;
+}
+
+.transfer-field-error {
+    padding: 0 1.25rem 1rem;
+    color: oklch(0.42 0.14 28);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.transfer-filter-actions,
+.transfer-form-actions,
+.transfer-detail-actions {
+    display: flex;
+    align-items: end;
+    gap: 0.625rem;
+}
+
+.transfer-form-actions,
+.transfer-detail-actions {
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--color-line);
+}
+
+.transfer-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.transfer-table {
+    width: 100%;
+    min-width: 52rem;
+    border-collapse: collapse;
+}
+
+.transfer-table th,
+.transfer-table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.transfer-table th {
+    color: var(--color-muted);
+    background: var(--color-surface);
+    font-size: 0.8125rem;
+}
+
+.transfer-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.transfer-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.75rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    color: var(--color-primary-strong);
+    background: var(--color-surface);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.transfer-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--color-line);
+}
+
+.transfer-form-section + .transfer-form-section {
+    border-top: 1px solid var(--color-line);
+}
+
+.transfer-parts {
+    display: grid;
+    gap: 0.875rem;
+    padding: 1rem 1.25rem;
+}
+
+.transfer-part {
+    display: grid;
+    grid-template-columns: minmax(15rem, 2fr) minmax(9rem, 0.75fr) minmax(12rem, 1.25fr) auto;
+    align-items: end;
+    gap: 0.875rem;
+    padding: 0.875rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+}
+
+.transfer-field--series {
+    grid-column: 1 / -2;
+}
+
+.transfer-field--series textarea {
+    min-height: 6.5rem;
+    resize: vertical;
+}
+
+.transfer-series-pair {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.transfer-series-pair span {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.transfer-series-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.transfer-series-list li {
+    max-width: 100%;
+    padding: 0.25rem 0.5rem;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.transfer-muted {
+    color: var(--color-muted);
+}
+
+.transfer-product-search {
+    position: relative;
+}
+
+.transfer-search-results {
+    display: grid;
+    max-height: 15rem;
+    overflow-y: auto;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.transfer-search-option {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.transfer-search-option:disabled {
+    color: var(--color-muted);
+    cursor: not-allowed;
+}
+
+.transfer-search-option:hover:not(:disabled),
+.transfer-search-option:focus-visible {
+    background: var(--color-surface);
+}
+
+.transfer-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(12rem, 1fr));
+    gap: 1px;
+    margin: 0;
+    background: var(--color-line);
+}
+
+.transfer-detail-grid div {
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem;
+    background: var(--color-bg);
+}
+
+.transfer-detail-grid__wide {
+    grid-column: 1 / -1;
+}
+
+.transfer-detail-grid dt {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.transfer-detail-grid dd {
+    margin: 0;
+}
+
+@media (max-width: 900px) {
+    .transfer-heading,
+    .transfer-section-heading,
+    .transfer-form-actions,
+    .transfer-detail-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .transfer-filters,
+    .transfer-form-grid,
+    .transfer-context-grid,
+    .transfer-detail-grid,
+    .transfer-part {
+        grid-template-columns: 1fr;
+    }
+
+    .transfer-field--series {
+        grid-column: auto;
+    }
+
+    .transfer-filter-actions {
+        align-items: stretch;
+    }
+
+    .transfer-filter-actions .button,
+    .transfer-form-actions .button,
+    .transfer-detail-actions .button {
+        width: 100%;
+    }
+}

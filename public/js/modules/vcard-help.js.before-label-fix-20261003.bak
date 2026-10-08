@@ -1,0 +1,257 @@
+(() => {
+    const section = document.querySelector('.vcard-public__help');
+    const form = document.getElementById('vcard-help-form');
+    const serviceInput = form?.querySelector('input[name="servicio"]');
+    const messageInput = document.getElementById('vcard-help-message');
+    const detailsInput = document.getElementById('vcard-help-details');
+    const fieldsHost = document.getElementById('vcard-help-specific-fields');
+    const topic = document.getElementById('vcard-help-topic');
+    const subtitle = document.getElementById('vcard-help-subtitle');
+    const chipsHost = document.getElementById('vcard-help-chips');
+    const submit = document.getElementById('vcard-help-submit');
+    const status = document.getElementById('vcard-help-status');
+
+    if (!section || !form || !serviceInput || !messageInput || !detailsInput || !fieldsHost || !topic || !subtitle || !chipsHost) {
+        return;
+    }
+
+    const commonUnknown = [
+        { value: 'no_se', label: 'No sé' },
+        { value: 'no_aplica', label: 'No aplica' },
+        { value: 'no_estoy_seguro', label: 'No estoy seguro' },
+    ];
+    const serviceConfig = {
+        proyecto: {
+            title: 'Cuéntanos sobre tu proyecto',
+            subtitle: 'Con algunos datos podemos canalizarte con el área adecuada.',
+            cta: 'Solicitar asesoría para mi proyecto',
+            fields: [
+                { key: 'tipo_proyecto', label: 'Tipo de proyecto', type: 'select', required: true, options: [['nuevo', 'Nuevo proyecto'], ['ampliacion', 'Ampliación'], ['reemplazo', 'Reemplazo'], ['remodelacion', 'Remodelación'], ['asesoria', 'Asesoría']] },
+                { key: 'aplicacion', label: 'Aplicación', type: 'text', placeholder: 'Ej. cámara de refrigeración' },
+                { key: 'ubicacion', label: 'Ciudad o ubicación', type: 'text', autocomplete: 'address-level2' },
+                { key: 'etapa', label: 'Etapa del proyecto', type: 'select', options: [['idea', 'Idea'], ['planeacion', 'Planeación'], ['cotizando', 'Cotizando'], ['ejecucion', 'En ejecución'], ['reemplazo', 'Reemplazo']] },
+                { key: 'capacidad_aproximada', label: 'Capacidad aproximada (opcional)', type: 'text', placeholder: 'Si la conoces' },
+                { key: 'descripcion', label: '¿Qué necesitas?', type: 'textarea', required: true, placeholder: 'Cuéntanos brevemente sobre tu proyecto' },
+            ],
+            summary: ['tipo_proyecto', 'aplicacion', 'ubicacion', 'etapa', 'capacidad_aproximada'],
+        },
+        refaccion: {
+            title: 'Te ayudamos a encontrar la refacción correcta',
+            subtitle: 'No necesitas conocer todos los datos técnicos. Ingresa lo que tengas.',
+            cta: 'Buscar mi refacción',
+            fields: [
+                { key: 'tipo_refaccion', label: 'Tipo de refacción', type: 'text', placeholder: 'Ej. compresor, tarjeta, motor' },
+                { key: 'marca', label: 'Marca', type: 'text', suggestions: true },
+                { key: 'modelo_clave', label: 'Modelo o clave', type: 'text', suggestions: true },
+                { key: 'refrigerante', label: 'Refrigerante', type: 'text', suggestions: true },
+                { key: 'voltaje', label: 'Voltaje', type: 'text', suggestions: true },
+                { key: 'cantidad', label: 'Cantidad', type: 'number', min: '1', placeholder: '1' },
+                { key: 'descripcion', label: 'Información adicional', type: 'textarea', placeholder: '¿Dónde se utiliza o qué falla presenta?' },
+            ],
+            summary: ['tipo_refaccion', 'marca', 'modelo_clave', 'refrigerante', 'cantidad'],
+        },
+        capacitacion: {
+            title: 'Encuentra la capacitación adecuada',
+            subtitle: 'Cuéntanos qué quieres aprender y tu nivel actual.',
+            cta: 'Quiero información del Instituto ACR',
+            fields: [
+                { key: 'curso_tema', label: 'Curso o tema de interés', type: 'text', required: true, placeholder: 'Ej. refrigeración comercial' },
+                { key: 'nivel', label: 'Nivel de experiencia', type: 'select', options: [['principiante', 'Principiante'], ['tecnico', 'Técnico'], ['instalador', 'Instalador'], ['mantenimiento', 'Mantenimiento'], ['profesional', 'Profesional']] },
+                { key: 'modalidad', label: 'Modalidad preferida', type: 'select', options: [['presencial', 'Presencial'], ['online', 'En línea'], ['indistinto', 'Me es indistinto']] },
+                { key: 'ciudad', label: 'Ciudad', type: 'text', autocomplete: 'address-level2' },
+            ],
+            summary: ['curso_tema', 'nivel', 'modalidad', 'ciudad'],
+        },
+        asesoria: {
+            title: 'Solicita tu cotización',
+            subtitle: 'Dinos qué necesitas y te canalizamos rápidamente.',
+            cta: 'Solicitar cotización',
+            fields: [
+                { key: 'tipo', label: '¿Qué deseas cotizar?', type: 'select', required: true, options: [['producto', 'Producto'], ['refaccion', 'Refacción'], ['equipo', 'Equipo'], ['servicio', 'Servicio'], ['otro', 'Otro']] },
+                { key: 'descripcion', label: '¿Qué necesitas?', type: 'textarea', required: true, placeholder: 'Describe brevemente lo que deseas cotizar' },
+                { key: 'cantidad', label: 'Cantidad', type: 'number', min: '1', placeholder: '1' },
+                { key: 'marca_modelo', label: 'Marca o modelo (si lo conoces)', type: 'text', suggestions: true },
+                { key: 'urgencia', label: '¿Para cuándo lo necesitas?', type: 'select', options: [['normal', 'Normal'], ['esta_semana', 'Esta semana'], ['urgente', 'Urgente']] },
+            ],
+            summary: ['tipo', 'cantidad', 'marca_modelo', 'urgencia', 'descripcion'],
+        },
+    };
+
+    const labels = new Map();
+    let datalistIndex = 0;
+
+    function fieldElement(config) {
+        const label = document.createElement('label');
+        label.append(document.createTextNode(config.label));
+        let control;
+
+        if (config.type === 'select') {
+            control = document.createElement('select');
+            control.add(new Option('Selecciona una opción', ''));
+            config.options.forEach(([value, text]) => control.add(new Option(text, value)));
+        } else if (config.type === 'textarea') {
+            control = document.createElement('textarea');
+            control.rows = 3;
+            control.maxLength = 2000;
+            label.classList.add('vcard-public__help-message');
+        } else {
+            control = document.createElement('input');
+            control.type = config.type;
+            if (config.min) control.min = config.min;
+            if (config.type === 'number') control.step = '1';
+        }
+
+        control.name = config.key;
+        control.dataset.detail = config.key;
+        control.required = config.required === true;
+        control.autocomplete = config.autocomplete || 'off';
+        if (config.placeholder) control.placeholder = config.placeholder;
+
+        if (config.suggestions) {
+            const listId = `vcard-help-options-${++datalistIndex}`;
+            const list = document.createElement('datalist');
+            list.id = listId;
+            commonUnknown.forEach(({ value, label: optionLabel }) => {
+                const option = document.createElement('option');
+                option.value = optionLabel;
+                list.append(option);
+            });
+            control.setAttribute('list', listId);
+            label.append(control, list);
+        } else {
+            label.append(control);
+        }
+
+        labels.set(config.key, config.label);
+        return label;
+    }
+
+    function currentDetails() {
+        return Object.fromEntries([...fieldsHost.querySelectorAll('[data-detail]')]
+            .map((field) => [field.dataset.detail, field.value.trim()])
+            .filter(([, value]) => value !== ''));
+    }
+
+    function humanValue(value) {
+        const unknownLabels = { no_se: 'No sé', no_aplica: 'No aplica', no_estoy_seguro: 'No estoy seguro' };
+        if (Object.hasOwn(unknownLabels, value)) return unknownLabels[value];
+        return value.replaceAll('_', ' ');
+    }
+
+    function refreshSummary() {
+        const config = serviceConfig[serviceInput.value];
+        const details = currentDetails();
+        detailsInput.value = JSON.stringify(details);
+        const chips = [];
+
+        config?.summary.forEach((key) => {
+            const raw = details[key];
+            if (!raw) return;
+            let value = humanValue(raw);
+            if (key === 'cantidad') value += Number(raw) === 1 ? ' pieza' : ' piezas';
+            chips.push(value.toLocaleUpperCase('es-MX'));
+        });
+
+        chipsHost.replaceChildren();
+        if (chips.length === 0) {
+            const empty = document.createElement('span');
+            empty.className = 'vcard-public__help-empty';
+            empty.textContent = 'Completa los datos para ver el resumen.';
+            chipsHost.append(empty);
+        } else {
+            chips.forEach((text) => {
+                const chip = document.createElement('span');
+                chip.className = 'vcard-public__help-chip';
+                chip.textContent = text;
+                chipsHost.append(chip);
+            });
+        }
+
+        const description = details.descripcion || details.curso_tema || '';
+        const summaryText = Object.entries(details)
+            .map(([key, value]) => `${labels.get(key) || key}: ${humanValue(value)}`)
+            .join('; ');
+        messageInput.value = description || (summaryText ? `Solicitud ${config?.title || 'comercial'}: ${summaryText}` : '');
+    }
+
+    function selectService(service, focusFields = false) {
+        const selected = shortcuts.find((shortcut) => shortcut.dataset.service === service);
+        const activeService = selected ? service : '';
+        const config = serviceConfig[activeService];
+
+        form.hidden = activeService === '';
+        serviceInput.value = activeService;
+        fieldsHost.replaceChildren();
+        labels.clear();
+        if (config) config.fields.forEach((field) => fieldsHost.append(fieldElement(field)));
+        topic.textContent = config?.title || 'Cuéntanos qué necesitas';
+        subtitle.textContent = config?.subtitle || 'Con algunos datos podemos canalizarte con el área adecuada.';
+        if (submit) submit.textContent = config?.cta || 'Enviar solicitud';
+        detailsInput.value = '{}';
+        messageInput.value = '';
+        if (status) status.textContent = '';
+
+        shortcuts.forEach((shortcut) => {
+            const active = shortcut === selected;
+            shortcut.classList.toggle('is-active', active);
+            shortcut.setAttribute('aria-selected', String(active));
+            shortcut.setAttribute('aria-expanded', String(active));
+        });
+
+        refreshSummary();
+        if (focusFields) fieldsHost.querySelector('input, select, textarea')?.focus();
+    }
+
+    const shortcuts = [...section.querySelectorAll('.vcard-public__help-shortcut[data-service]')];
+    shortcuts.forEach((shortcut, index) => {
+        shortcut.addEventListener('click', (event) => {
+            event.preventDefault();
+            const wasActive = shortcut.getAttribute('aria-selected') === 'true';
+            selectService(wasActive ? '' : shortcut.dataset.service);
+        });
+        shortcut.addEventListener('keydown', (event) => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const nextIndex = event.key === 'Home' ? 0
+                : event.key === 'End' ? shortcuts.length - 1
+                    : (index + (event.key === 'ArrowRight' ? 1 : shortcuts.length - 1)) % shortcuts.length;
+            shortcuts[nextIndex].focus();
+        });
+    });
+
+    fieldsHost.addEventListener('input', refreshSummary);
+    fieldsHost.addEventListener('change', refreshSummary);
+    const initialService = serviceInput.value || shortcuts.find((item) => item.getAttribute('aria-selected') === 'true')?.dataset.service || '';
+    selectService(initialService);
+
+    form.addEventListener('submit', (event) => {
+        refreshSummary();
+        const service = serviceInput.value;
+        const details = currentDetails();
+        if (service === 'refaccion' && Object.keys(details).length === 0) {
+            event.preventDefault();
+            if (status) status.textContent = 'Agrega al menos un dato de la refacción; puedes escribir “No sé” si lo prefieres.';
+            fieldsHost.querySelector('input, select, textarea')?.focus();
+            return;
+        }
+
+        if (!form.reportValidity()) {
+            event.preventDefault();
+            if (status) status.textContent = 'Revisa los campos marcados para continuar.';
+            return;
+        }
+
+        if (form.dataset.enabled !== 'true') {
+            event.preventDefault();
+            if (status) status.textContent = 'El envío todavía no está activado.';
+            return;
+        }
+
+        form.setAttribute('aria-busy', 'true');
+        if (submit) {
+            submit.disabled = true;
+            submit.textContent = 'Enviando solicitud…';
+        }
+        if (status) status.textContent = 'Enviando tu solicitud…';
+    });
+})();

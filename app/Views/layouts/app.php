@@ -1,0 +1,454 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Core\View;
+use App\Support\Security\CsrfTokenService;
+
+if (!$csrf instanceof CsrfTokenService
+    || !is_array($user ?? null)
+    || !is_array($context ?? null)
+    || !is_string($contentView ?? null)
+) {
+    throw new RuntimeException('Authenticated layout context is incomplete.');
+}
+
+$contentData = is_array($contentData ?? null) ? $contentData : [];
+$requestPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+$isNotificationDashboard = is_string($requestPath) && rtrim($requestPath, '/') === '/app';
+$notificationPreview = [];
+if (!$isNotificationDashboard
+    && isset($notificationCenterController)
+    && is_object($notificationCenterController)
+    && method_exists($notificationCenterController, 'dashboardData')
+    && (int) ($user['user_id'] ?? 0) > 0
+) {
+    $notificationPopoverData = $notificationCenterController->dashboardData((int) $user['user_id'], 'all');
+    $notificationPreview = is_array($notificationPopoverData['items'] ?? null)
+        ? array_slice($notificationPopoverData['items'], 0, 5)
+        : [];
+    $notificationUnreadCount = max(0, (int) ($notificationPopoverData['unread_count'] ?? 0));
+}
+$content = View::render($contentView, [
+    'context' => $context,
+    'csrf' => $csrf,
+    'user' => $user,
+] + $contentData);
+$appName = is_string($appName ?? null) && $appName !== ''
+    ? $appName
+    : 'SoporteGR ERP';
+$appName = trim($appName, " \t\n\r\0\x0B\"'");
+$activeNavigation = is_string($activeNavigation ?? null)
+    ? $activeNavigation
+    : 'home';
+$canAccessProfile = ($canAccessProfile ?? false) === true;
+$canAccessCredential = ($canAccessCredential ?? false) === true;
+$canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
+$canAccessProducts = ($canAccessProducts ?? false) === true;
+$canAccessProductPrices = ($canAccessProductPrices ?? false) === true;
+$canAccessProductTickets = ($canAccessProductTickets ?? false) === true;
+$canAccessInventory = ($canAccessInventory ?? false) === true;
+$canAccessInventoryStock = ($canAccessInventoryStock ?? false) === true;
+$canAccessInventorySerialStock = ($canAccessInventorySerialStock ?? false) === true;
+$canAccessInventoryKardex = ($canAccessInventoryKardex ?? false) === true;
+$canAccessInventorySerialKardex = ($canAccessInventorySerialKardex ?? false) === true;
+$canAccessInventoryTransfers = ($canAccessInventoryTransfers ?? false) === true;
+$canAccessConfiguration = ($canAccessConfiguration ?? false) === true;
+$canAccessConfigCompanies = ($canAccessConfigCompanies ?? false) === true;
+$canAccessConfigWarehouses = ($canAccessConfigWarehouses ?? false) === true;
+$canAccessConfigFolios = ($canAccessConfigFolios ?? false) === true;
+$canAccessPriceLists = ($canAccessPriceLists ?? false) === true;
+$canAccessMailConfiguration = ($canAccessMailConfiguration ?? false) === true;
+$canAccessAudit = ($canAccessAudit ?? false) === true;
+$stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
+$scripts = is_array($scripts ?? null) ? $scripts : [];
+$pushPublicKey = is_string($pushPublicKey ?? null) ? trim($pushPublicKey) : '';
+if (!in_array('/js/modules/notification-realtime.js', $scripts, true)) {
+    $scripts[] = '/js/modules/notification-realtime.js';
+}
+if (!$isNotificationDashboard && isset($notificationUnreadCount) && !in_array('/js/modules/notification-popover.js', $scripts, true)) {
+    $scripts[] = '/js/modules/notification-popover.js';
+}
+$activeCompany = is_array($context['active_company'] ?? null)
+    ? $context['active_company']
+    : null;
+$activeWarehouse = is_array($context['active_warehouse'] ?? null)
+    ? $context['active_warehouse']
+    : null;
+?>
+<!doctype html>
+<html lang="es">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=gr1">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#1c4e74">
+    <meta name="csrf-token" content="<?= e($csrf->token()) ?>">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="/css/modules/pwa.css">
+    <script src="/js/pwa.js" defer></script>
+    <script src="/js/pwa-splash.js" defer></script>
+    <script src="/js/webauthn-support.js" defer></script>
+    <script src="/js/device-unlock.js?v=passkey-mobile-2" defer></script>
+    <script src="/js/passkeys.js?v=passkey-mobile-2" defer></script>
+    <title><?= e($pageTitle ?? 'Inicio') ?> · <?= e($appName) ?></title>
+    <link rel="stylesheet" href="/css/core/app.css?v=notif-popover-20261006">
+    <?php foreach ($stylesheets as $stylesheet): ?>
+        <?php if (
+            is_string($stylesheet)
+            && preg_match('#^/css/[a-z0-9/_-]+\.css$#', $stylesheet) === 1
+        ): ?>
+            <link rel="stylesheet" href="<?= e($stylesheet) ?>">
+        <?php endif; ?>
+    <?php endforeach; ?>
+</head>
+<body class="app-body" data-device-page="app" data-push-public-key="<?= e($pushPublicKey) ?>">
+    <div class="pwa-splash" data-pwa-splash hidden role="status" aria-live="polite" aria-label="Iniciando SoporteGR ERP">
+        <div class="pwa-splash__graphic" aria-hidden="true">❄</div>
+        <div class="pwa-splash__content">
+            <img class="pwa-splash__logo" src="/img/gr.png?v=2" alt="" width="88" height="88">
+            <strong class="pwa-splash__title">SoporteGR ERP</strong>
+            <span class="pwa-splash__subtitle">Iniciando...</span>
+        </div>
+    </div>
+    <a class="skip-link" href="#main-content">Saltar al contenido</a>
+
+    <div class="app-shell">
+        <aside class="app-sidebar" aria-label="Navegación principal">
+            <a class="app-brand" href="/app" aria-label="<?= e($appName) ?>, inicio">
+                <span class="app-brand__mark" aria-hidden="true">
+                    <img
+                        src="/img/gr.png?v=2"
+                        alt=""
+                        width="40"
+                        height="40"
+                    >
+                </span>
+                <span>
+                    <strong><?= e($appName) ?></strong>
+                    <small>Entorno administrativo</small>
+                </span>
+            </a>
+
+            <nav class="app-navigation" aria-label="Secciones">
+                <a
+                    class="app-navigation__item<?= $activeNavigation === 'home' ? ' is-active' : '' ?>"
+                    href="/app"
+                    <?= $activeNavigation === 'home' ? 'aria-current="page"' : '' ?>
+                >
+                    <span aria-hidden="true">⌂</span>
+                    Inicio
+                </a>
+                <?php if ($canAccessProfile): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'profile' ? ' is-active' : '' ?>"
+                        href="/perfil"
+                        <?= $activeNavigation === 'profile' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">◌</span>
+                        Mi perfil
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessCredential): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'credential' ? ' is-active' : '' ?>"
+                        href="/perfil/credencial"
+                        <?= $activeNavigation === 'credential' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▣</span>
+                        Mi credencial
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessCatalogs): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'catalogs' ? ' is-active' : '' ?>"
+                        href="/catalogos"
+                        <?= $activeNavigation === 'catalogs' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▦</span>
+                        Catálogos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProducts): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'products' ? ' is-active' : '' ?>"
+                        href="/productos"
+                        <?= $activeNavigation === 'products' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▤</span>
+                        Productos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProductPrices): ?>
+                    <span class="app-navigation__section">Precios</span>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'product-prices' ? ' is-active' : '' ?>"
+                        href="/precios/productos"
+                        <?= $activeNavigation === 'product-prices' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">$</span>
+                        Precios por producto
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessProductTickets): ?>
+                    <span class="app-navigation__section">Tickets</span>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'product-tickets' ? ' is-active' : '' ?>"
+                        href="/tickets/productos"
+                        <?= $activeNavigation === 'product-tickets' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">✉</span>
+                        Tickets de productos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventory): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory' ? ' is-active' : '' ?>"
+                        href="/inventario/movimientos"
+                        <?= $activeNavigation === 'inventory' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">⇄</span>
+                        Inventario · Movimientos
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventoryStock): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-stock' ? ' is-active' : '' ?>"
+                        href="/inventario/existencias"
+                        <?= $activeNavigation === 'inventory-stock' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">≡</span>
+                        Inventario · Existencias
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventorySerialStock): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-stock' ? ' is-active' : '' ?>"
+                        href="/inventario/existencias-series"
+                        <?= $activeNavigation === 'inventory-serial-stock' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">#</span>
+                        Inventario · Existencias por serie
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventoryKardex): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-kardex' ? ' is-active' : '' ?>"
+                        href="/inventario/kardex"
+                        <?= $activeNavigation === 'inventory-kardex' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">↕</span>
+                        Inventario · Kardex
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventorySerialKardex): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-serial-kardex' ? ' is-active' : '' ?>"
+                        href="/inventario/kardex-series"
+                        <?= $activeNavigation === 'inventory-serial-kardex' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">⌁</span>
+                        Inventario · Kardex por serie
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessInventoryTransfers): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'inventory-transfers' ? ' is-active' : '' ?>"
+                        href="/inventario/transferencias"
+                        <?= $activeNavigation === 'inventory-transfers' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">⇆</span>
+                        Inventario · Transferencias
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfiguration): ?>
+                    <span class="app-navigation__section">Configuración</span>
+                <?php endif; ?>
+                <?php if ($canAccessConfigCompanies): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-companies' ? ' is-active' : '' ?>"
+                        href="/configuracion/empresas"
+                        <?= $activeNavigation === 'configuration-companies' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▧</span>
+                        Empresas
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfigWarehouses): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-warehouses' ? ' is-active' : '' ?>"
+                        href="/configuracion/almacenes"
+                        <?= $activeNavigation === 'configuration-warehouses' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">▣</span>
+                        Almacenes
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessConfigFolios): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-folios' ? ' is-active' : '' ?>"
+                        href="/configuracion/folios"
+                        <?= $activeNavigation === 'configuration-folios' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">№</span>
+                        Folios
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessPriceLists): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-price-lists' ? ' is-active' : '' ?>"
+                        href="/configuracion/listas-precios"
+                        <?= $activeNavigation === 'configuration-price-lists' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">$</span>
+                        Listas de precios
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessMailConfiguration): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'configuration-mail' ? ' is-active' : '' ?>"
+                        href="/admin/correo"
+                        <?= $activeNavigation === 'configuration-mail' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">@</span>
+                        Correo
+                    </a>
+                <?php endif; ?>
+                <?php if ($canAccessAudit): ?>
+                    <a
+                        class="app-navigation__item<?= $activeNavigation === 'audit' ? ' is-active' : '' ?>"
+                        href="/auditoria"
+                        <?= $activeNavigation === 'audit' ? 'aria-current="page"' : '' ?>
+                    >
+                        <span aria-hidden="true">!</span>
+                        Auditoria
+                    </a>
+                <?php endif; ?>
+            </nav>
+
+            <p class="app-sidebar__note">
+                La navegación crecerá únicamente con módulos aprobados.
+            </p>
+        </aside>
+
+        <div class="app-workspace">
+            <header class="app-topbar">
+                <div class="app-topbar__context">
+                    <span>Área privada</span>
+                    <strong><?= e($pageTitle ?? 'Inicio') ?></strong>
+                    <?php if ($activeCompany !== null && $activeWarehouse !== null): ?>
+                        <small>
+                            <?= e($activeCompany['name'] ?? '') ?>
+                            ·
+                            <?= e($activeWarehouse['name'] ?? '') ?>
+                        </small>
+                    <?php endif; ?>
+                </div>
+
+                    <?php if (!$isNotificationDashboard && isset($notificationUnreadCount)): ?>
+    <?php $notificationUnreadCount = max(0, (int) $notificationUnreadCount); ?>
+    <div class="notification-popover" data-notification-popover>
+        <button class="notification-bell" type="button" id="notification-bell" aria-label="Notificaciones<?= $notificationUnreadCount > 0 ? ', ' . e((string) $notificationUnreadCount) . ' sin leer' : '' ?>" aria-haspopup="true" aria-expanded="false" aria-controls="notification-popover-panel" data-notification-trigger>
+            <span aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
+            <?php if ($notificationUnreadCount > 0): ?>
+                <span class="notification-bell__count" aria-hidden="true" data-notification-bell-count><?= e((string) $notificationUnreadCount) ?></span>
+            <?php endif; ?>
+        </button>
+        <section class="notification-popover__panel" id="notification-popover-panel" aria-label="Notificaciones recientes" data-notification-panel hidden>
+            <header class="notification-popover__header">
+                <strong>Notificaciones</strong>
+                <span data-notification-popover-count<?= $notificationUnreadCount > 0 ? '' : ' hidden' ?>><?= e((string) $notificationUnreadCount) ?> sin leer</span>
+            </header>
+            <?php if ($notificationPreview === []): ?>
+                <p class="notification-popover__empty">No hay avisos recientes.</p>
+            <?php else: ?>
+                <ul class="notification-popover__list" data-notification-popover-list>
+                    <?php foreach ($notificationPreview as $preview): ?>
+                        <?php
+                        $previewId = (int) ($preview['id'] ?? 0);
+                        $previewUnread = ($preview['leida_at'] ?? null) === null;
+                        $previewDate = new DateTimeImmutable((string) ($preview['created_at'] ?? 'now'));
+                        $previewAge = max(0, time() - $previewDate->getTimestamp());
+                        if ($previewAge < 60) {
+                            $previewTimeLabel = 'Hace un momento';
+                        } elseif ($previewAge < 3600) {
+                            $previewTimeLabel = 'Hace ' . (int) floor($previewAge / 60) . ' min';
+                        } elseif ($previewAge < 86400) {
+                            $previewTimeLabel = 'Hace ' . (int) floor($previewAge / 3600) . ' h';
+                        } else {
+                            $previewTimeLabel = $previewDate->format('d/m/Y H:i');
+                        }
+                        $previewActionRaw = $preview['accion_url'] ?? null;
+                        $previewActionUrl = is_string($previewActionRaw)
+                            && str_starts_with($previewActionRaw, '/')
+                            && !str_starts_with($previewActionRaw, '//')
+                            && !str_contains($previewActionRaw, '\\')
+                            ? $previewActionRaw
+                            : '';
+                        ?>
+                        <li class="notification-popover__item<?= $previewUnread ? ' is-unread' : '' ?>">
+                            <span class="notification-popover__dot" aria-hidden="true"></span>
+                            <div class="notification-popover__copy">
+                                <strong><?= e($preview['titulo'] ?? html_entity_decode('Notificaci&#243;n', ENT_QUOTES, 'UTF-8')) ?></strong>
+                                <span><?= e($previewTimeLabel) ?></span>
+                            </div>
+                            <?php if ($previewUnread): ?>
+                                <form method="post" action="/app/notificaciones/<?= e((string) $previewId) ?>/leer">
+                                    <?= csrf_field($csrf) ?>
+                                    <button class="notification-popover__action" type="submit" aria-label="<?= $previewActionUrl !== '' ? 'Ver: ' : 'Marcar como le&#237;da: ' ?><?= e($preview['titulo'] ?? '') ?>"><?= $previewActionUrl !== '' ? 'Ver' : 'Leer' ?></button>
+                                </form>
+                            <?php elseif ($previewActionUrl !== ''): ?>
+                                <a class="notification-popover__action" href="<?= e($previewActionUrl) ?>">Ver</a>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <a class="notification-popover__all" href="/app#centro-notificaciones">Ver todas</a>
+        </section>
+    </div>
+<?php endif; ?>
+                <div class="app-account">
+                    <button
+                        class="button button--secondary push-enable-button"
+                        type="button"
+                        data-push-enable
+                        hidden
+                    >
+                        Activar notificaciones en este dispositivo
+                    </button>
+                    <div class="app-account__identity">
+                        <strong><?= e($user['username'] ?? '') ?></strong>
+                        <span><?= e($user['email'] ?? '') ?></span>
+                    </div>
+                    <form method="post" action="/logout">
+                        <?= csrf_field($csrf) ?>
+                        <button class="button button--secondary" type="submit">
+                            Cerrar sesión
+                        </button>
+                    </form>
+                </div>
+            </header>
+
+            <main class="app-main" id="main-content" tabindex="-1">
+                <?= View::render('auth/device-controls', ['csrf' => $csrf]) ?>
+                <?php if ($activeNavigation === 'profile'): ?>
+                    <?= View::render('auth/passkey-controls', ['csrf' => $csrf]) ?>
+                <?php endif; ?>
+                <?= $content ?>
+            </main>
+        </div>
+    </div>
+    <?php foreach ($scripts as $script): ?>
+        <?php if (
+            is_string($script)
+            && preg_match('#^/js/[a-z0-9/_-]+\.js$#', $script) === 1
+        ): ?>
+            <script src="<?= e($script) ?>" defer></script>
+        <?php endif; ?>
+    <?php endforeach; ?>
+</body>
+</html>
+

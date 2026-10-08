@@ -1,0 +1,995 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Core\Config;
+use App\Core\Request;
+use App\Core\Response;
+use App\Core\Session;
+use App\Core\View;
+use App\Domain\Vcards\VcardQrService;
+use App\Domain\Vcards\VcardProductService;
+use App\Domain\Vcards\VcardService;
+use App\Domain\Vcards\VcardVcfService;
+use App\Support\Security\CsrfTokenService;
+
+final class PublicVcardController
+{
+    private const PRODUCTS_PREVIEW_LIMIT = 4;
+
+    private readonly VcardQrService $qr;
+    private readonly VcardVcfService $vcf;
+
+    public function __construct(
+        private readonly Config $config,
+        private readonly VcardService $vcards,
+        ?VcardVcfService $vcf = null,
+        ?VcardQrService $qr = null,
+        private readonly ?VcardProductService $products = null,
+        private readonly ?CsrfTokenService $csrf = null,
+        private readonly ?Session $session = null
+    ) {
+        $this->vcf = $vcf ?? new VcardVcfService();
+        $this->qr = $qr ?? new VcardQrService();
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function show(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->notFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null) {
+            return $this->notFound();
+        }
+
+        $publicProducts = $this->publicProducts($slug, $vcard);
+        $previewProducts = array_slice($publicProducts, 0, self::PRODUCTS_PREVIEW_LIMIT);
+        $productsTotal = count($publicProducts);
+        $requestedService = $request->query()['servicio'] ?? '';
+        $leadSelection = is_string($requestedService)
+            && in_array($requestedService, ['proyecto', 'refaccion', 'capacitacion', 'asesoria'], true)
+                ? $requestedService
+                : '';
+
+        return $this->withPublicHeaders(Response::html(View::render('vcards/public', [
+            'appName' => $this->appName(),
+            'canonicalUrl' => $this->canonicalUrl($request),
+            'contactAction' => $this->contactAction($vcard['canal_contacto'] ?? null),
+            'metaDescription' => $this->metaDescription($vcard),
+            'pageTitle' => $this->pageTitle($vcard),
+            'productsTotal' => $productsTotal,
+            'productsUrl' => $productsTotal > count($previewProducts)
+                ? '/v/' . rawurlencode($slug) . '/productos'
+                : null,
+            'publicProducts' => $previewProducts,
+            'qrUrl' => $slug !== '' ? '/v/' . rawurlencode($slug) . '/' . 'qr' : null,
+            'vcfUrl' => $this->vcf->hasMinimumData($vcard) && $slug !== ''
+                ? '/v/' . rawurlencode($slug) . '/vcf'
+                : null,
+            'vcard' => $vcard,
+            'leadCsrfToken' => $this->csrf?->token() ?? '',
+            'leadEnabled' => $this->leadWebhookReady(),
+            'leadSelection' => $leadSelection,
+            'leadStatus' => is_string($request->query()['solicitud'] ?? null)
+                ? $request->query()['solicitud']
+                : '',
+        ])));
+    }
+
+    /** @param array<string, string> $params */
+    public function submitLead(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+        $vcard = $slug !== '' ? $this->vcards->resolverPublicaPorSlug($slug) : null;
+        if ($slug === '' || $vcard === null) {
+            return $this->notFound();
+        }
+
+        $back = '/v/' . rawurlencode($slug);
+        if (!$this->leadWebhookReady()) {
+            return Response::redirect($back . '?solicitud=no_disponible#solicitud');
+        }
+
+        // Hidden field catches simple bot submissions without relaying personal data.
+        if (trim((string) $request->input('sitio_web', '')) !== '') {
+            return Response::redirect($back . '?solicitud=enviada#solicitud');
+        }
+
+        $service = $request->input('servicio');
+        $name = $request->input('nombre');
+        $email = $request->input('correo');
+        $phone = $request->input('telefono');
+        $message = $request->input('mensaje');
+        $details = $this->validateLeadDetails($service, $request->input('detalles'));
+        $allowed = ['proyecto', 'refaccion', 'capacitacion', 'asesoria'];
+        if (
+            !is_string($service) || !in_array($service, $allowed, true)
+            || !is_string($name) || trim($name) === '' || strlen($name) > 400
+            || !is_string($email) || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 254
+            || !is_string($phone) || strlen($phone) > 30
+            || !is_string($message) || trim($message) === '' || strlen($message) > 8000
+            || $details === null
+        ) {
+            return Response::redirect($back . '?solicitud=datos_invalidos#solicitud');
+        }
+
+        $lastSent = $this->session?->get('_vcard_lead_last_sent', 0);
+        if (is_int($lastSent) && $lastSent + 30 > time()) {
+            return Response::redirect($back . '?solicitud=espera#solicitud');
+        }
+
+        $seller = is_string($vcard['nombre'] ?? null)
+            ? trim((string) $vcard['nombre'])
+            : '';
+
+        $ownerUserId = $this->vcards->propietarioUsuarioIdPublico($slug);
+        $ownerRoles = $this->vcards->rolesNotificacionPropietarioPublico($slug);
+        if ($ownerUserId === null) {
+            return $this->notFound();
+        }
+        $solicitudId = $this->newSolicitudId();
+        $payload = [
+            'nombre' => trim($name),
+            'correo' => trim($email),
+            'telefono' => trim($phone),
+            'mensaje' => trim($message),
+            'servicio' => $service,
+            'vendedor' => $seller,
+            'vendedor_usuario_id' => $ownerUserId,
+            'vendedor_roles' => $ownerRoles,
+            'origen' => 'vcard',
+            'detalles' => $details,
+            'vcard_slug' => $slug,
+            'vcard_url' => rtrim((string) $this->config->get('app.url', ''), '/') . $back,
+            'solicitud_id' => $solicitudId,
+            'fecha' => date(DATE_ATOM),
+        ];
+
+        if (!$this->relayLead($payload)) {
+            return Response::redirect($back . '?solicitud=error#solicitud');
+        }
+
+        $this->session?->put('_vcard_lead_last_sent', time());
+        return Response::redirect($back . '?solicitud=enviada#solicitud');
+    }
+
+    /**
+     * Validate the service-specific JSON object posted by the public form.
+     *
+     * @return array<string, string|int>|null
+     */
+    private function validateLeadDetails(mixed $service, mixed $rawDetails): ?array
+    {
+        if (!is_string($service) || !is_string($rawDetails) || strlen($rawDetails) > 12000) {
+            return null;
+        }
+
+        $fieldsByService = [
+            'proyecto' => [
+                'tipo_proyecto', 'aplicacion', 'ubicacion', 'etapa',
+                'capacidad_aproximada', 'descripcion',
+            ],
+            'refaccion' => [
+                'tipo_refaccion', 'marca', 'modelo_clave', 'refrigerante',
+                'voltaje', 'cantidad', 'descripcion',
+            ],
+            'capacitacion' => ['curso_tema', 'nivel', 'modalidad', 'ciudad'],
+            'asesoria' => ['tipo', 'descripcion', 'cantidad', 'marca_modelo', 'urgencia'],
+        ];
+        if (!isset($fieldsByService[$service])) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($rawDetails, true, 3, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        if (!is_array($decoded) || $decoded === [] || array_is_list($decoded)) {
+            return null;
+        }
+
+        foreach ($decoded as $key => $_value) {
+            if (!is_string($key) || !in_array($key, $fieldsByService[$service], true)) {
+                return null;
+            }
+        }
+
+        $limits = [
+            'tipo_proyecto' => 40,
+            'aplicacion' => 160,
+            'ubicacion' => 120,
+            'etapa' => 24,
+            'capacidad_aproximada' => 80,
+            'descripcion' => 2000,
+            'tipo_refaccion' => 120,
+            'marca' => 120,
+            'modelo_clave' => 120,
+            'refrigerante' => 80,
+            'voltaje' => 60,
+            'curso_tema' => 160,
+            'nivel' => 24,
+            'modalidad' => 24,
+            'ciudad' => 120,
+            'tipo' => 24,
+            'marca_modelo' => 160,
+            'urgencia' => 24,
+        ];
+        $enums = [
+            'tipo_proyecto' => ['nuevo', 'ampliacion', 'reemplazo', 'remodelacion', 'asesoria'],
+            'etapa' => ['idea', 'planeacion', 'cotizando', 'ejecucion', 'reemplazo'],
+            'nivel' => ['principiante', 'tecnico', 'instalador', 'mantenimiento', 'profesional'],
+            'modalidad' => ['presencial', 'online', 'indistinto'],
+            'tipo' => ['producto', 'refaccion', 'equipo', 'servicio', 'proyecto', 'otro'],
+            'urgencia' => ['normal', 'esta_semana', 'urgente'],
+        ];
+        $clean = [];
+        foreach ($decoded as $key => $value) {
+            if ($key === 'cantidad') {
+                if (
+                    !(is_int($value) || (is_string($value) && preg_match('/^[0-9]{1,5}$/D', $value) === 1))
+                    || (int) $value < 1
+                    || (int) $value > 10000
+                ) {
+                    return null;
+                }
+                $clean[$key] = (int) $value;
+                continue;
+            }
+
+            if (!is_string($value)) {
+                return null;
+            }
+            $value = trim($value);
+            if ($value === '') {
+                continue;
+            }
+            if (strlen($value) > ($limits[$key] ?? 0)) {
+                return null;
+            }
+            if (isset($enums[$key]) && !in_array($value, $enums[$key], true)) {
+                return null;
+            }
+            $clean[$key] = $value;
+        }
+
+        $requiredByService = [
+            'proyecto' => ['tipo_proyecto', 'descripcion'],
+            'refaccion' => [],
+            'capacitacion' => ['curso_tema'],
+            'asesoria' => ['tipo', 'descripcion'],
+        ];
+        foreach ($requiredByService[$service] as $key) {
+            if (!isset($clean[$key]) || $clean[$key] === '') {
+                return null;
+            }
+        }
+        if ($service === 'refaccion' && count(array_diff(array_keys($clean), ['cantidad'])) === 0) {
+            return null;
+        }
+
+        return $clean;
+    }
+
+    private function leadWebhookReady(): bool
+    {
+        $url = trim((string) $this->config->get('vcard_leads.webhook_url', ''));
+        $secret = trim((string) $this->config->get('vcard_leads.webhook_secret', ''));
+        $parts = parse_url($url);
+
+        return is_array($parts)
+            && strtolower((string) ($parts['scheme'] ?? '')) === 'https'
+            && isset($parts['host'])
+            && $secret !== '';
+    }
+
+    private function newSolicitudId(): string
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function relayLead(array $payload): bool
+    {
+        if (!function_exists('curl_init')) {
+            return false;
+        }
+
+        try {
+            $payloadJson = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        } catch (\JsonException) {
+            return false;
+        }
+
+        $url = (string) $this->config->get('vcard_leads.webhook_url', '');
+        $secret = (string) $this->config->get('vcard_leads.webhook_secret', '');
+        $handle = curl_init($url);
+        if ($handle === false) {
+            return false;
+        }
+
+        try {
+            curl_setopt_array($handle, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $payloadJson,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'X-VCard-Token: ' . $secret,
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_TIMEOUT => 8,
+                CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $result = curl_exec($handle);
+            $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+            return $result !== false && $status >= 200 && $status < 300;
+        } finally {
+            curl_close($handle);
+        }
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function products(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->notFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null || ($vcard['productos_habilitados'] ?? false) !== true) {
+            return $this->notFound();
+        }
+
+        $publicProducts = $this->publicProducts($slug, $vcard);
+
+        if ($publicProducts === []) {
+            return $this->notFound();
+        }
+
+        return $this->withPublicHeaders(Response::html(View::render('vcards/products', [
+            'appName' => $this->appName(),
+            'backUrl' => '/v/' . rawurlencode($slug),
+            'canonicalUrl' => $this->canonicalUrl($request),
+            'metaDescription' => 'Productos públicos relacionados con ' . $this->pageTitle($vcard),
+            'pageTitle' => 'Productos de ' . $this->pageTitle($vcard),
+            'publicProducts' => $publicProducts,
+            'vcard' => $vcard,
+        ])));
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function productImage(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+        $productId = $params['id_producto'] ?? '';
+
+        if (
+            $this->products === null
+            || $slug === ''
+            || !is_string($productId)
+            || preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1
+        ) {
+            return $this->productImageNotFound();
+        }
+
+        $photo = $this->products->imagenPublicaPorSlug($slug, $productId);
+
+        if ($photo === null) {
+            return $this->productImageNotFound();
+        }
+
+        return $this->serveProductImage($photo);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function photo(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->photoNotFound();
+        }
+
+        $photo = $this->vcards->obtenerFotoPublicaPorSlug($slug);
+
+        if ($photo === null) {
+            return $this->photoNotFound();
+        }
+
+        return $this->servePhoto($photo);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function qr(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->qrNotFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null) {
+            return $this->qrNotFound();
+        }
+
+        $payload = $this->publicVcardUrl($request, (string) ($vcard['slug'] ?? $slug));
+        $qr = $this->qr->generate($payload);
+
+        return $this->withPublicHeaders(Response::binary(
+            $qr['png'],
+            'image/png',
+            ['Cache-Control' => 'public, max-age=3600']
+        ));
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function vcf(Request $request, array $params): Response
+    {
+        $slug = $this->slugFromParams($params);
+
+        if ($slug === '') {
+            return $this->vcfNotFound();
+        }
+
+        $vcard = $this->vcards->resolverPublicaPorSlug($slug);
+
+        if ($vcard === null) {
+            return $this->vcfNotFound();
+        }
+
+        $body = $this->vcf->generate($vcard);
+
+        if ($body === null) {
+            return $this->vcfNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary(
+            $body,
+            'text/vcard; charset=utf-8',
+            [
+                'Content-Disposition' => 'attachment; filename="contacto-'
+                    . $this->safeFilenameSlug($slug)
+                    . '.vcf"',
+                'Cache-Control' => 'public, max-age=300',
+            ]
+        ));
+    }
+
+    private function notFound(): Response
+    {
+        return $this->withPublicHeaders(Response::html(View::render('vcards/not-found', [
+            'appName' => $this->appName(),
+        ]), 404))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function photoNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function vcfNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function qrNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    private function productImageNotFound(): Response
+    {
+        return $this->withPublicHeaders(new Response('', 404, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Cache-Control' => 'no-store',
+        ]))->withHeader('X-Robots-Tag', 'noindex');
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function slugFromParams(array $params): string
+    {
+        $slug = $params['slug'] ?? '';
+
+        return is_string($slug) ? $slug : '';
+    }
+
+    private function appName(): string
+    {
+        $appName = (string) $this->config->get('app.name', 'SoporteGR ERP');
+        $appName = trim($appName, " \t\n\r\0\x0B\"'");
+
+        return $appName !== '' ? $appName : 'SoporteGR ERP';
+    }
+
+    private function canonicalUrl(Request $request): string
+    {
+        $baseUrl = rtrim((string) $this->config->get('app.url', ''), '/');
+
+        if ($baseUrl === '') {
+            return $request->path();
+        }
+
+        return $baseUrl . $request->path();
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     */
+    private function pageTitle(array $vcard): string
+    {
+        $title = (string) ($vcard['titulo_publico'] ?? '');
+        $name = (string) ($vcard['nombre'] ?? '');
+        $pageTitle = trim($title !== '' ? $title : $name);
+
+        return $pageTitle !== '' ? $pageTitle : 'Contacto';
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     */
+    private function metaDescription(array $vcard): string
+    {
+        $description = trim((string) ($vcard['descripcion_publica'] ?? ''));
+
+        if ($description !== '') {
+            return $this->limit($description, 160);
+        }
+
+        $parts = array_filter([
+            $vcard['puesto'] ?? null,
+            $vcard['empresa'] ?? null,
+            $vcard['ubicacion'] ?? null,
+        ], static fn (mixed $value): bool => is_string($value) && trim($value) !== '');
+        $fallback = trim(implode(' · ', $parts));
+
+        return $fallback !== ''
+            ? $this->limit($fallback, 160)
+            : 'vCard pública';
+    }
+
+    /**
+     * @param array{tipo?: mixed, valor?: mixed}|mixed $channel
+     * @return array{label: string, href: string}|null
+     */
+    private function contactAction(mixed $channel): ?array
+    {
+        if (!is_array($channel)) {
+            return null;
+        }
+
+        $type = $channel['tipo'] ?? null;
+        $value = $channel['valor'] ?? null;
+
+        if (!is_string($type) || !is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return match ($type) {
+            'correo' => [
+                'label' => 'Enviar correo',
+                'href' => 'mailto:' . rawurlencode($value),
+            ],
+            'telefono_fijo', 'telefono_movil' => [
+                'label' => 'Llamar',
+                'href' => 'tel:' . preg_replace('/[^0-9+]/', '', $value),
+            ],
+            'whatsapp' => [
+                'label' => 'Contactar por WhatsApp',
+                'href' => 'https://wa.me/' . preg_replace('/\D/', '', $value),
+            ],
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     * @return list<array<string, mixed>>
+     */
+    private function publicProducts(string $slug, array $vcard): array
+    {
+        if (
+            $this->products === null
+            || $slug === ''
+            || ($vcard['productos_habilitados'] ?? false) !== true
+        ) {
+            return [];
+        }
+
+        return array_map(
+            fn (array $product): array => $this->withProductPresentation($slug, $vcard, $product),
+            $this->products->listarPublicosPorSlug($slug)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $product
+     * @return array<string, mixed>
+     */
+    private function withProductPresentation(string $slug, array $vcard, array $product): array
+    {
+        $productId = (string) ($product['id_producto'] ?? '');
+
+        if (
+            ($product['imagen_disponible'] ?? false) === true
+            && $slug !== ''
+            && preg_match('/^[A-Z0-9]{1,16}$/', $productId) === 1
+        ) {
+            $product['imagen_url'] = '/v/'
+                . rawurlencode($slug)
+                . '/productos/'
+                . rawurlencode($productId)
+                . '/imagen';
+        }
+
+        $whatsappUrl = $this->productWhatsappUrl($vcard, $product);
+
+        if ($whatsappUrl !== null) {
+            $product['whatsapp_url'] = $whatsappUrl;
+        }
+
+        unset($product['imagen_disponible']);
+
+        return $product;
+    }
+
+    /**
+     * @param array<string, mixed> $vcard
+     * @param array<string, mixed> $product
+     */
+    private function productWhatsappUrl(array $vcard, array $product): ?string
+    {
+        $rawWhatsapp = $vcard['whatsapp'] ?? null;
+
+        if (!is_string($rawWhatsapp) || trim($rawWhatsapp) === '') {
+            return null;
+        }
+
+        $number = preg_replace('/\D/', '', $rawWhatsapp) ?? '';
+
+        if ($number === '') {
+            return null;
+        }
+
+        $description = trim((string) ($product['descripcion'] ?? ''));
+        $productId = trim((string) ($product['id_producto'] ?? ''));
+
+        if ($description === '' || $productId === '' || preg_match('/^[A-Z0-9]{1,16}$/', $productId) !== 1) {
+            return null;
+        }
+
+        $message = 'Hola, me interesa recibir información sobre el producto '
+            . $description
+            . ', código '
+            . $productId
+            . '.';
+        $brand = trim((string) ($product['marca'] ?? ''));
+
+        if ($brand !== '') {
+            $message .= ' Marca: ' . $brand . '.';
+        }
+
+        return 'https://wa.me/' . $number . '?text=' . rawurlencode($message);
+    }
+
+    private function limit(string $value, int $max): string
+    {
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            return mb_strlen($value, 'UTF-8') > $max
+                ? rtrim(mb_substr($value, 0, $max - 1, 'UTF-8')) . '…'
+                : $value;
+        }
+
+        return strlen($value) > $max
+            ? rtrim(substr($value, 0, $max - 1)) . '…'
+            : $value;
+    }
+
+    private function withPublicHeaders(Response $response): Response
+    {
+        return $response
+            ->withHeader('X-Content-Type-Options', 'nosniff')
+            ->withHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->withHeader('X-Frame-Options', 'DENY');
+    }
+
+    /**
+     * @param array<string, mixed> $photo
+     */
+    private function servePhoto(array $photo): Response
+    {
+        $mime = strtolower((string) ($photo['mime'] ?? ''));
+        $extension = strtolower((string) ($photo['extension'] ?? ''));
+        $relativePath = (string) ($photo['ruta_relativa'] ?? '');
+
+        if (!$this->allowedPhotoFormat($mime, $extension)) {
+            return $this->photoNotFound();
+        }
+
+        $path = $this->safePhotoPath($relativePath);
+
+        if ($path === null || !is_file($path) || !is_readable($path)) {
+            return $this->photoNotFound();
+        }
+
+        $actualSize = filesize($path);
+
+        if ($actualSize === false || $actualSize < 1) {
+            return $this->photoNotFound();
+        }
+
+        $actualMime = $this->detectMime($path);
+
+        if ($actualMime !== $mime) {
+            return $this->photoNotFound();
+        }
+
+        $body = file_get_contents($path);
+
+        if (!is_string($body) || $body === '') {
+            return $this->photoNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary($body, $mime, [
+            'Cache-Control' => 'public, max-age=3600',
+        ]));
+    }
+
+    /**
+     * @param array<string, mixed> $photo
+     */
+    private function serveProductImage(array $photo): Response
+    {
+        $mime = strtolower((string) ($photo['mime_type'] ?? ''));
+        $relativePath = (string) ($photo['ruta_relativa'] ?? '');
+        $declaredSize = (int) ($photo['tamano_bytes'] ?? 0);
+        $extension = strtolower((string) pathinfo($relativePath, PATHINFO_EXTENSION));
+
+        if (!$this->allowedPhotoMetadata($mime, $extension, $declaredSize)) {
+            return $this->productImageNotFound();
+        }
+
+        $path = $this->safeProductImagePath($relativePath);
+
+        if ($path === null || !is_file($path) || !is_readable($path)) {
+            return $this->productImageNotFound();
+        }
+
+        $actualSize = filesize($path);
+
+        if ($actualSize === false || $actualSize < 1) {
+            return $this->productImageNotFound();
+        }
+
+        $actualMime = $this->detectMime($path);
+
+        if ($actualMime !== $mime || @getimagesize($path) === false) {
+            return $this->productImageNotFound();
+        }
+
+        $body = file_get_contents($path);
+
+        if (!is_string($body) || $body === '') {
+            return $this->productImageNotFound();
+        }
+
+        return $this->withPublicHeaders(Response::binary($body, $mime, [
+            'Cache-Control' => 'public, max-age=3600',
+        ]));
+    }
+
+    private function allowedPhotoMetadata(
+        string $mime,
+        string $extension,
+        int $declaredSize
+    ): bool {
+        return $declaredSize > 0
+            && $this->allowedPhotoFormat($mime, $extension);
+    }
+
+    private function allowedPhotoFormat(string $mime, string $extension): bool
+    {
+        return match ($mime) {
+            'image/jpeg' => in_array($extension, ['jpg', 'jpeg'], true),
+            'image/png' => $extension === 'png',
+            'image/webp' => $extension === 'webp',
+            default => false,
+        };
+    }
+
+    private function safePhotoPath(string $relativePath): ?string
+    {
+        $relativePath = str_replace('\\', '/', $relativePath);
+
+        if (
+            $relativePath === ''
+            || str_contains($relativePath, "\0")
+            || str_contains($relativePath, '..')
+            || str_starts_with($relativePath, '/')
+        ) {
+            return null;
+        }
+
+        if (preg_match('#\Auploads/perfiles/[^/]+\z#D', $relativePath) === 1) {
+            $allowedRelativeRoot = 'uploads/perfiles';
+        } elseif (preg_match('#\Auploads/usuarios/[1-9][0-9]*/fotos/[^/]+\z#D', $relativePath) === 1) {
+            $allowedRelativeRoot = 'uploads/usuarios';
+        } else {
+            return null;
+        }
+
+        $storagePath = rtrim(
+            (string) $this->config->get('paths.STORAGE_PATH', STORAGE_PATH),
+            '/\\'
+        );
+        $uploadsRoot = realpath($storagePath . DIRECTORY_SEPARATOR . 'uploads');
+        $allowedRoot = realpath(
+            $storagePath . DIRECTORY_SEPARATOR
+                . str_replace('/', DIRECTORY_SEPARATOR, $allowedRelativeRoot)
+        );
+
+        if ($uploadsRoot === false || $allowedRoot === false) {
+            return null;
+        }
+
+        $candidate = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+        $realPath = realpath($candidate);
+
+        if ($realPath === false) {
+            return null;
+        }
+
+        $normalizedUploadsRoot = $this->normalizedPath($uploadsRoot) . '/';
+        $normalizedAllowedRoot = $this->normalizedPath($allowedRoot) . '/';
+        $normalizedPath = $this->normalizedPath($realPath);
+
+        if (
+            !str_starts_with($normalizedPath, $normalizedUploadsRoot)
+            || !str_starts_with($normalizedPath, $normalizedAllowedRoot)
+        ) {
+            return null;
+        }
+
+        return $realPath;
+    }
+
+    private function safeProductImagePath(string $relativePath): ?string
+    {
+        if (
+            $relativePath === ''
+            || str_contains($relativePath, '..')
+            || str_contains($relativePath, '\\')
+            || str_starts_with($relativePath, '/')
+            || preg_match('/\.(php|phtml|phar)(\.|$)/i', $relativePath) === 1
+        ) {
+            return null;
+        }
+
+        $storagePath = rtrim(
+            (string) $this->config->get('paths.STORAGE_PATH', STORAGE_PATH),
+            '/\\'
+        );
+        $root = $storagePath . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, 'uploads/productos');
+        $rootReal = realpath($root);
+
+        if ($rootReal === false) {
+            return null;
+        }
+
+        $candidate = $root . DIRECTORY_SEPARATOR
+            . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+        $realPath = realpath($candidate);
+
+        if ($realPath === false) {
+            return null;
+        }
+
+        $normalizedRoot = $this->normalizedPath($rootReal) . '/';
+        $normalizedPath = $this->normalizedPath($realPath);
+
+        if (!str_starts_with($normalizedPath, $normalizedRoot)) {
+            return null;
+        }
+
+        return $realPath;
+    }
+
+    private function detectMime(string $path): string
+    {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+
+        if ($finfo === false) {
+            return '';
+        }
+
+        try {
+            $mime = finfo_file($finfo, $path);
+        } finally {
+            finfo_close($finfo);
+        }
+
+        return is_string($mime) ? strtolower($mime) : '';
+    }
+
+    private function normalizedPath(string $path): string
+    {
+        return rtrim(str_replace('\\', '/', $path), '/');
+    }
+
+    private function safeFilenameSlug(string $slug): string
+    {
+        $safe = preg_replace('/[^a-z0-9-]+/', '-', strtolower($slug));
+        $safe = is_string($safe) ? trim($safe, '-') : '';
+
+        return $safe !== '' ? $safe : 'contacto';
+    }
+
+    private function publicVcardUrl(Request $request, string $slug): string
+    {
+        $path = '/v/' . rawurlencode($slug);
+        $host = trim((string) ($request->header('host') ?? ''));
+
+        if ($host !== '' && preg_match('/^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/', $host) === 1) {
+            $proto = strtolower(trim((string) ($request->header('x-forwarded-proto') ?? '')));
+            $scheme = in_array($proto, ['http', 'https'], true) ? $proto : 'http';
+
+            return $scheme . '://' . $host . $path;
+        }
+
+        $baseUrl = rtrim((string) $this->config->get('app.url', ''), '/');
+
+        if ($baseUrl !== '' && preg_match('/^https?:\/\/[^\/\s]+$/', $baseUrl) === 1) {
+            return $baseUrl . $path;
+        }
+
+        return $path;
+    }
+}
+
+

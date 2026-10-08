@@ -1,0 +1,384 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Support\Security\CsrfTokenService;
+
+if (!is_array($user ?? null)
+    || !is_array($context ?? null)
+    || !$csrf instanceof CsrfTokenService
+) {
+    throw new RuntimeException('Authenticated content context is incomplete.');
+}
+
+$companies = is_array($context['companies'] ?? null) ? $context['companies'] : [];
+$warehouses = is_array($context['warehouses'] ?? null) ? $context['warehouses'] : [];
+$activeCompany = is_array($context['active_company'] ?? null)
+    ? $context['active_company']
+    : null;
+$activeWarehouse = is_array($context['active_warehouse'] ?? null)
+    ? $context['active_warehouse']
+    : null;
+$hasScope = ($context['has_scope'] ?? false) === true;
+$hasActiveContext = ($context['has_active_context'] ?? false) === true;
+$requiresSelection = ($context['requires_selection'] ?? false) === true;
+$canAccessCatalogs = ($canAccessCatalogs ?? false) === true;
+?>
+<header class="page-heading page-heading--dashboard">
+    <div class="page-heading__eyebrow">
+        <p class="page-heading__path">Inicio</p>
+        <span class="status-label"><span aria-hidden="true"></span> Tu espacio de trabajo</span>
+    </div>
+    <h1>&iexcl;Hola, <?= e($user['username'] ?? 'bienvenido') ?>!</h1>
+    <p>Aqu&iacute; tienes un resumen de tu actividad.</p>
+    <p class="page-heading__privacy">Solo ves la informaci&oacute;n y notificaciones que te corresponden.</p>
+</header>
+
+<?php
+$notifications = is_array($notifications ?? null) ? $notifications : [];
+$notificationFilter = in_array($notificationFilter ?? '', ['all', 'unread', 'today'], true)
+    ? $notificationFilter
+    : 'all';
+$unreadNotificationCount = max(0, (int) ($unreadNotificationCount ?? 0));
+$notificationLabels = [
+    'solicitud_cotizacion' => 'Nueva solicitud de cotización',
+    'solicitud_vcard' => 'Nueva solicitud desde vCard',
+    'cotizacion_pendiente' => 'Cotización pendiente',
+    'cotizacion_enviada' => 'Cotización enviada',
+    'seguimiento_pendiente' => 'Seguimiento pendiente',
+    'cliente_respondio' => 'Cliente respondió',
+    'oportunidad_por_vencer' => 'Oportunidad próxima a vencer',
+    'recordatorio_llamada' => 'Recordatorio de llamada',
+    'solicitud_capacitacion' => 'Solicitud de Instituto ACR',
+];
+?>
+<?php
+$todayKey = (new DateTimeImmutable('today'))->format('Y-m-d');
+$newNotificationsToday = 0;
+foreach ($notifications as $notificationForMetric) {
+    $createdForMetric = $notificationForMetric['created_at'] ?? null;
+    if (is_string($createdForMetric) && substr($createdForMetric, 0, 10) === $todayKey) {
+        $newNotificationsToday++;
+    }
+}
+?>
+<section class="dashboard-metrics" aria-label="Resumen de actividad">
+    <article class="dashboard-metric dashboard-metric--pending">
+        <span class="dashboard-metric__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 3h8l4 4v14H4V3h4Zm7 1v4h4M8 12h8M8 16h5"/></svg></span>
+        <div><span class="dashboard-metric__label">Pendientes</span><strong data-notifications-unread><?= e((string) $unreadNotificationCount) ?></strong><small>Sin leer en tu bandeja</small></div>
+    </article>
+    <article class="dashboard-metric dashboard-metric--new">
+        <span class="dashboard-metric__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8m0-12.8L5.6 18.4"/></svg></span>
+        <div><span class="dashboard-metric__label">Nuevas</span><strong data-notifications-today><?= e((string) $newNotificationsToday) ?></strong><small>Avisos de hoy en los recientes</small></div>
+    </article>
+    <article class="dashboard-metric dashboard-metric--followup">
+        <span class="dashboard-metric__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <div><span class="dashboard-metric__label">Seguimiento hoy</span><strong aria-label="Dato no disponible">&mdash;</strong><small>No hay fecha de seguimiento disponible</small></div>
+    </article>
+</section>
+<section class="notification-center" id="centro-notificaciones" aria-labelledby="notifications-title">
+    <span class="notification-center__legacy-anchor" id="notificaciones" aria-hidden="true"></span>
+    <div class="notification-center__heading">
+        <div class="notification-center__title-group">
+            <span class="notification-center__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
+            <div><p class="section-kicker">Tu actividad</p><h2 id="notifications-title">Centro de notificaciones</h2><p>Solo ves las notificaciones que te corresponden.</p></div>
+        </div>
+        <?php if ($unreadNotificationCount > 0): ?>
+            <form method="post" action="/app/notificaciones/leer-todas">
+                <?= csrf_field($csrf) ?>
+                <button class="button button--secondary" type="submit"><?= html_entity_decode('Marcar todas como le&#237;das', ENT_QUOTES, 'UTF-8') ?></button>
+            </form>
+        <?php endif; ?>
+    </div>
+    <div class="notification-center__toolbar">
+        <nav class="notification-filters" aria-label="Filtrar notificaciones">
+            <?php foreach (['all' => 'Todas', 'unread' => html_entity_decode('No le&#237;das', ENT_QUOTES, 'UTF-8'), 'today' => 'Hoy'] as $value => $label): ?>
+                <a class="notification-filter<?= $notificationFilter === $value ? ' is-active' : '' ?>" href="/app?notificaciones=<?= e($value) ?>#centro-notificaciones" <?= $notificationFilter === $value ? 'aria-current="page"' : '' ?>><?= e($label) ?></a>
+            <?php endforeach; ?>
+        </nav>
+        <span class="notification-count" data-notifications-count aria-label="<?= e((string) $unreadNotificationCount) ?> sin leer"><?= e((string) $unreadNotificationCount) ?> sin leer</span>
+    </div>
+    <?php if ($notifications === []): ?>
+        <div class="notification-empty" role="status" data-notification-empty>
+            <span class="notification-empty__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
+            <strong>No tienes notificaciones pendientes</strong>
+            <span>Cuando recibas una solicitud, seguimiento o aviso asignado a tu usuario, aparecer&aacute; aqu&iacute;.</span>
+        </div>
+    <?php else: ?>
+        <ul class="notification-list" data-notification-list>
+            <?php foreach ($notifications as $notification): ?>
+                <?php
+                $notificationId = (int) ($notification['id'] ?? 0);
+                $notificationType = (string) ($notification['tipo'] ?? '');
+                $notificationDate = new DateTimeImmutable((string) ($notification['created_at'] ?? 'now'));
+                $notificationDateLabel = $notificationDate->format('Y-m-d') === $todayKey ? 'Hoy, ' . $notificationDate->format('H:i') : $notificationDate->format('d/m/Y H:i');
+                $isUnread = ($notification['leida_at'] ?? null) === null;
+                $notificationPriority = (string) ($notification['prioridad'] ?? 'normal');
+                $rawActionUrl = $notification['accion_url'] ?? null;
+                $actionUrl = is_string($rawActionUrl) && str_starts_with($rawActionUrl, '/') && !str_starts_with($rawActionUrl, '//') && !str_contains($rawActionUrl, '\\') ? $rawActionUrl : '';
+                ?>
+                <li class="notification-item<?= $isUnread ? ' is-unread' : ' is-read' ?><?= in_array($notificationPriority, ['alta', 'urgente'], true) ? ' is-high-priority' : '' ?>" data-notification-id="<?= e((string) $notificationId) ?>">
+                    <span class="notification-item__icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
+                    <div class="notification-item__copy">
+                        <div class="notification-item__title-row"><h3><?= e($notificationLabels[$notificationType] ?? $notification['titulo'] ?? html_entity_decode('Notificaci&#243;n', ENT_QUOTES, 'UTF-8')) ?></h3><span class="notification-priority notification-priority--<?= e($notificationPriority) ?>"><?= e(ucfirst($notificationPriority)) ?></span></div>
+                        <p><?= e($notification['mensaje'] ?? '') ?></p>
+                        <div class="notification-item__meta"><time datetime="<?= e((string) ($notification['created_at'] ?? '')) ?>"><?= e($notificationDateLabel) ?></time><span class="notification-role"><?= e((string) ($notification['rol_codigo'] ?? '')) ?></span></div>
+                    </div>
+                    <div class="notification-item__actions">
+                        <?php if ($isUnread): ?>
+                            <form method="post" action="/app/notificaciones/<?= e((string) $notificationId) ?>/leer">
+                                <?= csrf_field($csrf) ?>
+                                <button class="button button--secondary notification-item__action" type="submit"><?= $actionUrl !== '' ? 'Atender' : html_entity_decode('Marcar le&#237;da', ENT_QUOTES, 'UTF-8') ?></button>
+                            </form>
+                        <?php elseif ($actionUrl !== ''): ?>
+                            <a class="button button--secondary notification-item__action" href="<?= e($actionUrl) ?>">Ver</a>
+                        <?php else: ?>
+                            <span class="notification-item__read-label">Le&#237;da</span>
+                        <?php endif; ?>
+                    </div>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</section>
+<div class="home-grid">
+    <section class="home-section home-section--context" aria-labelledby="scope-title">
+        <div class="home-section__heading">
+            <div>
+                <p class="section-kicker">Contexto de trabajo</p>
+                <h2 id="scope-title">Empresa y almacén activos</h2>
+            </div>
+            <?php if ($hasActiveContext): ?>
+                <span class="status-label">
+                    <span aria-hidden="true"></span>
+                    Activo
+                </span>
+            <?php else: ?>
+                <span class="status-label status-label--neutral">
+                    Sin contexto
+                </span>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($hasActiveContext): ?>
+            <dl class="context-summary">
+                <div>
+                    <dt>Empresa</dt>
+                    <dd><?= e($activeCompany['name'] ?? '') ?></dd>
+                </div>
+                <div>
+                    <dt>Almacén</dt>
+                    <dd><?= e($activeWarehouse['name'] ?? '') ?></dd>
+                </div>
+            </dl>
+        <?php elseif (!$hasScope): ?>
+            <div class="empty-state" role="status">
+                <strong>No hay un contexto disponible</strong>
+                <p>
+                    Tu cuenta no tiene una empresa y un almacén activos.
+                    Solicita una asignación al administrador del sistema.
+                </p>
+            </div>
+        <?php else: ?>
+            <div class="empty-state" role="status">
+                <strong>Selecciona un contexto</strong>
+                <p>
+                    Elige una empresa y un almacén permitidos para establecer
+                    el contexto de trabajo.
+                </p>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($hasScope && $requiresSelection): ?>
+            <form class="scope-context-form" method="post" action="/app/contexto">
+                <?= csrf_field($csrf) ?>
+
+                <div class="scope-context-form__field">
+                    <label for="active-company">Empresa</label>
+                    <select
+                        id="active-company"
+                        name="active_company_id"
+                        required
+                    >
+                        <option value="">Selecciona una empresa</option>
+                        <?php foreach ($companies as $company): ?>
+                            <option
+                                value="<?= e((string) ($company['id'] ?? '')) ?>"
+                                <?php if (
+                                    (int) ($activeCompany['id'] ?? 0)
+                                    === (int) ($company['id'] ?? 0)
+                                ): ?>
+                                    selected
+                                <?php endif; ?>
+                            >
+                                <?= e($company['name'] ?? '') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="scope-context-form__field">
+                    <label for="active-warehouse">Almacén</label>
+                    <select
+                        id="active-warehouse"
+                        name="active_warehouse_id"
+                        required
+                    >
+                        <option value="">Selecciona un almacén</option>
+                        <?php foreach ($companies as $company): ?>
+                            <?php
+                            $companyId = (int) ($company['id'] ?? 0);
+                            $companyWarehouses = array_values(array_filter(
+                                $warehouses,
+                                static fn (array $warehouse): bool =>
+                                    (int) ($warehouse['company_id'] ?? 0) === $companyId
+                            ));
+                            ?>
+                            <?php if ($companyWarehouses !== []): ?>
+                                <optgroup label="<?= e($company['name'] ?? '') ?>">
+                                    <?php foreach ($companyWarehouses as $warehouse): ?>
+                                        <option
+                                            value="<?= e((string) ($warehouse['id'] ?? '')) ?>"
+                                            <?php if (
+                                                (int) ($activeWarehouse['id'] ?? 0)
+                                                === (int) ($warehouse['id'] ?? 0)
+                                            ): ?>
+                                                selected
+                                            <?php endif; ?>
+                                        >
+                                            <?= e($warehouse['name'] ?? '') ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </optgroup>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <button class="button" type="submit">Cambiar contexto</button>
+            </form>
+        <?php endif; ?>
+    </section>
+
+    <section class="home-section" aria-labelledby="session-title">
+        <div class="home-section__heading">
+            <div>
+                <p class="section-kicker">Identidad</p>
+                <h2 id="session-title">Sesión autenticada</h2>
+            </div>
+            <span class="status-label">
+                <span aria-hidden="true"></span>
+                Activa
+            </span>
+        </div>
+
+        <dl class="session-summary">
+            <div>
+                <dt>Usuario</dt>
+                <dd><?= e($user['username'] ?? '') ?></dd>
+            </div>
+            <div>
+                <dt>Correo</dt>
+                <dd><?= e($user['email'] ?? '') ?></dd>
+            </div>
+        </dl>
+    </section>
+</div>
+
+<section class="home-section security-section" aria-labelledby="security-title">
+    <div class="home-section__heading">
+        <div>
+            <p class="section-kicker">Controles base</p>
+            <h2 id="security-title">Seguridad de la sesión</h2>
+        </div>
+        <span class="status-label">
+            <span aria-hidden="true"></span>
+            Operativa
+        </span>
+    </div>
+
+    <ul class="control-list">
+        <li>
+            <div>
+                <strong>Autenticación</strong>
+                <span>La identidad de la sesión fue verificada.</span>
+            </div>
+            <span class="control-list__state">Activa</span>
+        </li>
+        <li>
+            <div>
+                <strong>Protección de formularios</strong>
+                <span>Las acciones de cambio requieren una solicitud válida.</span>
+            </div>
+            <span class="control-list__state">Activa</span>
+        </li>
+        <li>
+            <div>
+                <strong>Autorización</strong>
+                <span>El acceso a esta pantalla está controlado.</span>
+            </div>
+            <span class="control-list__state">Activa</span>
+        </li>
+        <li>
+            <div>
+                <strong>Alcance operativo</strong>
+                <span>Empresa y almacén se validan contra tus asignaciones.</span>
+            </div>
+            <span class="control-list__state">Activa</span>
+        </li>
+    </ul>
+</section>
+
+<div class="home-grid home-grid--secondary">
+    <section class="home-section" aria-labelledby="access-title">
+        <div class="home-section__heading">
+            <div>
+                <p class="section-kicker">Navegación</p>
+                <h2 id="access-title">Accesos disponibles</h2>
+            </div>
+        </div>
+        <ul class="plain-status-list">
+            <li>
+                <span>Inicio privado</span>
+                <strong>Disponible</strong>
+            </li>
+            <li>
+                <span>Cierre seguro de sesión</span>
+                <strong>Disponible en la barra superior</strong>
+            </li>
+            <?php if ($canAccessCatalogs): ?>
+                <li>
+                    <span>Catálogos base</span>
+                    <strong>Disponible en la navegación</strong>
+                </li>
+            <?php endif; ?>
+        </ul>
+    </section>
+
+    <section class="home-section" aria-labelledby="pending-title">
+        <div class="home-section__heading">
+            <div>
+                <p class="section-kicker">Siguientes fases</p>
+                <h2 id="pending-title">Operaciones pendientes</h2>
+            </div>
+        </div>
+        <ul class="plain-status-list plain-status-list--pending">
+            <li>
+                <span>Productos</span>
+                <strong>No disponibles</strong>
+            </li>
+            <li>
+                <span>Inventario y movimientos</span>
+                <strong>No disponibles</strong>
+            </li>
+            <li>
+                <span>Solicitudes y procesos comerciales</span>
+                <strong>No disponibles</strong>
+            </li>
+        </ul>
+    </section>
+</div>
+
+<p class="home-boundary">Este resumen muestra únicamente la actividad y las notificaciones asignadas a tu usuario.</p>
+
+

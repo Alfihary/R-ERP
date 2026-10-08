@@ -1,0 +1,32 @@
+[hidden]{display:none!important}
+.pwa-install,.device-secondary{border:1px solid #6aaed5;border-radius:9px;padding:10px 14px;background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+.pwa-install{margin-top:16px}
+.device-wide{width:100%}
+.device-secondary:focus-visible,.pwa-install:focus-visible{outline:3px solid #74c5f5;outline-offset:3px}
+.device-panel{margin:0 0 20px;padding:14px 18px;border:1px solid #c2d2e0;border-radius:10px;background:#f4f8fb;color:#182c3d;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.device-panel p{margin:0;font-size:13px}
+.device-panel [data-device-message]{flex-basis:100%}
+.device-dialog{width:min(440px,calc(100% - 32px));border:1px solid #3c5267;border-radius:16px;background:#15212e;color:#e4edf6;padding:26px}
+.device-dialog::backdrop{background:#071522b8}
+.device-dialog h2{margin-top:0;font-size:20px}
+.device-dialog p{font-size:14px;line-height:1.5}
+.device-dialog label{display:block;margin-bottom:8px}
+.device-dialog input{width:100%;padding:12px;border:1px solid #6f8295;border-radius:8px;background:#202c3b;color:#fff;font:inherit}
+.device-dialog-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+[data-device-message],[data-pwa-message]{font-size:13px;line-height:1.5}
+.device-cover .app-shell{visibility:hidden}
+.device-cover::before{content:'Verificando la sesión…';position:fixed;inset:0;display:grid;place-items:center;background:#1c4e74;color:#fff;z-index:9999;font:18px system-ui}
+.passkey-panel{margin:0 0 20px;padding:22px;border:1px solid #c2d2e0;border-radius:12px;background:#f7fafc;color:#182c3d}
+.passkey-panel__heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.passkey-panel__heading h2{margin:0 0 7px;font-size:20px}
+.passkey-panel__eyebrow{margin:0 0 5px;color:#17638d;font-size:11px;font-weight:700;letter-spacing:.12em}
+.passkey-panel__description{max-width:680px;margin:0;color:#496174;font-size:13px;line-height:1.55}
+.passkey-list{display:grid;gap:10px;margin:18px 0 0;padding:0;list-style:none}
+.passkey-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px;border:1px solid #d0dce6;border-radius:10px;background:#fff}
+.passkey-item strong,.passkey-item small{display:block}
+.passkey-item small{margin-top:4px;color:#607486;font-size:12px;line-height:1.45}
+.passkey-empty{padding:14px;border:1px dashed #bacbd8;border-radius:10px;color:#607486;font-size:13px;text-align:center}
+.passkey-panel [data-passkey-message]{display:block;margin-top:13px;font-size:13px;line-height:1.5}
+.passkey-panel [data-passkey-message]:empty{display:none}
+.device-dialog .passkey-name-field{margin-bottom:16px}
+@media(max-width:680px){.passkey-panel{padding:18px}.passkey-panel__heading,.passkey-item{align-items:stretch;flex-direction:column}.passkey-panel__heading .device-secondary,.passkey-item .device-secondary{width:100%}}
