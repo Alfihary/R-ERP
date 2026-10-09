@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repositories;
 
+use App\Domain\Inventory\InventoryMutationRepositoryInterface;
+use App\Domain\Inventory\TransactionBoundaryInterface;
 use App\Infrastructure\Database\ConnectionProvider;
 use PDO;
 
-final class InventoryRepository
+final class InventoryRepository implements
+    InventoryMutationRepositoryInterface,
+    TransactionBoundaryInterface
 {
     public function __construct(private readonly ConnectionProvider $connection)
     {

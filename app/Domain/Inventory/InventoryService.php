@@ -22,7 +22,9 @@ final class InventoryService
         private readonly InventoryRepository $inventory,
         private readonly ?FolioService $folios = null,
         private readonly ?InventoryIdempotencyRepository $idempotency = null,
-        private readonly ?AuditRepository $audit = null
+        private readonly ?AuditRepository $audit = null,
+        private readonly ?InventoryMutationRepositoryInterface $mutations = null,
+        private readonly ?TransactionBoundaryInterface $transactions = null
     )
     {
     }
@@ -35,7 +37,7 @@ final class InventoryService
     {
         $request = $this->validateRequestShape($input);
 
-        return $this->inventory->transactional(function () use ($request): array {
+        return $this->transactionBoundary()->transactional(function () use ($request): array {
             $this->assertUser($request['usuario_id']);
             $this->assertScope($request['empresa_id'], $request['almacen_id']);
             $concept = $this->assertConcept($request['concepto_codigo']);
@@ -56,7 +58,7 @@ final class InventoryService
                 ]);
             }
 
-            $movementId = $this->inventory->createDraftMovement(
+            $movementId = $this->mutationRepository()->createDraftMovement(
                 $request['empresa_id'],
                 $request['almacen_id'],
                 $concept['id'],
@@ -71,7 +73,7 @@ final class InventoryService
             $detailIds = [];
 
             foreach ($parts as $part) {
-                $detailIds[$part['id_producto']] = $this->inventory->insertMovementDetail(
+                $detailIds[$part['id_producto']] = $this->mutationRepository()->insertMovementDetail(
                     $movementId,
                     $part['id_producto'],
                     $part['cantidad'],
@@ -84,7 +86,7 @@ final class InventoryService
 
             foreach ($parts as $part) {
                 if ($concept['naturaleza'] === 'ENTRADA') {
-                    $this->inventory->ensureExistenceRow(
+                    $this->mutationRepository()->ensureExistenceRow(
                         $request['almacen_id'],
                         $part['id_producto']
                     );
@@ -123,13 +125,13 @@ final class InventoryService
                 }
 
                 if ($concept['naturaleza'] === 'ENTRADA') {
-                    $this->inventory->increaseExistence(
+                    $this->mutationRepository()->increaseExistence(
                         $request['almacen_id'],
                         $part['id_producto'],
                         $part['cantidad']
                     );
                 } else {
-                    $this->inventory->decreaseExistence(
+                    $this->mutationRepository()->decreaseExistence(
                         $request['almacen_id'],
                         $part['id_producto'],
                         $part['cantidad']
@@ -150,7 +152,7 @@ final class InventoryService
                 ];
             }
 
-            $this->inventory->markMovementApplied(
+            $this->mutationRepository()->markMovementApplied(
                 $movementId,
                 $request['usuario_id']
             );
@@ -636,8 +638,8 @@ final class InventoryService
                 ]);
             }
 
-            $this->inventory->insertMovementDetailSeries($detailId, $seriesId);
-            $this->inventory->saveSeriesStock(
+            $this->mutationRepository()->insertMovementDetailSeries($detailId, $seriesId);
+            $this->mutationRepository()->saveSeriesStock(
                 $seriesId,
                 $warehouseId,
                 'EN_EXISTENCIA'
@@ -691,8 +693,8 @@ final class InventoryService
                 ]);
             }
 
-            $this->inventory->insertMovementDetailSeries($detailId, $seriesId);
-            $this->inventory->saveSeriesStock(
+            $this->mutationRepository()->insertMovementDetailSeries($detailId, $seriesId);
+            $this->mutationRepository()->saveSeriesStock(
                 $seriesId,
                 null,
                 'FUERA_EXISTENCIA'
@@ -868,5 +870,15 @@ final class InventoryService
         return function_exists('mb_strlen')
             ? mb_strlen($value, 'UTF-8')
             : strlen($value);
+    }
+
+    private function mutationRepository(): InventoryMutationRepositoryInterface
+    {
+        return $this->mutations ?? $this->inventory;
+    }
+
+    private function transactionBoundary(): TransactionBoundaryInterface
+    {
+        return $this->transactions ?? $this->inventory;
     }
 }

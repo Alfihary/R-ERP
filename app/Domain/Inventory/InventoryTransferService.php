@@ -22,7 +22,9 @@ final class InventoryTransferService
         private readonly InventoryRepository $inventory,
         private readonly ?FolioService $folios = null,
         private readonly ?InventoryIdempotencyRepository $idempotency = null,
-        private readonly ?AuditRepository $audit = null
+        private readonly ?AuditRepository $audit = null,
+        private readonly ?InventoryMutationRepositoryInterface $mutations = null,
+        private readonly ?TransactionBoundaryInterface $transactions = null
     )
     {
     }
@@ -35,7 +37,7 @@ final class InventoryTransferService
     {
         $request = $this->validateRequestShape($input);
 
-        return $this->inventory->transactional(function () use ($request): array {
+        return $this->transactionBoundary()->transactional(function () use ($request): array {
             $this->assertUser($request['usuario_id']);
             $this->assertScope(
                 $request['empresa_id'],
@@ -69,13 +71,13 @@ final class InventoryTransferService
             }
 
             foreach ($parts as $part) {
-                $this->inventory->ensureExistenceRow(
+                $this->mutationRepository()->ensureExistenceRow(
                     $request['almacen_destino_id'],
                     $part['id_producto']
                 );
             }
 
-            $exitMovementId = $this->inventory->createDraftMovement(
+            $exitMovementId = $this->mutationRepository()->createDraftMovement(
                 $request['empresa_id'],
                 $request['almacen_origen_id'],
                 $exitConcept['id'],
@@ -90,7 +92,7 @@ final class InventoryTransferService
             $exitDetailIds = [];
 
             foreach ($parts as $part) {
-                $exitDetailIds[$part['id_producto']] = $this->inventory->insertMovementDetail(
+                $exitDetailIds[$part['id_producto']] = $this->mutationRepository()->insertMovementDetail(
                     $exitMovementId,
                     $part['id_producto'],
                     $part['cantidad'],
@@ -99,7 +101,7 @@ final class InventoryTransferService
                 );
             }
 
-            $entryMovementId = $this->inventory->createDraftMovement(
+            $entryMovementId = $this->mutationRepository()->createDraftMovement(
                 $request['empresa_id'],
                 $request['almacen_destino_id'],
                 $entryConcept['id'],
@@ -114,7 +116,7 @@ final class InventoryTransferService
             $entryDetailIds = [];
 
             foreach ($parts as $part) {
-                $entryDetailIds[$part['id_producto']] = $this->inventory->insertMovementDetail(
+                $entryDetailIds[$part['id_producto']] = $this->mutationRepository()->insertMovementDetail(
                     $entryMovementId,
                     $part['id_producto'],
                     $part['cantidad'],
@@ -155,12 +157,12 @@ final class InventoryTransferService
                     );
                 }
 
-                $this->inventory->decreaseExistence(
+                $this->mutationRepository()->decreaseExistence(
                     $request['almacen_origen_id'],
                     $part['id_producto'],
                     $part['cantidad']
                 );
-                $this->inventory->increaseExistence(
+                $this->mutationRepository()->increaseExistence(
                     $request['almacen_destino_id'],
                     $part['id_producto'],
                     $part['cantidad']
@@ -188,11 +190,11 @@ final class InventoryTransferService
                 ];
             }
 
-            $this->inventory->markMovementApplied(
+            $this->mutationRepository()->markMovementApplied(
                 $exitMovementId,
                 $request['usuario_id']
             );
-            $this->inventory->markMovementApplied(
+            $this->mutationRepository()->markMovementApplied(
                 $entryMovementId,
                 $request['usuario_id']
             );
@@ -663,15 +665,15 @@ final class InventoryTransferService
                 ]);
             }
 
-            $this->inventory->insertMovementDetailSeries(
+            $this->mutationRepository()->insertMovementDetailSeries(
                 $exitDetailId,
                 $seriesId
             );
-            $this->inventory->insertMovementDetailSeries(
+            $this->mutationRepository()->insertMovementDetailSeries(
                 $entryDetailId,
                 $seriesId
             );
-            $this->inventory->saveSeriesStock(
+            $this->mutationRepository()->saveSeriesStock(
                 $seriesId,
                 $destinationWarehouseId,
                 'EN_EXISTENCIA'
@@ -840,6 +842,16 @@ final class InventoryTransferService
 
         return ((int) $integer * 1_000_000)
             + (int) str_pad(substr($fraction, 0, 6), 6, '0');
+    }
+
+    private function mutationRepository(): InventoryMutationRepositoryInterface
+    {
+        return $this->mutations ?? $this->inventory;
+    }
+
+    private function transactionBoundary(): TransactionBoundaryInterface
+    {
+        return $this->transactions ?? $this->inventory;
     }
 
     private function length(string $value): int
