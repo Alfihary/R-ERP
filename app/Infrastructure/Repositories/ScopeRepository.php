@@ -106,4 +106,98 @@ final class ScopeRepository implements ScopeRepositoryInterface
 
         return $warehouses;
     }
+
+    /** @return array{id:int}|null */
+    public function activeCompany(int $companyId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id FROM empresas WHERE id = :id AND activo = 1 AND eliminado_en IS NULL LIMIT 1'
+        );
+        $statement->execute(['id' => $companyId]);
+        $row = $statement->fetch();
+        return $row === false ? null : ['id' => (int) $row['id']];
+    }
+
+    /** @return array{id:int,empresa_id:int}|null */
+    public function activeWarehouseForCompany(int $warehouseId, int $companyId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT id, empresa_id FROM almacenes
+             WHERE id = :id AND empresa_id = :empresa_id
+               AND activo = 1 AND eliminado_en IS NULL LIMIT 1'
+        );
+        $statement->execute(['id' => $warehouseId, 'empresa_id' => $companyId]);
+        $row = $statement->fetch();
+        return $row === false ? null : [
+            'id' => (int) $row['id'],
+            'empresa_id' => (int) $row['empresa_id'],
+        ];
+    }
+
+    public function replaceUserScope(int $userId, int $companyId, int $warehouseId, int $actorId): void
+    {
+        $pdo = $this->connection->pdo();
+        $deactivateCompanies = $pdo->prepare(
+            'UPDATE usuario_empresas SET activo = 0, eliminado_en = CURRENT_TIMESTAMP,
+                    eliminado_por = :actor_deleted, actualizado_por = :actor_updated
+             WHERE usuario_id = :user_id AND empresa_id <> :company_id AND activo = 1'
+        );
+        $deactivateCompanies->execute([
+            'actor_deleted' => $actorId, 'actor_updated' => $actorId,
+            'user_id' => $userId, 'company_id' => $companyId,
+        ]);
+        $company = $pdo->prepare(
+            'INSERT INTO usuario_empresas (usuario_id, empresa_id, activo, creado_por, actualizado_por)
+             VALUES (:user_id, :company_id, 1, :actor_created, :actor_updated)
+             ON DUPLICATE KEY UPDATE activo = 1, eliminado_en = NULL,
+                eliminado_por = NULL, actualizado_por = :actor_update'
+        );
+        $company->execute([
+            'user_id' => $userId, 'company_id' => $companyId,
+            'actor_created' => $actorId, 'actor_updated' => $actorId, 'actor_update' => $actorId,
+        ]);
+
+        $warehouseRows = $pdo->prepare(
+            'UPDATE usuario_almacenes SET activo = 0, eliminado_en = CURRENT_TIMESTAMP,
+                    eliminado_por = :actor_deleted, actualizado_por = :actor_updated
+             WHERE usuario_id = :user_id AND almacen_id <> :warehouse_id AND activo = 1'
+        );
+        $warehouseRows->execute([
+            'actor_deleted' => $actorId, 'actor_updated' => $actorId,
+            'user_id' => $userId, 'warehouse_id' => $warehouseId,
+        ]);
+        $warehouse = $pdo->prepare(
+            'INSERT INTO usuario_almacenes (usuario_id, empresa_id, almacen_id, activo, creado_por, actualizado_por)
+             VALUES (:user_id, :company_id, :warehouse_id, 1, :actor_created, :actor_updated)
+             ON DUPLICATE KEY UPDATE empresa_id = VALUES(empresa_id), activo = 1,
+                eliminado_en = NULL, eliminado_por = NULL, actualizado_por = :actor_update'
+        );
+        $warehouse->execute([
+            'user_id' => $userId, 'company_id' => $companyId,
+            'warehouse_id' => $warehouseId, 'actor_created' => $actorId,
+            'actor_updated' => $actorId,
+            'actor_update' => $actorId,
+        ]);
+    }
+
+    public function transactional(callable $operation): mixed
+    {
+        $pdo = $this->connection->pdo();
+        $owns = !$pdo->inTransaction();
+        if ($owns) {
+            $pdo->beginTransaction();
+        }
+        try {
+            $result = $operation();
+            if ($owns) {
+                $pdo->commit();
+            }
+            return $result;
+        } catch (\Throwable $exception) {
+            if ($owns && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
 }

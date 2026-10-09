@@ -7,7 +7,7 @@ namespace App\Domain\Audit;
 use App\Infrastructure\Repositories\AuditRepository;
 use Throwable;
 
-final class AuditService
+final class AuditService implements AuditRecorderInterface
 {
     private const REDACTED = '[REDACTED]';
 
@@ -40,6 +40,31 @@ final class AuditService
     public function recordPublic(string $action, array $metadata = []): void
     {
         $this->write($action, null, $metadata);
+    }
+
+    /**
+     * Write an audited event as part of an owning transaction.
+     * Unlike record(), storage failures are allowed to abort the operation.
+     * @param array<string, mixed> $metadata
+     */
+    public function recordRequired(string $action, ?int $actorUserId, array $metadata = []): void
+    {
+        $entity = $this->safeColumnString($metadata['entidad'] ?? 'usuarios', 80) ?? 'usuarios';
+        $entityId = $this->safeNullableColumnString($metadata['entidad_id'] ?? null, 64);
+        $result = $this->safeColumnString($metadata['resultado'] ?? 'ok', 32) ?? 'ok';
+        $ip = $this->safeIp($metadata['ip'] ?? null);
+        $userAgent = $this->safeUserAgent($metadata['user_agent'] ?? null);
+        $clean = $this->sanitizeMetadata($metadata);
+        $this->repository->insertRequired(
+            $actorUserId,
+            $this->safeColumnString($action, 120) ?? 'evento.desconocido',
+            $entity,
+            $entityId,
+            $result,
+            $ip,
+            $userAgent,
+            $clean === [] ? null : $clean
+        );
     }
 
     /**

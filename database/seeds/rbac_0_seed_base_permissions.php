@@ -27,6 +27,42 @@ return new class implements Seed {
             'nombre' => 'Ver autorización base',
             'descripcion' => 'Permite consultar superficies futuras de autorización base.',
         ],
+        [
+            'codigo' => 'usuarios.acceder',
+            'modulo' => 'usuarios',
+            'nombre' => 'Administrar usuarios',
+            'descripcion' => 'Permite consultar la consola administrativa de usuarios.',
+        ],
+        [
+            'codigo' => 'usuarios.crear',
+            'modulo' => 'usuarios',
+            'nombre' => 'Crear usuarios',
+            'descripcion' => 'Permite crear usuarios administrativos.',
+        ],
+        [
+            'codigo' => 'usuarios.editar',
+            'modulo' => 'usuarios',
+            'nombre' => 'Editar usuarios',
+            'descripcion' => 'Permite editar datos no sensibles de usuarios.',
+        ],
+        [
+            'codigo' => 'usuarios.estado',
+            'modulo' => 'usuarios',
+            'nombre' => 'Cambiar estado de usuarios',
+            'descripcion' => 'Permite activar, desactivar o dar de baja lógicamente usuarios.',
+        ],
+        [
+            'codigo' => 'usuarios.roles',
+            'modulo' => 'usuarios',
+            'nombre' => 'Sincronizar roles de usuarios',
+            'descripcion' => 'Permite reemplazar el conjunto de roles de un usuario.',
+        ],
+        [
+            'codigo' => 'usuarios.password',
+            'modulo' => 'usuarios',
+            'nombre' => 'Restablecer contraseña de usuarios',
+            'descripcion' => 'Permite restablecer una contraseña administrativa sin exponer secretos.',
+        ],
     ];
 
     public function id(): string
