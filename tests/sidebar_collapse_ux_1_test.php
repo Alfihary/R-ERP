@@ -25,8 +25,8 @@ $navigationMarkup = preg_match('/<nav\b[^>]*>(.*?)<\/nav>/is', $layout, $navigat
 preg_match_all('/href="(\/[^"#]+)"/', $navigationMarkup, $linkMatches);
 $sidebarLinks = $linkMatches[1] ?? [];
 
-if (count($sidebarLinks) !== 20 || count($sidebarLinks) !== count(array_unique($sidebarLinks))) {
-    throw new RuntimeException('Sidebar must contain exactly 20 unique links.');
+if (count($sidebarLinks) !== 21 || count($sidebarLinks) !== count(array_unique($sidebarLinks))) {
+    throw new RuntimeException('Sidebar must contain exactly 20 unique group links plus root.');
 }
 
 foreach ($groupIds as $groupId) {

@@ -16,6 +16,7 @@ use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
@@ -68,7 +69,8 @@ return static function (
     MailConfigurationController $mailConfigurationController,
     MailOutboxController $mailOutboxController,
     AuditController $auditController,
-    ProductRequestTicketController $productRequestTicketController
+    ProductRequestTicketController $productRequestTicketController,
+    AdminUserController $adminUserController
 ): void {
     $router->get('/', static function (Request $request) use ($config): Response {
         return Response::html(View::render('welcome', [
@@ -150,6 +152,45 @@ return static function (
         $permissions,
         'sistema.app.ver'
     );
+
+    $adminUsersMiddleware = static function (string $permission) use (
+        $authMiddleware,
+        $auth,
+        $permissions
+    ): array {
+        return [
+            $authMiddleware,
+            new PermissionMiddleware($auth, $permissions, $permission),
+        ];
+    };
+
+    $router->get('/admin/usuarios', static fn (Request $request): Response =>
+        $adminUserController->index($request),
+        $adminUsersMiddleware('usuarios.acceder'));
+    $router->get('/admin/usuarios/crear', static fn (Request $request): Response =>
+        $adminUserController->createForm($request),
+        $adminUsersMiddleware('usuarios.crear'));
+    $router->post('/admin/usuarios', static fn (Request $request): Response =>
+        $adminUserController->store($request),
+        $adminUsersMiddleware('usuarios.crear'));
+    $router->get('/admin/usuarios/{id}/editar', static fn (Request $request, array $params): Response =>
+        $adminUserController->editForm($request, $params),
+        $adminUsersMiddleware('usuarios.editar'));
+    $router->post('/admin/usuarios/{id}/editar', static fn (Request $request, array $params): Response =>
+        $adminUserController->update($request, $params),
+        $adminUsersMiddleware('usuarios.editar'));
+    $router->post('/admin/usuarios/{id}/estado', static fn (Request $request, array $params): Response =>
+        $adminUserController->changeStatus($request, $params),
+        $adminUsersMiddleware('usuarios.estado'));
+    $router->post('/admin/usuarios/{id}/eliminar', static fn (Request $request, array $params): Response =>
+        $adminUserController->softDelete($request, $params),
+        $adminUsersMiddleware('usuarios.estado'));
+    $router->post('/admin/usuarios/{id}/roles', static fn (Request $request, array $params): Response =>
+        $adminUserController->roles($request, $params),
+        $adminUsersMiddleware('usuarios.roles'));
+    $router->post('/admin/usuarios/{id}/password', static fn (Request $request, array $params): Response =>
+        $adminUserController->password($request, $params),
+        $adminUsersMiddleware('usuarios.password'));
 
     $router->get('/app', static function (Request $request) use (
         $auth,

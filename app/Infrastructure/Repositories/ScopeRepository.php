@@ -134,6 +134,24 @@ final class ScopeRepository implements ScopeRepositoryInterface
         ];
     }
 
+    /** @return list<array{id:int,codigo:string,nombre:string}> */
+    public function activeCompanyOptions(): array
+    {
+        return $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre FROM empresas
+             WHERE activo = 1 AND eliminado_en IS NULL ORDER BY nombre, codigo'
+        )->fetchAll();
+    }
+
+    /** @return list<array{id:int,empresa_id:int,codigo:string,nombre:string}> */
+    public function activeWarehouseOptions(): array
+    {
+        return $this->connection->pdo()->query(
+            'SELECT id, empresa_id, codigo, nombre FROM almacenes
+             WHERE activo = 1 AND eliminado_en IS NULL ORDER BY nombre, codigo'
+        )->fetchAll();
+    }
+
     public function replaceUserScope(int $userId, int $companyId, int $warehouseId, int $actorId): void
     {
         $pdo = $this->connection->pdo();

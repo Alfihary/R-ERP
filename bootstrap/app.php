@@ -49,6 +49,7 @@ use App\Http\Middlewares\CsrfMiddleware;
 use App\Http\Middlewares\ErrorHandlingMiddleware;
 use App\Http\Middlewares\SecurityHeadersMiddleware;
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ClassificationController;
 use App\Http\Controllers\CompanyController;
@@ -446,6 +447,26 @@ $productRequestTicketController = new ProductRequestTicketController(
     $scopeContext,
     $csrf
 );
+$adminUserRepository = new UserRepository($connection);
+$adminRoleRepository = new \App\Infrastructure\Repositories\RoleRepository($connection);
+$adminScopeRepository = new ScopeRepository($connection);
+$adminUserService = new \App\Domain\Users\UserAdminService(
+    $adminUserRepository,
+    $adminRoleRepository,
+    $adminScopeRepository,
+    $audit
+);
+$adminUserController = new AdminUserController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $adminUserService,
+    $adminUserRepository,
+    $adminRoleRepository,
+    $adminScopeRepository
+);
 
 $router = new Router();
 $router->middleware(new SecurityHeadersMiddleware());
@@ -479,7 +500,8 @@ $registerRoutes(
     $mailConfigurationController,
     $mailOutboxController,
     $auditController,
-    $productRequestTicketController
+    $productRequestTicketController,
+    $adminUserController
 );
 
 return new App($router, $config, $debug, $errorHandler);

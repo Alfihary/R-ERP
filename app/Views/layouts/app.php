@@ -33,7 +33,7 @@ $activeSidebarGroup = match ($activeNavigation) {
     'inventory-transfers', 'configuration-price-lists' => 'inventory',
     'catalogs' => 'catalogs',
     'configuration-companies', 'configuration-warehouses' => 'organization',
-    'configuration-folios', 'configuration-mail', 'mail-outbox', 'audit' => 'administration',
+    'configuration-folios', 'configuration-mail', 'mail-outbox', 'audit', 'admin-users' => 'administration',
     'profile', 'credential' => 'account',
     default => null,
 };
@@ -61,6 +61,7 @@ if (is_array($centralSidebar)) {
     $canAccessMailConfiguration = ($sidebarPermissions['configuracion.correo.administrar'] ?? false) === true;
     $canAccessMailOutbox = ($sidebarPermissions['correos.cola.ver'] ?? false) === true;
     $canAccessAudit = ($sidebarPermissions['auditoria.ver'] ?? false) === true;
+    $canAccessAdminUsers = ($sidebarPermissions['usuarios.acceder'] ?? false) === true;
 }
 $canAccessProfile = ($canAccessProfile ?? false) === true;
 $canAccessCredential = ($canAccessCredential ?? false) === true;
@@ -82,6 +83,7 @@ $canAccessPriceLists = ($canAccessPriceLists ?? false) === true;
 $canAccessMailConfiguration = ($canAccessMailConfiguration ?? false) === true;
 $canAccessMailOutbox = ($canAccessMailOutbox ?? false) === true;
 $canAccessAudit = ($canAccessAudit ?? false) === true;
+$canAccessAdminUsers = ($canAccessAdminUsers ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
 if (!in_array('/js/sidebar-collapse.js', $scripts, true)) {
@@ -148,7 +150,8 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                 <?php $showAdministration = $canAccessConfigFolios
                     || $canAccessMailConfiguration
                     || $canAccessMailOutbox
-                    || $canAccessAudit; ?>
+                    || $canAccessAudit
+                    || $canAccessAdminUsers; ?>
 
                 <?php if ($showOperation): ?>
                     <section class="app-navigation__group<?= $activeSidebarGroup === 'operation' ? ' has-active-item' : '' ?>" data-sidebar-group="operation">
@@ -365,6 +368,16 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                         >
                             <span aria-hidden="true">!</span>
                             Auditoría
+                        </a>
+                    <?php endif; ?>
+                    <?php if ($canAccessAdminUsers): ?>
+                        <a
+                            class="app-navigation__item<?= $activeNavigation === 'admin-users' ? ' is-active' : '' ?>"
+                            href="/admin/usuarios"
+                            <?= $activeNavigation === 'admin-users' ? 'aria-current="page"' : '' ?>
+                        >
+                            <span aria-hidden="true">◉</span>
+                            Usuarios
                         </a>
                     <?php endif; ?>
                         </div>

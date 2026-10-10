@@ -91,6 +91,7 @@ final class SidebarNavigationService
             ['group' => 'administration', 'id' => 'configuration-mail', 'label' => 'Correo', 'href' => '/admin/correo', 'icon' => '@', 'permission' => 'configuracion.correo.administrar'],
             ['group' => 'administration', 'id' => 'mail-outbox', 'label' => 'Cola de correo', 'href' => '/admin/correo/cola', 'icon' => '✉', 'permission' => 'correos.cola.ver'],
             ['group' => 'administration', 'id' => 'audit', 'label' => 'Auditoría', 'href' => '/auditoria', 'icon' => '!', 'permission' => 'auditoria.ver'],
+            ['group' => 'administration', 'id' => 'admin-users', 'label' => 'Usuarios', 'href' => '/admin/usuarios', 'icon' => '◉', 'permission' => 'usuarios.acceder'],
             ['group' => 'account', 'id' => 'profile', 'label' => 'Mi perfil', 'href' => '/perfil', 'icon' => '◌', 'permission' => 'perfil.ver'],
             ['group' => 'account', 'id' => 'credential', 'label' => 'Mi credencial', 'href' => '/perfil/credencial', 'icon' => '▣', 'permission' => 'credencial.ver'],
         ];

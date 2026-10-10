@@ -86,6 +86,16 @@ final class RoleRepository
         return $statement->fetchAll();
     }
 
+    /** @return list<array{id:int,codigo:string,nombre:string}> */
+    public function activeOptions(): array
+    {
+        return $this->connection->pdo()->query(
+            'SELECT id, codigo, nombre FROM roles
+             WHERE activo = 1 AND eliminado_en IS NULL
+             ORDER BY nombre, codigo, id'
+        )->fetchAll();
+    }
+
     /** @return list<array{id:int,codigo:string}> */
     public function activeRolesForUser(int $userId): array
     {

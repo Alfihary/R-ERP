@@ -8,50 +8,56 @@ final class Env
 {
     public static function load(string $path): void
     {
-        if (!is_file($path) || !is_readable($path)) {
+        if (!is_file($path)) {
             return;
         }
 
-        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $handle = @fopen($path, 'rb');
 
-        if ($lines === false) {
-            throw new \RuntimeException('Unable to read the environment file.');
+        if ($handle === false) {
+            return;
         }
 
-        foreach ($lines as $lineNumber => $line) {
-            $line = trim($line);
+        try {
+            $lineNumber = 0;
+            while (($line = fgets($handle)) !== false) {
+                $lineNumber++;
+                $line = trim($line);
 
-            if ($line === '' || str_starts_with($line, '#')) {
-                continue;
+                if ($line === '' || str_starts_with($line, '#')) {
+                    continue;
+                }
+
+                if (str_starts_with($line, 'export ')) {
+                    $line = trim(substr($line, 7));
+                }
+
+                if (!str_contains($line, '=')) {
+                    throw new \RuntimeException(
+                        sprintf('Invalid environment entry on line %d.', $lineNumber)
+                    );
+                }
+
+                [$key, $value] = array_map('trim', explode('=', $line, 2));
+
+                if (preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) !== 1) {
+                    throw new \RuntimeException(
+                        sprintf('Invalid environment key on line %d.', $lineNumber)
+                    );
+                }
+
+                $value = self::unquote($value);
+
+                if (self::exists($key)) {
+                    continue;
+                }
+
+                $_ENV[$key] = $value;
+                $_SERVER[$key] = $value;
+                putenv($key . '=' . $value);
             }
-
-            if (str_starts_with($line, 'export ')) {
-                $line = trim(substr($line, 7));
-            }
-
-            if (!str_contains($line, '=')) {
-                throw new \RuntimeException(
-                    sprintf('Invalid environment entry on line %d.', $lineNumber + 1)
-                );
-            }
-
-            [$key, $value] = array_map('trim', explode('=', $line, 2));
-
-            if (preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) !== 1) {
-                throw new \RuntimeException(
-                    sprintf('Invalid environment key on line %d.', $lineNumber + 1)
-                );
-            }
-
-            $value = self::unquote($value);
-
-            if (self::exists($key)) {
-                continue;
-            }
-
-            $_ENV[$key] = $value;
-            $_SERVER[$key] = $value;
-            putenv($key . '=' . $value);
+        } finally {
+            fclose($handle);
         }
     }
 

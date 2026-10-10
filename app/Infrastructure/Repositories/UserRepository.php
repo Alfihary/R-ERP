@@ -57,6 +57,135 @@ final class UserRepository
             ->fetchColumn();
     }
 
+    /**
+     * @param array{q?:string,status?:string,company_id?:int,warehouse_id?:int,role_id?:int,page?:int,per_page?:int} $filters
+     * @return array{rows:list<array<string,mixed>>,total:int,page:int,per_page:int,filters:array<string,mixed>}
+     */
+    public function paginateAdmin(array $filters): array
+    {
+        [$where, $parameters] = $this->adminConditions($filters);
+        $perPage = max(1, min(50, (int) ($filters['per_page'] ?? 20)));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT u.id, u.username, u.email, u.activo, u.eliminado_en,
+                    u.ultimo_acceso_en,
+                    p.primer_nombre, p.segundo_nombre,
+                    p.apellido_paterno, p.apellido_materno,
+                    e.nombre AS empresa_nombre, a.nombre AS almacen_nombre,
+                    GROUP_CONCAT(DISTINCT r.nombre ORDER BY r.nombre SEPARATOR \' | \') AS roles
+             FROM usuarios u
+             LEFT JOIN perfiles_usuario p ON p.usuario_id = u.id
+             LEFT JOIN usuario_empresas ue ON ue.usuario_id = u.id
+                AND ue.activo = 1 AND ue.eliminado_en IS NULL
+             LEFT JOIN empresas e ON e.id = ue.empresa_id
+                AND e.activo = 1 AND e.eliminado_en IS NULL
+             LEFT JOIN usuario_almacenes ua ON ua.usuario_id = u.id
+                AND ua.activo = 1 AND ua.eliminado_en IS NULL
+             LEFT JOIN almacenes a ON a.id = ua.almacen_id
+                AND a.empresa_id = ua.empresa_id
+                AND a.activo = 1 AND a.eliminado_en IS NULL
+             LEFT JOIN usuario_roles ur ON ur.usuario_id = u.id
+                AND ur.activo = 1 AND ur.eliminado_en IS NULL
+             LEFT JOIN roles r ON r.id = ur.rol_id
+                AND r.activo = 1 AND r.eliminado_en IS NULL
+             WHERE ' . $where . '
+             GROUP BY u.id, u.username, u.email, u.activo, u.eliminado_en,
+                      u.ultimo_acceso_en, p.primer_nombre, p.segundo_nombre,
+                      p.apellido_paterno, p.apellido_materno, e.nombre, a.nombre
+             ORDER BY u.username, u.id
+             LIMIT ' . $perPage . ' OFFSET ' . $offset
+        );
+        $statement->execute($parameters);
+
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(DISTINCT u.id)
+             FROM usuarios u
+             LEFT JOIN perfiles_usuario p ON p.usuario_id = u.id
+             LEFT JOIN usuario_empresas ue ON ue.usuario_id = u.id
+                AND ue.activo = 1 AND ue.eliminado_en IS NULL
+             LEFT JOIN usuario_almacenes ua ON ua.usuario_id = u.id
+                AND ua.activo = 1 AND ua.eliminado_en IS NULL
+             LEFT JOIN usuario_roles ur ON ur.usuario_id = u.id
+                AND ur.activo = 1 AND ur.eliminado_en IS NULL
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+
+        return [
+            'rows' => $statement->fetchAll(),
+            'total' => (int) $count->fetchColumn(),
+            'page' => $page,
+            'per_page' => $perPage,
+            'filters' => [
+                'q' => (string) ($filters['q'] ?? ''),
+                'status' => (string) ($filters['status'] ?? 'active'),
+                'company_id' => (int) ($filters['company_id'] ?? 0),
+                'warehouse_id' => (int) ($filters['warehouse_id'] ?? 0),
+                'role_id' => (int) ($filters['role_id'] ?? 0),
+            ],
+        ];
+    }
+
+    /** @return array<string,mixed>|null */
+    public function findAdminById(int $userId): ?array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT u.id, u.username, u.email, u.activo, u.eliminado_en,
+                    u.ultimo_acceso_en, p.primer_nombre, p.segundo_nombre,
+                    p.apellido_paterno, p.apellido_materno,
+                    ue.empresa_id, ua.almacen_id
+             FROM usuarios u
+             LEFT JOIN perfiles_usuario p ON p.usuario_id = u.id
+             LEFT JOIN usuario_empresas ue ON ue.usuario_id = u.id
+                AND ue.activo = 1 AND ue.eliminado_en IS NULL
+             LEFT JOIN usuario_almacenes ua ON ua.usuario_id = u.id
+                AND ua.activo = 1 AND ua.eliminado_en IS NULL
+             WHERE u.id = :id LIMIT 1'
+        );
+        $statement->execute(['id' => $userId]);
+        $row = $statement->fetch();
+        return $row === false ? null : $row;
+    }
+
+    /** @return array{0:string,1:array<string,mixed>} */
+    private function adminConditions(array $filters): array
+    {
+        $where = ['1=1'];
+        $parameters = [];
+        $status = (string) ($filters['status'] ?? 'active');
+        if ($status === 'active') {
+            $where[] = 'u.activo = 1 AND u.eliminado_en IS NULL';
+        } elseif ($status === 'inactive') {
+            $where[] = 'u.activo = 0 AND u.eliminado_en IS NULL';
+        } elseif ($status === 'deleted') {
+            $where[] = 'u.eliminado_en IS NOT NULL';
+        }
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $where[] = '(u.username LIKE :q_username OR u.email LIKE :q_email OR '
+                . 'CONCAT_WS(\' \', p.primer_nombre, p.segundo_nombre, '
+                . 'p.apellido_paterno, p.apellido_materno) LIKE :q_profile)';
+            $search = '%' . $q . '%';
+            $parameters['q_username'] = $search;
+            $parameters['q_email'] = $search;
+            $parameters['q_profile'] = $search;
+        }
+        foreach ([
+            'company_id' => 'ue.empresa_id',
+            'warehouse_id' => 'ua.almacen_id',
+            'role_id' => 'ur.rol_id',
+        ] as $key => $column) {
+            $value = filter_var($filters[$key] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($value !== false) {
+                $where[] = $column . ' = :' . $key;
+                $parameters[$key] = (int) $value;
+            }
+        }
+        return [implode(' AND ', $where), $parameters];
+    }
+
     public function create(string $username, string $email, string $passwordHash): int
     {
         $statement = $this->connection->pdo()->prepare(

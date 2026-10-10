@@ -29,8 +29,8 @@ $adminSignature = static function (array $navigation): array {
 };
 
 $expected = $adminSignature($admin);
-if (count($expected) !== 20 || count($admin['groups']) !== 6) {
-    throw new RuntimeException('ADMIN navigation must contain 20 items and 6 groups.');
+if (count($expected) !== 21 || count($admin['groups']) !== 6) {
+    throw new RuntimeException('ADMIN navigation must contain 20 items, 1 root and 6 groups.');
 }
 foreach ($routes as $route) {
     if ($adminSignature($admin) !== $expected) {
@@ -92,8 +92,8 @@ foreach ($renderedSignatures as $index => $signature) {
         throw new RuntimeException('Rendered sidebar href set drift at route index ' . $index . '.');
     }
 }
-if (count($renderedSignatures[0] ?? []) !== 20) {
-    throw new RuntimeException('Rendered ADMIN layout must contain 20 links.');
+if (count($renderedSignatures[0] ?? []) !== 21) {
+    throw new RuntimeException('Rendered ADMIN layout must contain 20 group links plus root.');
 }
 $limited = SidebarNavigationService::forPermissions(
     static fn (string $permission): bool => $permission === 'inventario.existencias.acceder'
