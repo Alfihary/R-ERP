@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Products;
 
+use App\Domain\Audit\AuditRecorderInterface;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 
@@ -16,12 +17,16 @@ final class ProductImageService
         'image/png' => 'png',
         'image/webp' => 'webp',
     ];
+    private readonly ?\Closure $unlinker;
 
     public function __construct(
         private readonly ProductRepository $products,
         private readonly ProductDocumentRepository $documents,
-        private readonly string $storagePath
+        private readonly string $storagePath,
+        private readonly ?AuditRecorderInterface $audit = null,
+        ?callable $unlinker = null
     ) {
+        $this->unlinker = $unlinker === null ? null : \Closure::fromCallable($unlinker);
     }
 
     /**
@@ -100,7 +105,7 @@ final class ProductImageService
         }
 
         try {
-            $oldPhoto = $this->documents->transactional(function () use (
+            $result = $this->documents->transactional(function () use (
                 $actorId,
                 $productId,
                 $relativePath,
@@ -126,8 +131,28 @@ final class ProductImageService
                     $actorId
                 );
 
-                return $previous;
+                $this->audit?->recordRequired(
+                    $previous === null
+                        ? 'producto_imagen.subir'
+                        : 'producto_imagen.reemplazar',
+                    $actorId,
+                    [
+                        'entidad' => 'productos',
+                        'entidad_id' => $productId,
+                        'id_producto' => $productId,
+                        'id_documento_nuevo' => $documentId,
+                        'id_documento_anterior' => $previous['id'] ?? null,
+                        'mime' => $validated['mime_type'],
+                        'tamano_bytes' => $validated['size'],
+                    ]
+                );
+
+                return [
+                    'previous' => $previous,
+                    'document_id' => $documentId,
+                ];
             });
+            $oldPhoto = $result['previous'];
         } catch (\Throwable $exception) {
             $this->deleteFileIfInsideRoot($targetPath);
             throw $exception;
@@ -199,6 +224,18 @@ final class ProductImageService
                 $documentId,
                 $actorId
             );
+            $this->audit?->recordRequired(
+                'producto_imagen.subir',
+                $actorId,
+                [
+                    'entidad' => 'productos',
+                    'entidad_id' => $productId,
+                    'id_producto' => $productId,
+                    'id_documento_nuevo' => $documentId,
+                    'mime' => $validated['mime_type'],
+                    'tamano_bytes' => $validated['size'],
+                ]
+            );
         } catch (\Throwable $exception) {
             $this->deleteFileIfInsideRoot($targetPath);
             throw $exception;
@@ -233,6 +270,17 @@ final class ProductImageService
             }
 
             $this->documents->deactivateMainPhoto((int) $photo['id'], $actorId);
+
+            $this->audit?->recordRequired(
+                'producto_imagen.eliminar',
+                $actorId,
+                [
+                    'entidad' => 'productos',
+                    'entidad_id' => $productId,
+                    'id_producto' => $productId,
+                    'id_documento_anterior' => (int) $photo['id'],
+                ]
+            );
 
             return $photo;
         });
@@ -427,7 +475,12 @@ final class ProductImageService
         $root = $this->normalized($this->uploadRoot()) . '/';
 
         if (str_starts_with($this->normalized($real), $root) && is_file($real)) {
-            @unlink($real);
+            $deleted = $this->unlinker !== null
+                ? ($this->unlinker)($real)
+                : @unlink($real);
+            if ($deleted !== true) {
+                return;
+            }
             $this->removeEmptyProductDirectory(dirname($real));
         }
     }

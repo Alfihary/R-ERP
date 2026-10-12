@@ -2,7 +2,19 @@
 
 declare(strict_types=1);
 
+if (PHP_SAPI !== 'cli') {
+    throw new RuntimeException('PRODUCTOS-IMAGEN-1 test is CLI-only.');
+}
+
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', dirname(__DIR__, 2));
+    require BASE_PATH . '/bootstrap/autoload.php';
+}
+
 use App\Domain\Products\ProductImageService;
+use App\Domain\Products\ProductImageOrphanCleanupService;
+use App\Domain\Audit\AuditService;
+use App\Domain\Audit\AuditRecorderInterface;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
 use App\Infrastructure\Database\ConnectionProvider;
@@ -11,8 +23,9 @@ use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\AuditRepository;
 
-return new class implements DatabaseTest {
+$test = new class implements DatabaseTest {
     private const PRODUCT_ID = 'QAIMGTEST001';
     private const CREATE_NO_IMAGE_ID = 'QAIMGNOIMG';
     private const CREATE_IMAGE_ID = 'QAIMGCREATE';
@@ -110,10 +123,12 @@ return new class implements DatabaseTest {
         }
 
         $connection = new ConnectionProvider($databaseConfig);
+        $audit = new AuditService(new AuditRepository($connection));
         $service = new ProductImageService(
             new ProductRepository($connection),
             new ProductDocumentRepository($connection),
-            $storagePath
+            $storagePath,
+            $audit
         );
         $products = new ProductService(new ProductRepository($connection));
         $unitId = $this->unitId($pdo);
@@ -304,23 +319,130 @@ return new class implements DatabaseTest {
             $firstPath = $this->absoluteStoredPath($firstPhoto);
 
             $second = $this->imageFile('jpg');
-            $service->replace(self::PRODUCT_ID, $this->upload($second, 'b.jpg'), $actorId);
+            $failingReplaceService = new ProductImageService(
+                new ProductRepository($connection),
+                new ProductDocumentRepository($connection),
+                $storagePath,
+                $audit,
+                static fn (string $path): bool => false
+            );
+            $failingReplaceService->replace(
+                self::PRODUCT_ID,
+                $this->upload($second, 'b.jpg'),
+                $actorId
+            );
             $secondPhoto = $service->current(self::PRODUCT_ID);
             $secondPath = $this->absoluteStoredPath($secondPhoto);
+            $cleanupService = new ProductImageOrphanCleanupService(
+                new ProductDocumentRepository($connection),
+                $storagePath
+            );
+            $dryCandidates = $cleanupService->cleanup(true);
 
             $results['reemplazo'] = $secondPhoto !== null
                 && (int) $secondPhoto['id'] !== (int) $firstPhoto['id'];
+            $results['replace_unlink_failure_handled'] = is_file($firstPath)
+                && is_file($secondPath);
             $results['imagen_anterior_inactiva'] =
                 $this->activeMainCount($pdo, self::PRODUCT_ID) === 1
                 && $this->inactiveById($pdo, (int) $firstPhoto['id']);
+            $results['archivo_anterior_detectado'] = in_array(
+                self::PRODUCT_ID . '/' . basename($firstPath),
+                $dryCandidates,
+                true
+            );
+            $cleanupService->cleanup(false);
             $results['archivo_anterior_eliminado'] = !is_file($firstPath);
             $results['archivo_nuevo_permanece'] = is_file($secondPath);
+            $results['referenced_file_preserved_after_cleanup'] =
+                !in_array(
+                    self::PRODUCT_ID . '/' . basename($secondPath),
+                    $cleanupService->cleanup(true),
+                    true
+                );
 
-            $service->delete(self::PRODUCT_ID, $actorId);
+            $failingDeleteService = new ProductImageService(
+                new ProductRepository($connection),
+                new ProductDocumentRepository($connection),
+                $storagePath,
+                $audit,
+                static fn (string $path): bool => false
+            );
+            $failingDeleteService->delete(self::PRODUCT_ID, $actorId);
+            $results['delete_unlink_failure_handled'] = is_file($secondPath);
             $results['eliminacion_logica'] =
                 $this->activeMainCount($pdo, self::PRODUCT_ID) === 0
                 && $this->inactiveById($pdo, (int) $secondPhoto['id']);
+            $results['archivo_huerfano_post_delete'] = is_file($secondPath)
+                && in_array(
+                    self::PRODUCT_ID . '/' . basename($secondPath),
+                    $cleanupService->cleanup(true),
+                    true
+                );
+            $cleanupService->cleanup(false);
             $results['archivo_eliminado'] = !is_file($secondPath);
+            $results['orphan_cleanup_idempotent'] =
+                $cleanupService->cleanup(true) === []
+                && $cleanupService->cleanup(false) === [];
+
+            $auditFailure = new class implements AuditRecorderInterface {
+                public function recordRequired(
+                    string $action,
+                    ?int $actorUserId = null,
+                    array $metadata = []
+                ): void {
+                    throw new RuntimeException('QA audit failure.');
+                }
+            };
+            $auditFailureService = new ProductImageService(
+                new ProductRepository($connection),
+                new ProductDocumentRepository($connection),
+                $storagePath,
+                $auditFailure
+            );
+            $auditBaselineUpload = $this->imageFile('png');
+            $service->replace(
+                self::PRODUCT_ID,
+                $this->upload($auditBaselineUpload, 'audit-baseline.png'),
+                $actorId
+            );
+            $auditBaselinePhoto = $service->current(self::PRODUCT_ID);
+            $auditBaselinePath = $this->absoluteStoredPath($auditBaselinePhoto);
+            $auditFailureUpload = $this->imageFile('png');
+            $auditFailureRollback = false;
+            try {
+                $auditFailureService->replace(
+                    self::PRODUCT_ID,
+                    $this->upload($auditFailureUpload, 'audit-failure.png'),
+                    $actorId
+                );
+            } catch (Throwable) {
+                $auditFailureRollback = $this->activeMainCount(
+                    $pdo,
+                    self::PRODUCT_ID
+                ) === 1
+                    && $service->current(self::PRODUCT_ID) !== null
+                    && (int) $service->current(self::PRODUCT_ID)['id']
+                        === (int) $auditBaselinePhoto['id']
+                    && is_file($auditBaselinePath)
+                    && ($this->qaProductFiles(self::PRODUCT_ID) === 1);
+            } finally {
+                $this->remove($auditBaselineUpload);
+                $this->remove($auditFailureUpload);
+            }
+            $results['auditoria_falla_revierte'] = $auditFailureRollback;
+            $auditActions = $this->auditActions($pdo, self::PRODUCT_ID, $actorId);
+            $results['auditoria_subir'] = ($auditActions['producto_imagen.subir'] ?? 0) >= 1;
+            $results['auditoria_reemplazar'] = ($auditActions['producto_imagen.reemplazar'] ?? 0) >= 1;
+            $results['auditoria_eliminar'] = ($auditActions['producto_imagen.eliminar'] ?? 0) >= 1;
+            $results['auditoria_actor_subir'] =
+                ($auditActions['producto_imagen.subir_actor'] ?? 0) >= 1;
+            $results['auditoria_actor_reemplazar'] =
+                ($auditActions['producto_imagen.reemplazar_actor'] ?? 0) >= 1;
+            $results['auditoria_actor_eliminar'] =
+                ($auditActions['producto_imagen.eliminar_actor'] ?? 0) >= 1;
+            $results['orphan_outside_storage_rejected'] =
+                $this->orphanOutsideStorageRejected($cleanupService);
 
             $results['producto_inexistente_rechazado'] = $this->fails(
                 fn () => $service->replace(
@@ -438,6 +560,44 @@ return new class implements DatabaseTest {
             'crear_producto_con_imagen_invalida' => 'PASS',
             'crear_producto_datos_invalidos_con_imagen_valida' => 'PASS',
             'rollback_archivo_huerfano' => 'PASS',
+            'hardening' => [
+                'IMAGE_AUDIT_UPLOAD' =>
+                    $results['auditoria_subir']
+                    && $results['auditoria_actor_subir']
+                        ? 'PASS' : 'FAIL',
+                'IMAGE_AUDIT_REPLACE' =>
+                    $results['auditoria_reemplazar']
+                    && $results['auditoria_actor_reemplazar']
+                        ? 'PASS' : 'FAIL',
+                'IMAGE_AUDIT_DELETE' =>
+                    $results['auditoria_eliminar']
+                    && $results['auditoria_actor_eliminar']
+                        ? 'PASS' : 'FAIL',
+                'IMAGE_AUDIT_FAILURE_ROLLBACK' =>
+                    $results['auditoria_falla_revierte'] ? 'PASS' : 'FAIL',
+                'ORPHAN_DRY_RUN_DETECTS_QA_FILE' =>
+                    $results['archivo_anterior_detectado']
+                    && $results['archivo_huerfano_post_delete']
+                        ? 'PASS' : 'FAIL',
+                'ORPHAN_DRY_RUN_DELETES_NOTHING' =>
+                    $results['archivo_anterior_eliminado']
+                    && $results['archivo_nuevo_permanece']
+                        ? 'PASS' : 'FAIL',
+                'ORPHAN_CLEANUP_REMOVES_QA_ORPHAN' =>
+                    $results['archivo_eliminado'] ? 'PASS' : 'FAIL',
+                'ORPHAN_CLEANUP_PRESERVES_REFERENCED_FILE' =>
+                    $results['referenced_file_preserved_after_cleanup']
+                        ? 'PASS' : 'FAIL',
+                'ORPHAN_CLEANUP_REJECTS_OUTSIDE_STORAGE' =>
+                    $results['orphan_outside_storage_rejected']
+                        ? 'PASS' : 'FAIL',
+                'ORPHAN_CLEANUP_SECOND_RUN_SAFE' =>
+                    $results['orphan_cleanup_idempotent'] ? 'PASS' : 'FAIL',
+                'REPLACE_POST_COMMIT_UNLINK_FAILURE_HANDLED' =>
+                    $results['replace_unlink_failure_handled'] ? 'PASS' : 'FAIL',
+                'DELETE_POST_COMMIT_UNLINK_FAILURE_HANDLED' =>
+                    $results['delete_unlink_failure_handled'] ? 'PASS' : 'FAIL',
+            ],
             'maximo_una_principal_activa' => 'PASS',
             'rollback_qa' => $after === $before ? 'PASS' : 'FAIL',
             'counts' => $after,
@@ -967,6 +1127,41 @@ return new class implements DatabaseTest {
         $pdo->prepare(
             'DELETE FROM productos WHERE id_producto = :id_producto'
         )->execute(['id_producto' => $productId]);
+        $pdo->prepare(
+            'DELETE FROM auditoria_eventos
+             WHERE entidad = :entidad AND entidad_id = :entidad_id'
+        )->execute([
+            'entidad' => 'productos',
+            'entidad_id' => $productId,
+        ]);
+    }
+
+    /** @return array<string, int> */
+    private function auditActions(PDO $pdo, string $productId, int $actorId): array
+    {
+        $statement = $pdo->prepare(
+            'SELECT accion,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN actor_usuario_id = :actor_usuario_id
+                        THEN 1 ELSE 0 END) AS actor_total
+             FROM auditoria_eventos
+             WHERE entidad = :entidad AND entidad_id = :entidad_id
+             GROUP BY accion'
+        );
+        $statement->execute([
+            'entidad' => 'productos',
+            'entidad_id' => $productId,
+            'actor_usuario_id' => $actorId,
+        ]);
+
+        $result = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $action = (string) $row['accion'];
+            $result[$action] = (int) $row['total'];
+            $result[$action . '_actor'] = (int) $row['actor_total'];
+        }
+
+        return $result;
     }
 
     /**
@@ -997,6 +1192,31 @@ return new class implements DatabaseTest {
         return $count;
     }
 
+    private function qaProductFiles(string $productId): int
+    {
+        return count(glob(
+            BASE_PATH . '/storage/uploads/productos/' . $productId . '/*'
+        ) ?: []);
+    }
+
+    private function orphanOutsideStorageRejected(
+        ProductImageOrphanCleanupService $cleanupService
+    ): bool {
+        $method = new ReflectionMethod(
+            ProductImageOrphanCleanupService::class,
+            'safeFilePath'
+        );
+        $method->setAccessible(true);
+
+        try {
+            $method->invoke($cleanupService, '../outside-storage.png');
+        } catch (Throwable) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function remove(string $file): void
     {
         if (is_file($file)) {
@@ -1004,3 +1224,58 @@ return new class implements DatabaseTest {
         }
     }
 };
+
+if (
+    isset($_SERVER['SCRIPT_FILENAME'])
+    && realpath((string) $_SERVER['SCRIPT_FILENAME']) === realpath(__FILE__)
+) {
+    try {
+        $config = require BASE_PATH . '/bootstrap/database.php';
+        $environment = strtolower((string) $config->get('app.env', 'production'));
+
+        if ($environment === 'production') {
+            throw new RuntimeException(
+                'PRODUCTOS-IMAGEN-1 tests are disabled in production.'
+            );
+        }
+
+        $expectedDatabase = 'r_erp_db_core_0_test';
+        $database = $config->get('database', []);
+
+        if (
+            !is_array($database)
+            || ($database['name'] ?? '') !== $expectedDatabase
+        ) {
+            throw new RuntimeException(
+                'PRODUCTOS-IMAGEN-1 test database mismatch.'
+            );
+        }
+
+        $pdo = (new ConnectionProvider($database))->pdo();
+
+        if (
+            (string) $pdo->query('SELECT DATABASE()')->fetchColumn()
+            !== $expectedDatabase
+        ) {
+            throw new RuntimeException('SELECT DATABASE() mismatch.');
+        }
+
+        echo json_encode(
+            $test->run($pdo, $expectedDatabase),
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        ) . PHP_EOL;
+    } catch (PDOException $exception) {
+        fwrite(
+            STDERR,
+            'PRODUCTOS-IMAGEN-1 test database operation failed with SQLSTATE['
+            . $exception->getCode()
+            . '].' . PHP_EOL
+        );
+        exit(1);
+    } catch (Throwable $exception) {
+        fwrite(STDERR, $exception->getMessage() . PHP_EOL);
+        exit(1);
+    }
+}
+
+return $test;

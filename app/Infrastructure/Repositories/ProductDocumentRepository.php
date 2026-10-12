@@ -150,6 +150,27 @@ final class ProductDocumentRepository
         ]);
     }
 
+    /** @return list<string> */
+    public function activeReferencedRelativePaths(): array
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT ruta_relativa
+             FROM producto_documentos
+             WHERE activo = 1 AND eliminado_en IS NULL'
+        );
+        $statement->execute();
+
+        $paths = [];
+
+        foreach ($statement->fetchAll(PDO::FETCH_COLUMN) as $path) {
+            if (is_string($path) && $path !== '') {
+                $paths[] = $path;
+            }
+        }
+
+        return $paths;
+    }
+
     /**
      * @template T
      * @param callable(): T $operation

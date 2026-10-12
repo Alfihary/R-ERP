@@ -227,7 +227,8 @@ $products = new ProductService($productRepository, $productPrices);
 $productImages = new ProductImageService(
     $productRepository,
     $productDocuments,
-    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
+    (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH),
+    $audit
 );
 $inventoryRepository = new InventoryRepository($connection);
 $inventoryIdempotency = new InventoryIdempotencyRepository($connection);
