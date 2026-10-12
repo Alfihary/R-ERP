@@ -3,6 +3,9 @@
 ## Estado de la microfase
 
 `PRODUCTOS_2B_1_STATUS=PASS`
+`PRODUCTOS_2B_2_STATUS=PASS`
+`PRODUCTOS_2B_2_CODEX_VISUAL_REVIEW=PASS`
+`VISUAL_RUNTIME_AVAILABLE=true`
 
 Esta microfase prepara el listado de productos para una futura columna de
 miniatura sin renderizar imágenes todavía. El contrato devuelve metadatos
@@ -47,15 +50,33 @@ fallback JavaScript, caché HTTP de imágenes, generación de thumbnails,
 cambios de esquema, migraciones, seeds, SMTP, deploy y cambios en
 `ProductImageService`.
 
-Pendiente de PRODUCTOS-2B-2: columna visual de thumbnail, placeholder,
-fallback para imagen rota, cache busting del `src`, posible caché HTTP,
-generación/almacenamiento físico de thumbnails y validación visual en
-1440, 390 y 360 píxeles.
+## PRODUCTOS-2B-2 implementado
+
+El listado ahora incluye una columna Imagen con thumbnail de 48 × 48 píxeles
+en escritorio y 40 × 40 píxeles en pantallas pequeñas. El `src` usa solamente
+`/productos/imagen`, `id_producto` y `primary_image_version` como token `v`.
+La vista no expone rutas relativas ni rutas de storage.
+
+También se incorporó placeholder interno, `loading="lazy"`,
+`decoding="async"` y fallback externo en
+`public/js/modules/products-list.js` para ocultar una imagen cuyo archivo ya
+no esté disponible y revelar el mismo placeholder.
+
+No se generan thumbnails físicos, no se usa GD ni Imagick y no se modificó el
+endpoint ni su política de caché HTTP; el cache busting por versión es
+suficiente para esta fase.
+
+La validación visual real confirmó PASS en 1440 × 900, 390 × 844 y
+360 × 800: alineación, placeholder, overflow horizontal interno, acciones y
+paginación. `FALLBACK_IMAGEN_ROTA=NOT_TESTED`; la cobertura automatizada del
+fallback permanece PASS. El riesgo de ancho de banda por escalar imágenes
+originales queda documentado como optimización futura.
+AwardSpace y la validación de hosting siguen pendientes; esta fase es local.
 
 El DB-TEST `database/tests/productos_listado_2b_test.php` se ejecutó en la
 base QA autorizada. Crea y elimina únicamente IDs `QA2B*`, verifica
 paginación, filtros, estados de documentos, versión determinista, ausencia de
 N+1 y dejó `QA_PRODUCT_RESIDUALS=0`, `QA_DOCUMENT_RESIDUALS=0`.
 
-La revisión visual humana de la futura miniatura y la implementación de
-thumbnails siguen fuera de esta microfase. No se realizó staging ni commit.
+La revisión visual automatizada asistida se cerró con PASS; no se altera el
+alcance funcional de la microfase. No se realizó deploy ni envío SMTP.

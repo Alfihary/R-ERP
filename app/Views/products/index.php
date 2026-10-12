@@ -158,6 +158,7 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
                 <thead>
                     <tr>
                         <th scope="col">ID producto</th>
+                        <th scope="col">Imagen</th>
                         <th scope="col">Descripción</th>
                         <th scope="col">Identificador</th>
                         <th scope="col">Tipo</th>
@@ -174,9 +175,40 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
                         <?php
                         $productId = (string) ($product['id_producto'] ?? '');
                         $active = (int) ($product['activo'] ?? 0) === 1;
+                        $hasPrimaryImage = ($product['has_primary_image'] ?? false) === true;
+                        $imageVersion = (string) ($product['primary_image_version'] ?? '');
+                        $imageSrc = '/productos/imagen?id_producto='
+                            . rawurlencode($productId);
+                        if ($imageVersion !== '') {
+                            $imageSrc .= '&v=' . rawurlencode($imageVersion);
+                        }
                         ?>
                         <tr>
                             <td><strong><?= e($productId) ?></strong></td>
+                            <td>
+                                <span
+                                    class="product-thumbnail-wrap<?= $hasPrimaryImage ? ' has-image' : '' ?>"
+                                    data-product-thumbnail
+                                >
+                                    <span
+                                        class="product-thumbnail-placeholder"
+                                        <?= $hasPrimaryImage ? 'hidden' : '' ?>
+                                        aria-hidden="<?= $hasPrimaryImage ? 'true' : 'false' ?>"
+                                    >
+                                        Sin imagen
+                                    </span>
+                                    <?php if ($hasPrimaryImage): ?>
+                                        <img
+                                            class="product-thumbnail"
+                                            src="<?= e($imageSrc) ?>"
+                                            alt=""
+                                            loading="lazy"
+                                            decoding="async"
+                                            data-product-thumbnail-image
+                                        >
+                                    <?php endif; ?>
+                                </span>
+                            </td>
                             <td><?= e($product['descripcion'] ?? '') ?></td>
                             <td>
                                 <?php

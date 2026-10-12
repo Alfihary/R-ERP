@@ -371,7 +371,10 @@ final class ProductController
             'context' => $context->toArray(),
             'csrf' => $this->csrf,
             'pageTitle' => $pageTitle,
-            'scripts' => ['/js/modules/product-sat-search.js'],
+            'scripts' => [
+                '/js/modules/product-sat-search.js',
+                '/js/modules/products-list.js',
+            ],
             'stylesheets' => ['/css/modules/products.css'],
             'user' => $user,
         ]), $status);
