@@ -32,13 +32,14 @@ final class ProductController
     public function index(Request $request): Response
     {
         $user = $this->user();
+        $query = $request->query();
 
         return $this->render('products/index', [
             'abilities' => $this->abilities($user['user_id']),
             'catalogs' => $this->products->catalogs(),
-            'filters' => $this->products->filters($request->query()),
+            'filters' => $this->products->filters($query),
             'notice' => $this->resultMessage($request),
-            'products' => $this->products->search($request->query()),
+            'result' => $this->products->search($query),
         ], 'Productos');
     }
 

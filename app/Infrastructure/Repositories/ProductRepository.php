@@ -22,9 +22,109 @@ final class ProductRepository
      *     brand_id?: int|null,
      *     classification_id?: int|null
      * } $filters
-     * @return list<array<string, mixed>>
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     total: int,
+     *     page: int,
+     *     per_page: int,
+     *     total_pages: int
+     * }
      */
-    public function search(array $filters): array
+    public function search(array $filters, int $page = 1, int $perPage = 20): array
+    {
+        $page = max(1, $page);
+        $perPage = min(50, max(1, $perPage));
+        [$conditions, $parameters] = $this->searchConditions($filters);
+        $where = implode(' AND ', $conditions);
+
+        $count = $this->connection->pdo()->prepare(
+            'SELECT COUNT(*)
+             FROM productos p
+             INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
+             WHERE ' . $where
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $statement = $this->connection->pdo()->prepare(
+            <<<'SQL'
+            SELECT
+                p.id_producto,
+                p.descripcion,
+                p.sku,
+                p.upc,
+                p.ean,
+                p.gtin,
+                p.activo,
+                tp.codigo AS tipo_codigo,
+                tp.nombre AS tipo_nombre,
+                u.codigo AS unidad_codigo,
+                l.nombre AS linea_nombre,
+                m.nombre AS marca_nombre,
+                c.nombre AS clasificacion_nombre,
+                EXISTS (
+                    SELECT 1
+                    FROM producto_documentos pid
+                    WHERE pid.id_producto = p.id_producto
+                      AND pid.tipo_documento = 'FOTO_PRINCIPAL'
+                      AND pid.es_principal = 1
+                      AND pid.activo = 1
+                      AND pid.eliminado_en IS NULL
+                ) AS has_primary_image,
+                (
+                    SELECT COALESCE(pid.actualizado_en, pid.creado_en)
+                    FROM producto_documentos pid
+                    WHERE pid.id_producto = p.id_producto
+                      AND pid.tipo_documento = 'FOTO_PRINCIPAL'
+                      AND pid.es_principal = 1
+                      AND pid.activo = 1
+                      AND pid.eliminado_en IS NULL
+                    ORDER BY pid.id DESC
+                    LIMIT 1
+                ) AS primary_image_version
+            FROM productos p
+            INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
+            INNER JOIN unidades_medida u ON u.id = p.unidad_medida_id
+            LEFT JOIN lineas_producto l ON l.id = p.linea_producto_id
+            LEFT JOIN marcas m ON m.id = p.marca_id
+            LEFT JOIN clasificaciones_producto c
+                ON c.id = p.clasificacion_producto_id
+            WHERE
+            SQL
+            . ' ' . $where
+            . ' ORDER BY p.descripcion, p.id_producto
+                LIMIT :limit OFFSET :offset'
+        );
+        foreach ($parameters as $name => $value) {
+            $statement->bindValue(':' . $name, $value);
+        }
+        $statement->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $statement->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        $items = $statement->fetchAll();
+        foreach ($items as &$item) {
+            $item['has_primary_image'] = (bool) $item['has_primary_image'];
+            $item['primary_image_version'] = $item['primary_image_version'] !== null
+                ? (string) $item['primary_image_version']
+                : null;
+        }
+        unset($item);
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+        ];
+    }
+
+    /** @return array{0: list<string>, 1: array<string, mixed>} */
+    private function searchConditions(array $filters): array
     {
         $conditions = ['p.eliminado_en IS NULL'];
         $parameters = [];
@@ -48,15 +148,13 @@ final class ProductRepository
                       AND pcb.codigo_barras LIKE :search_barcode
                 ))';
             $term = '%' . $filters['search'] . '%';
-            $parameters['search_id'] = $term;
-            $parameters['search_description'] = $term;
-            $parameters['search_sku'] = $term;
-            $parameters['search_upc'] = $term;
-            $parameters['search_ean'] = $term;
-            $parameters['search_gtin'] = $term;
-            $parameters['search_manufacturer'] = $term;
-            $parameters['search_model'] = $term;
-            $parameters['search_barcode'] = $term;
+            foreach ([
+                'search_id', 'search_description', 'search_sku', 'search_upc',
+                'search_ean', 'search_gtin', 'search_manufacturer',
+                'search_model', 'search_barcode',
+            ] as $key) {
+                $parameters[$key] = $term;
+            }
         }
 
         if (($filters['status'] ?? '') === 'active') {
@@ -81,37 +179,7 @@ final class ProductRepository
             }
         }
 
-        $statement = $this->connection->pdo()->prepare(
-            <<<'SQL'
-            SELECT
-                p.id_producto,
-                p.descripcion,
-                p.sku,
-                p.upc,
-                p.ean,
-                p.gtin,
-                p.activo,
-                tp.codigo AS tipo_codigo,
-                tp.nombre AS tipo_nombre,
-                u.codigo AS unidad_codigo,
-                l.nombre AS linea_nombre,
-                m.nombre AS marca_nombre,
-                c.nombre AS clasificacion_nombre
-            FROM productos p
-            INNER JOIN tipos_producto tp ON tp.id = p.tipo_producto_id
-            INNER JOIN unidades_medida u ON u.id = p.unidad_medida_id
-            LEFT JOIN lineas_producto l ON l.id = p.linea_producto_id
-            LEFT JOIN marcas m ON m.id = p.marca_id
-            LEFT JOIN clasificaciones_producto c
-                ON c.id = p.clasificacion_producto_id
-            WHERE
-            SQL
-            . ' ' . implode(' AND ', $conditions)
-            . ' ORDER BY p.descripcion, p.id_producto'
-        );
-        $statement->execute($parameters);
-
-        return $statement->fetchAll();
+        return [$conditions, $parameters];
     }
 
     /**

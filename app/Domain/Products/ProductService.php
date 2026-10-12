@@ -11,6 +11,9 @@ use PDOException;
 
 final class ProductService
 {
+    private const DEFAULT_PAGE_SIZE = 20;
+    private const MAX_PAGE_SIZE = 50;
+
     public function __construct(
         private readonly ProductRepository $products,
         private readonly ?ProductPriceService $prices = null
@@ -54,11 +57,41 @@ final class ProductService
 
     /**
      * @param array<string, mixed> $query
-     * @return list<array<string, mixed>>
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     total: int,
+     *     page: int,
+     *     per_page: int,
+     *     total_pages: int
+     * }
      */
     public function search(array $query): array
     {
-        return $this->products->search($this->filters($query));
+        [$page, $perPage] = $this->pagination($query);
+
+        return $this->products->search(
+            $this->filters($query),
+            $page,
+            $perPage
+        );
+    }
+
+    /** @return array{0: int, 1: int} */
+    public function pagination(array $query): array
+    {
+        $page = filter_var($query['page'] ?? 1, FILTER_VALIDATE_INT);
+        $perPage = filter_var(
+            $query['per_page'] ?? self::DEFAULT_PAGE_SIZE,
+            FILTER_VALIDATE_INT
+        );
+
+        return [
+            max(1, is_int($page) ? $page : 1),
+            min(
+                self::MAX_PAGE_SIZE,
+                max(1, is_int($perPage) ? $perPage : self::DEFAULT_PAGE_SIZE)
+            ),
+        ];
     }
 
     /**

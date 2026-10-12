@@ -9,12 +9,31 @@ if (
     || !is_array($abilities ?? null)
     || !is_array($catalogs ?? null)
     || !is_array($filters ?? null)
-    || !is_array($products ?? null)
+    || !is_array($result ?? null)
 ) {
     throw new RuntimeException('Product list data is incomplete.');
 }
 
 $notice = is_string($notice ?? null) ? $notice : null;
+$products = is_array($result['items'] ?? null) ? $result['items'] : [];
+$page = max(1, (int) ($result['page'] ?? 1));
+$perPage = max(1, (int) ($result['per_page'] ?? 20));
+$total = max(0, (int) ($result['total'] ?? 0));
+$totalPages = max(1, (int) ($result['total_pages'] ?? 1));
+$pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
+    $query = [
+        'search' => $filters['search'] ?? '',
+        'status' => $filters['status'] ?? '',
+        'type_code' => $filters['type_code'] ?? '',
+        'line_id' => $filters['line_id'] ?? '',
+        'brand_id' => $filters['brand_id'] ?? '',
+        'classification_id' => $filters['classification_id'] ?? '',
+        'page' => max(1, $targetPage),
+        'per_page' => $perPage,
+    ];
+
+    return '/productos?' . http_build_query($query);
+};
 ?>
 <header class="product-page-heading">
     <div>
@@ -123,7 +142,7 @@ $notice = is_string($notice ?? null) ? $notice : null;
     <div class="product-section-heading">
         <div>
             <h2 id="product-list-title">Listado</h2>
-            <p><?= e((string) count($products)) ?> producto(s) encontrado(s).</p>
+            <p><?= e((string) $total) ?> producto(s) encontrado(s).</p>
         </div>
     </div>
 
@@ -222,5 +241,22 @@ $notice = is_string($notice ?? null) ? $notice : null;
                 </tbody>
             </table>
         </div>
+        <?php if ($totalPages > 1): ?>
+            <nav class="product-pagination" aria-label="Paginación de productos">
+                <?php if ($page > 1): ?>
+                    <a
+                        class="button button--secondary"
+                        href="<?= e($pageUrl($page - 1)) ?>"
+                    >Anterior</a>
+                <?php endif; ?>
+                <span>Página <?= e((string) $page) ?> de <?= e((string) $totalPages) ?></span>
+                <?php if ($page < $totalPages): ?>
+                    <a
+                        class="button button--secondary"
+                        href="<?= e($pageUrl($page + 1)) ?>"
+                    >Siguiente</a>
+                <?php endif; ?>
+            </nav>
+        <?php endif; ?>
     <?php endif; ?>
 </section>
