@@ -429,6 +429,11 @@ return new class implements DatabaseTest {
                         'app/Views/products/form.php',
                         'Puedes guardar el producto sin precios'
                     ),
+                'form_declares_derived_price_currency' =>
+                    $this->fileContains(
+                        'app/Views/products/form.php',
+                        'derivada de la moneda del producto'
+                    ),
                 'form_declares_current_prices' =>
                     $this->fileContains(
                         'app/Views/products/form.php',

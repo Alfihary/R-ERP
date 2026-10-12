@@ -34,6 +34,17 @@ $initialPriceRows = is_array($values['precios_iniciales'] ?? null)
 $currencyPriceRows = is_array($values['precios_cambio_moneda'] ?? null)
     ? $values['precios_cambio_moneda']
     : [];
+$selectedCurrencyId = (string) ($values['moneda_id'] ?? '');
+$selectedCurrencyCode = '';
+foreach (($catalogs['currencies'] ?? []) as $currency) {
+    if (
+        is_array($currency)
+        && (string) ($currency['id'] ?? '') === $selectedCurrencyId
+    ) {
+        $selectedCurrencyCode = (string) ($currency['codigo'] ?? '');
+        break;
+    }
+}
 $pricedListIds = [];
 foreach ($prices as $price) {
     if (is_array($price) && isset($price['lista_precio_id'])) {
@@ -444,6 +455,16 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
                 Puedes guardar el producto sin precios y configurarlos después.
                 Si capturas al menos un precio, el producto debe tener moneda
                 asignada y la fila debe estar completa.
+            </p>
+            <p class="product-form-section__help">
+                <?php if ($selectedCurrencyCode !== ''): ?>
+                    Moneda de precios:
+                    <strong><?= e($selectedCurrencyCode) ?></strong>
+                    (derivada de la moneda del producto; no editable por fila).
+                <?php else: ?>
+                    Moneda de precios: selecciona la moneda del producto para
+                    capturar importes.
+                <?php endif; ?>
             </p>
             <?php if ($priceLists === []): ?>
                 <p class="product-related-empty">No hay listas de precios activas.</p>

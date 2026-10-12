@@ -43,6 +43,11 @@ ventas ni autorizaciones funcionales.
 Filas completamente vacías se ignoran para permitir formularios futuros con
 renglones reservados.
 
+En el formulario de creación, la moneda de los precios iniciales se deriva de
+`productos.moneda_id` y se muestra como indicador de solo lectura dentro de la
+sección. No se permite elegir una moneda distinta por fila ni se convierte
+automáticamente el importe.
+
 ### Cambio de moneda
 
 `precios_cambio_moneda` debe enviarse como lista de arreglos:
@@ -93,6 +98,15 @@ Casos cubiertos:
 - listas duplicadas en cambio de moneda se rechazan y no cambian la moneda;
 - producto sin precios puede cambiar moneda sin crear precios ni historial;
 - datos transitorios QA se revierten por rollback.
+
+La prueba UI también verifica que la sección de precios iniciales declare esta
+moneda derivada y que la configuración siga siendo opcional.
+
+## Cierre de hardening
+
+El hardening de precios iniciales queda documentado como completado sin cambio
+de base de datos (`DB_CHANGE_REQUIRED=false`). La validación visual del bloque
+de precios fue aprobada en los viewports `1440x900`, `390x844` y `360x800`.
 
 ## Excepción conocida
 
