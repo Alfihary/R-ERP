@@ -17,8 +17,8 @@ $notice = is_string($notice ?? null) ? $notice : null;
         <p>Catálogo estructural global</p>
         <h1>Importar productos</h1>
         <p>
-            Valida un archivo antes de cualquier importación. Esta etapa es
-            solo de preview y no crea ni actualiza productos.
+            Valida un archivo antes de importarlo. La ejecución es
+            CREATE-ONLY y no actualiza productos existentes.
         </p>
     </div>
     <a class="button button--secondary" href="/productos">Volver a productos</a>
@@ -193,8 +193,8 @@ $notice = is_string($notice ?? null) ? $notice : null;
             <form method="post" action="/productos/importar/confirmar" class="product-import-confirm">
                 <?= csrf_field($csrf) ?>
                 <input type="hidden" name="preview_id" value="<?= e((string) ($preview['preview_id'] ?? '')) ?>">
-                <button class="button" type="submit">Confirmar importación</button>
-                <small>Esta acción solo revalida el archivo; todavía no crea productos.</small>
+                <button class="button" type="submit">Confirmar e importar</button>
+                <small>Se revalida el archivo y se crea todo el lote en una sola transacción.</small>
             </form>
         <?php endif; ?>
 
@@ -204,7 +204,7 @@ $notice = is_string($notice ?? null) ? $notice : null;
             <button class="button button--secondary" type="submit">Descartar preview</button>
         </form>
         <p class="product-import-no-confirm">
-            La ejecución definitiva todavía no está habilitada.
+            La importación definitiva crea únicamente productos nuevos; precios, imágenes e inventario quedan fuera de alcance.
         </p>
     </section>
 <?php endif; ?>

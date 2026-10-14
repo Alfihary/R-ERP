@@ -11,6 +11,8 @@ use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Products\Import\ProductImportConfirmationException;
 use App\Domain\Products\Import\ProductImportConfirmationService;
+use App\Domain\Products\Import\ProductImportBatchException;
+use App\Domain\Products\Import\ProductImportBatchService;
 use App\Domain\Products\Import\ProductImportPreviewException;
 use App\Domain\Products\Import\ProductImportPreviewService;
 use App\Domain\Security\PermissionService;
@@ -27,6 +29,7 @@ final class ProductImportController
         private readonly CsrfTokenService $csrf,
         private readonly ProductImportPreviewService $previews,
         private readonly ProductImportConfirmationService $confirmations,
+        private readonly ?ProductImportBatchService $batch = null,
     ) {
     }
 
@@ -72,6 +75,34 @@ final class ProductImportController
 
     public function confirm(Request $request): Response
     {
+        $directToken = $request->input('confirmation_token');
+        if (is_string($directToken) && $directToken !== '') {
+            if ($this->batch === null) {
+                return $this->notFound();
+            }
+            try {
+                $result = $this->batch->execute(
+                    $directToken,
+                    $this->user()['user_id'],
+                    $this->sessionBinding(),
+                );
+                return Response::redirect(
+                    '/productos/importar?result=' . rawurlencode((string) $result['status'])
+                    . '&created=' . rawurlencode((string) $result['created_count']),
+                );
+            } catch (ProductImportBatchException $exception) {
+                if ($exception->httpStatus === 403 || $exception->httpStatus === 404) {
+                    return $this->notFound();
+                }
+                return $this->render(
+                    null,
+                    null,
+                    ['code' => $exception->errorCode, 'message' => $exception->getMessage()],
+                    null,
+                    $exception->httpStatus,
+                );
+            }
+        }
         $previewId = $request->input('preview_id');
         if (!is_string($previewId)) {
             return $this->render(
@@ -89,12 +120,29 @@ final class ProductImportController
                 $this->user()['user_id'],
                 $this->sessionBinding(),
             );
-            $preview = is_array($confirmation['preview'] ?? null)
-                ? $confirmation['preview']
-                : null;
-            $displayConfirmation = $confirmation;
-            unset($displayConfirmation['confirmation_token'], $displayConfirmation['preview']);
-            return $this->render($preview, $displayConfirmation, null, null, 200);
+            // Keep the confirmation-only constructor path available to the
+            // legacy service test; the production route always wires the
+            // definitive batch service.
+            if ($this->batch === null) {
+                $displayConfirmation = $confirmation;
+                unset($displayConfirmation['confirmation_token'], $displayConfirmation['preview']);
+                return $this->render(
+                    $confirmation['preview'] ?? null,
+                    $displayConfirmation,
+                    null,
+                    null,
+                    200,
+                );
+            }
+            $result = $this->batch->execute(
+                (string) $confirmation['confirmation_token'],
+                $this->user()['user_id'],
+                $this->sessionBinding(),
+            );
+            return Response::redirect(
+                '/productos/importar?result=' . rawurlencode((string) $result['status'])
+                . '&created=' . rawurlencode((string) $result['created_count']),
+            );
         } catch (ProductImportConfirmationException $exception) {
             if ($exception->httpStatus === 403 || $exception->httpStatus === 404) {
                 return $this->notFound();
@@ -103,6 +151,17 @@ final class ProductImportController
                 $exception->currentPreview,
                 null,
                 $this->safeConfirmationError($exception),
+                null,
+                $exception->httpStatus,
+            );
+        } catch (ProductImportBatchException $exception) {
+            if ($exception->httpStatus === 403 || $exception->httpStatus === 404) {
+                return $this->notFound();
+            }
+            return $this->render(
+                null,
+                null,
+                ['code' => $exception->errorCode, 'message' => $exception->getMessage()],
                 null,
                 $exception->httpStatus,
             );
@@ -204,9 +263,17 @@ final class ProductImportController
 
     private function notice(Request $request): ?string
     {
-        return ($request->query()['result'] ?? null) === 'discarded'
-            ? 'Preview descartado.'
-            : null;
+        $result = $request->query()['result'] ?? null;
+        if ($result === 'discarded') {
+            return 'Preview descartado.';
+        }
+        if ($result === 'succeeded') {
+            return 'Importación completada. Se crearon los productos nuevos.';
+        }
+        if ($result === 'already_processed') {
+            return 'La importación ya había sido procesada; se devolvió el resultado durable.';
+        }
+        return null;
     }
 
     private function notFound(): Response

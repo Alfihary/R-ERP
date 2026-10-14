@@ -16,7 +16,8 @@ final class ProductService
 
     public function __construct(
         private readonly ProductRepository $products,
-        private readonly ?ProductPriceService $prices = null
+        private readonly ?ProductPriceService $prices = null,
+        private readonly ?ProductCreateCore $createCore = null
     )
     {
     }
@@ -193,16 +194,11 @@ final class ProductService
                 $afterProductCreated,
                 $initialPrices
             ): void {
-                $this->products->create($data['product'], $actorId);
-                $this->products->replaceTaxes(
-                    $productId,
+                ($this->createCore ?? new ProductCreateCore($this->products))->create(
+                    $data['product'],
                     $data['tax_ids'],
-                    $actorId
-                );
-                $this->products->replaceBarcodes(
-                    $productId,
                     $data['barcodes'],
-                    $actorId
+                    $actorId,
                 );
                 if ($afterProductCreated !== null) {
                     $afterProductCreated($productId);

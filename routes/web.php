@@ -9,8 +9,11 @@ use App\Core\Router;
 use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Products\Import\ProductImportConfirmationService;
+use App\Domain\Products\Import\ProductImportBatchService;
 use App\Domain\Products\Import\ProductImportBusinessValidator;
 use App\Domain\Products\Import\ProductImportPreviewService;
+use App\Domain\Audit\AuditService;
+use App\Domain\Products\ProductCreateCore;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Http\Middlewares\AuthMiddleware;
@@ -42,6 +45,9 @@ use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Import\PrivateProductImportPreviewStore;
 use App\Infrastructure\Import\ProductImportReader;
 use App\Infrastructure\Repositories\PdoProductImportBusinessLookup;
+use App\Infrastructure\Repositories\AuditRepository;
+use App\Infrastructure\Repositories\ProductImportRunRepository;
+use App\Infrastructure\Repositories\ProductRepository;
 
 return static function (
     Router $router,
@@ -1319,6 +1325,8 @@ return static function (
         throw new RuntimeException('Product import database configuration is invalid.');
     }
     $productImportConnection = new ConnectionProvider($productImportDatabaseConfig);
+    $productImportRepository = new ProductRepository($productImportConnection);
+    $productImportAudit = new AuditService(new AuditRepository($productImportConnection));
     $productImportReader = new ProductImportReader();
     $productImportValidator = new ProductImportBusinessValidator(
         new PdoProductImportBusinessLookup($productImportConnection->pdo())
@@ -1338,6 +1346,20 @@ return static function (
             $productImportStore,
         ),
         new ProductImportConfirmationService(
+            $productImportReader,
+            $productImportValidator,
+            $productImportStore,
+        ),
+        new ProductImportBatchService(
+            $productImportConnection,
+            new ProductImportRunRepository($productImportConnection),
+            new ProductCreateCore($productImportRepository),
+            $productImportAudit,
+            new ProductImportConfirmationService(
+                $productImportReader,
+                $productImportValidator,
+                $productImportStore,
+            ),
             $productImportReader,
             $productImportValidator,
             $productImportStore,

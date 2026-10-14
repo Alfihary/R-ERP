@@ -33,6 +33,7 @@ use App\Domain\Pricing\PriceListService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
 use App\Domain\Products\ProductImageService;
+use App\Domain\Products\ProductCreateCore;
 use App\Domain\Products\ProductService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
@@ -223,7 +224,11 @@ $productPrices = new ProductPriceService(
     new ProductPriceHistoryRepository($connection)
 );
 $priceLists = new PriceListService(new PriceListRepository($connection));
-$products = new ProductService($productRepository, $productPrices);
+$products = new ProductService(
+    $productRepository,
+    $productPrices,
+    new ProductCreateCore($productRepository),
+);
 $productImages = new ProductImageService(
     $productRepository,
     $productDocuments,
