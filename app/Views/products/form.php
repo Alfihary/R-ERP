@@ -77,6 +77,8 @@ $priceRowValue = static function (
 };
 $selectedSatKeyId = (string) ($values['clave_sat_id'] ?? '');
 $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
+$similarProducts = is_array($similarProducts ?? null) ? $similarProducts : [];
+$similarAbilities = is_array($similarAbilities ?? null) ? $similarAbilities : [];
 ?>
 <header class="product-page-heading">
     <div>
@@ -176,6 +178,48 @@ $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
             </div>
         </div>
     </fieldset>
+
+    <?php if ($editing && (($similarAbilities['view'] ?? false) === true)): ?>
+        <fieldset class="product-form-section product-similar-section">
+            <legend>Productos similares</legend>
+            <p class="product-form-section__help">
+                Relación simétrica: cada producto se guarda una sola vez y se muestra desde ambos lados.
+            </p>
+            <?php if (($_GET['result'] ?? '') === 'similar_added'): ?>
+                <p class="product-notice" role="status">Producto similar agregado.</p>
+            <?php elseif (($_GET['result'] ?? '') === 'similar_removed'): ?>
+                <p class="product-notice" role="status">Producto similar retirado.</p>
+            <?php elseif (($_GET['result'] ?? '') === 'similar_error'): ?>
+                <p class="product-alert" role="alert">No fue posible actualizar la relación.</p>
+            <?php endif; ?>
+            <?php if (($similarAbilities['edit'] ?? false) === true): ?>
+                <div class="product-similar-search" data-similar-search data-product-id="<?= e($productId) ?>">
+                    <label for="similar_search">Agregar producto similar</label>
+                    <input id="similar_search" type="search" autocomplete="off" placeholder="ID, SKU o descripción" data-similar-input>
+                    <div class="product-similar-results" data-similar-results hidden></div>
+                </div>
+            <?php endif; ?>
+            <?php if ($similarProducts === []): ?>
+                <p class="product-related-empty">No hay productos similares activos.</p>
+            <?php else: ?>
+                <ul class="product-similar-list">
+                    <?php foreach ($similarProducts as $similar): ?>
+                        <li>
+                            <span><strong><?= e($similar['id_producto'] ?? '') ?></strong> · <?= e($similar['descripcion'] ?? '') ?></span>
+                            <?php if (($similarAbilities['edit'] ?? false) === true): ?>
+                                <form method="post" action="/productos/similares/quitar">
+                                    <?= csrf_field($csrf) ?>
+                                    <input type="hidden" name="id_producto" value="<?= e($productId) ?>">
+                                    <input type="hidden" name="similar_id" value="<?= e($similar['id_producto'] ?? '') ?>">
+                                    <button class="button button--sm button--secondary" type="submit">Quitar</button>
+                                </form>
+                            <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </fieldset>
+    <?php endif; ?>
 
     <?php if (!$editing): ?>
         <fieldset class="product-form-section product-image-section">

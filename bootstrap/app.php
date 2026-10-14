@@ -35,6 +35,7 @@ use App\Domain\Profile\ProfileService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductCreateCore;
 use App\Domain\Products\ProductService;
+use App\Domain\Products\ProductSimilarService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -65,6 +66,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
@@ -89,6 +91,7 @@ use App\Infrastructure\Repositories\MailOutboxQueryRepository;
 use App\Infrastructure\Repositories\MailOutboxActionRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\ProductSimilarRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
@@ -235,6 +238,11 @@ $productImages = new ProductImageService(
     (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH),
     $audit
 );
+$productSimilarService = new ProductSimilarService(
+    $connection,
+    new ProductSimilarRepository($connection),
+    $audit
+);
 $inventoryRepository = new InventoryRepository($connection);
 $inventoryIdempotency = new InventoryIdempotencyRepository($connection);
 $inventory = new InventoryService(
@@ -378,7 +386,16 @@ $productController = new ProductController(
     $scopeContext,
     $csrf,
     $products,
-    $productImages
+    $productImages,
+    $productSimilarService
+);
+$productSimilarController = new ProductSimilarController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productSimilarService
 );
 $priceListController = new PriceListController(
     $config,
@@ -499,6 +516,7 @@ $registerRoutes(
     $publicVcardController,
     $publicCredentialController,
     $productController,
+    $productSimilarController,
     $priceListController,
     $productPriceController,
     $inventoryController,

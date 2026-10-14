@@ -21,6 +21,8 @@ $taxes = is_array($product['taxes'] ?? null) ? $product['taxes'] : [];
 $barcodes = is_array($product['barcodes'] ?? null)
     ? $product['barcodes']
     : [];
+$similarProducts = is_array($similarProducts ?? null) ? $similarProducts : [];
+$similarAbilities = is_array($similarAbilities ?? null) ? $similarAbilities : [];
 $measurement = static function (mixed $value, string $unit): string {
     if ($value === null || $value === '') {
         return '—';
@@ -83,6 +85,26 @@ $satUnit = trim(
         <?php endif; ?>
     </div>
 </section>
+
+<?php if (($similarAbilities['view'] ?? false) === true): ?>
+    <section class="product-detail" aria-labelledby="product-similar-title">
+        <div class="product-section-heading">
+            <div>
+                <h2 id="product-similar-title">Productos similares</h2>
+                <p>Relaciones activas del catálogo.</p>
+            </div>
+        </div>
+        <?php if ($similarProducts === []): ?>
+            <p class="product-related-empty">No hay productos similares activos.</p>
+        <?php else: ?>
+            <ul class="product-similar-list">
+                <?php foreach ($similarProducts as $similar): ?>
+                    <li><span><strong><?= e($similar['id_producto'] ?? '') ?></strong> · <?= e($similar['descripcion'] ?? '') ?></span></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
 
 <section class="product-detail" aria-labelledby="product-detail-title">
     <div class="product-section-heading">

@@ -34,6 +34,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
@@ -68,6 +69,7 @@ return static function (
     PublicVcardController $publicVcardController,
     PublicCredentialController $publicCredentialController,
     ProductController $productController,
+    ProductSimilarController $productSimilarController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
@@ -1455,6 +1457,24 @@ return static function (
         static fn (Request $request): Response =>
             $productController->state($request, false),
         $productMiddleware('productos.estado')
+    );
+    $router->get(
+        '/productos/similares/buscar',
+        static fn (Request $request): Response =>
+            $productSimilarController->search($request),
+        $productMiddleware('productos.similares.editar')
+    );
+    $router->post(
+        '/productos/similares/agregar',
+        static fn (Request $request): Response =>
+            $productSimilarController->add($request),
+        $productMiddleware('productos.similares.editar')
+    );
+    $router->post(
+        '/productos/similares/quitar',
+        static fn (Request $request): Response =>
+            $productSimilarController->remove($request),
+        $productMiddleware('productos.similares.editar')
     );
 
     $inventoryBaseMiddleware = [

@@ -12,6 +12,7 @@ use App\Domain\Auth\AuthService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
+use App\Domain\Products\ProductSimilarService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Support\Security\CsrfTokenService;
@@ -25,7 +26,8 @@ final class ProductController
         private readonly ScopeContextService $scopeContext,
         private readonly CsrfTokenService $csrf,
         private readonly ProductService $products,
-        private readonly ProductImageService $images
+        private readonly ProductImageService $images,
+        private readonly ProductSimilarService $similars
     ) {
     }
 
@@ -138,6 +140,11 @@ final class ProductController
             'notice' => $this->resultMessage($request),
             'prices' => $this->safePrices($productId),
             'product' => $product,
+            'similarProducts' => $this->safeSimilarProducts($productId),
+            'similarAbilities' => [
+                'view' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.ver'),
+                'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.editar'),
+            ],
         ], 'Detalle de producto');
     }
 
@@ -312,10 +319,12 @@ final class ProductController
 
         $image = null;
         $prices = [];
+        $similarProducts = [];
 
         if ($editing && is_string($values['id_producto'] ?? null)) {
             $image = $this->safeImage((string) $values['id_producto']);
             $prices = $this->safePrices((string) $values['id_producto']);
+            $similarProducts = $this->safeSimilarProducts((string) $values['id_producto']);
         }
 
         return $this->render('products/form', [
@@ -325,6 +334,11 @@ final class ProductController
             'image' => $image,
             'priceLists' => $this->safePriceLists(),
             'prices' => $prices,
+            'similarProducts' => $similarProducts,
+            'similarAbilities' => [
+                'view' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.ver'),
+                'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.editar'),
+            ],
             'pricePermissions' => [
                 'create' => $this->permissions->allows(
                     $this->user()['user_id'],
@@ -374,6 +388,7 @@ final class ProductController
             'scripts' => [
                 '/js/modules/product-sat-search.js',
                 '/js/modules/products-list.js',
+                '/js/modules/product-similar-search.js',
             ],
             'stylesheets' => ['/css/modules/products.css'],
             'user' => $user,
@@ -676,6 +691,16 @@ final class ProductController
         try {
             return $this->products->prices($productId);
         } catch (ProductValidationException) {
+            return [];
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function safeSimilarProducts(string $productId): array
+    {
+        try {
+            return $this->similars->listFor($productId);
+        } catch (\Throwable) {
             return [];
         }
     }
