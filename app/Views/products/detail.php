@@ -23,6 +23,8 @@ $barcodes = is_array($product['barcodes'] ?? null)
     : [];
 $similarProducts = is_array($similarProducts ?? null) ? $similarProducts : [];
 $similarAbilities = is_array($similarAbilities ?? null) ? $similarAbilities : [];
+$kitComponents = is_array($kitComponents ?? null) ? $kitComponents : [];
+$kitAbilities = is_array($kitAbilities ?? null) ? $kitAbilities : [];
 $measurement = static function (mixed $value, string $unit): string {
     if ($value === null || $value === '') {
         return '—';
@@ -281,3 +283,18 @@ $satUnit = trim(
         <?php endif; ?>
     </section>
 </div>
+
+<?php if (($product['tipo_codigo'] ?? '') === 'KIT' && ($kitAbilities['view'] ?? false)): ?>
+    <section class="product-related-section" aria-labelledby="product-kit-title">
+        <div class="product-section-heading"><div><h2 id="product-kit-title">Componentes del KIT</h2><p>Composición de catálogo; no modifica inventario ni precios.</p></div></div>
+        <?php if ($kitComponents === []): ?>
+            <p class="product-related-empty">Este KIT aún no tiene componentes.</p>
+        <?php else: ?>
+            <ul class="product-plain-list">
+                <?php foreach ($kitComponents as $component): ?>
+                    <li><strong><?= e($component['componente_id_producto'] ?? '') ?></strong><span><?= e($component['descripcion'] ?? '') ?> · <?= e($component['cantidad'] ?? '') ?></span></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>

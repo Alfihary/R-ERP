@@ -79,6 +79,8 @@ $selectedSatKeyId = (string) ($values['clave_sat_id'] ?? '');
 $selectedSatKeyLabel = (string) ($values['clave_sat_label'] ?? '');
 $similarProducts = is_array($similarProducts ?? null) ? $similarProducts : [];
 $similarAbilities = is_array($similarAbilities ?? null) ? $similarAbilities : [];
+$kitComponents = is_array($kitComponents ?? null) ? $kitComponents : [];
+$kitAbilities = is_array($kitAbilities ?? null) ? $kitAbilities : [];
 ?>
 <header class="product-page-heading">
     <div>
@@ -1038,3 +1040,50 @@ $similarAbilities = is_array($similarAbilities ?? null) ? $similarAbilities : []
         <a class="button button--secondary" href="/productos">Cancelar</a>
     </div>
 </form>
+<?php if ($editing && (($values['tipo_producto'] ?? '') === 'KIT') && (($kitAbilities['view'] ?? false) === true)): ?>
+    <section class="product-form-section" aria-labelledby="kit-components-title">
+        <h2 id="kit-components-title">Componentes del KIT</h2>
+        <?php if (($kitAbilities['edit'] ?? false) === true): ?>
+            <div data-product-kit-search data-kit-id="<?= e($productId) ?>" data-search-url="/productos/kits/componentes/buscar">
+                <label for="kit-component-query">Buscar componente</label>
+                <input id="kit-component-query" data-kit-query type="search" autocomplete="off" maxlength="80">
+                <div data-kit-results role="listbox" aria-label="Resultados de componentes"></div>
+                <form method="post" action="/productos/kits/componentes/agregar">
+                    <?= csrf_field($csrf) ?>
+                    <input type="hidden" name="kit_id_producto" value="<?= e($productId) ?>">
+                    <input type="hidden" name="componente_id_producto" data-kit-selected-id value="">
+                    <label for="kit-component-quantity">Cantidad</label>
+                    <input id="kit-component-quantity" name="cantidad" inputmode="decimal" required pattern="[0-9]+(\.[0-9]{1,6})?">
+                    <button class="button button--secondary" type="submit">Agregar componente</button>
+                </form>
+            </div>
+        <?php endif; ?>
+        <?php if ($kitComponents === []): ?>
+            <p class="product-form-section__help">Este KIT aún no tiene componentes.</p>
+        <?php else: ?>
+            <ul class="product-plain-list">
+                <?php foreach ($kitComponents as $component): ?>
+                    <li>
+                        <strong><?= e($component['componente_id_producto'] ?? '') ?></strong>
+                        <span><?= e($component['descripcion'] ?? '') ?></span>
+                        <?php if (($kitAbilities['edit'] ?? false) === true): ?>
+                            <form method="post" action="/productos/kits/componentes/actualizar">
+                                <?= csrf_field($csrf) ?>
+                                <input type="hidden" name="kit_id_producto" value="<?= e($productId) ?>">
+                                <input type="hidden" name="componente_id_producto" value="<?= e((string) ($component['componente_id_producto'] ?? '')) ?>">
+                                <input name="cantidad" value="<?= e((string) ($component['cantidad'] ?? '')) ?>" inputmode="decimal" required pattern="[0-9]+(\.[0-9]{1,6})?">
+                                <button class="button button--secondary" type="submit">Actualizar</button>
+                            </form>
+                            <form method="post" action="/productos/kits/componentes/quitar">
+                                <?= csrf_field($csrf) ?>
+                                <input type="hidden" name="kit_id_producto" value="<?= e($productId) ?>">
+                                <input type="hidden" name="componente_id_producto" value="<?= e((string) ($component['componente_id_producto'] ?? '')) ?>">
+                                <button class="button button--secondary" type="submit">Quitar</button>
+                            </form>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>

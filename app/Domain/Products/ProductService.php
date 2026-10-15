@@ -7,6 +7,7 @@ namespace App\Domain\Products;
 use App\Domain\Pricing\PricingValidationException;
 use App\Domain\Pricing\ProductPriceService;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\ProductKitRepository;
 use PDOException;
 
 final class ProductService
@@ -17,7 +18,8 @@ final class ProductService
     public function __construct(
         private readonly ProductRepository $products,
         private readonly ?ProductPriceService $prices = null,
-        private readonly ?ProductCreateCore $createCore = null
+        private readonly ?ProductCreateCore $createCore = null,
+        private readonly ?ProductKitRepository $kitRelations = null
     )
     {
     }
@@ -242,6 +244,18 @@ final class ProductService
         }
 
         $data = $this->validate($input, $productId, false);
+        $newTypeCode = strtoupper($this->text($input, 'tipo_producto'));
+        if (
+            $this->kitRelations !== null
+            && ($current['tipo_codigo'] ?? null) === 'KIT'
+            && $newTypeCode !== 'KIT'
+            && $this->kitRelations->hasActiveComponents($productId)
+        ) {
+            throw new ProductValidationException([
+                'tipo_producto' =>
+                    'No puedes cambiar un KIT que tiene componentes activos.',
+            ]);
+        }
         $newCurrencyId = $data['product']['moneda_id'];
         $currentCurrencyId = $current['moneda_id'] === null
             ? null

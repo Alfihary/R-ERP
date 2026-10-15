@@ -38,6 +38,7 @@ use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProductAttributeController;
 use App\Http\Controllers\ProductVariantController;
+use App\Http\Controllers\ProductKitController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
@@ -76,6 +77,7 @@ return static function (
     ProductFamilyController $productFamilyController,
     ProductAttributeController $productAttributeController,
     ProductVariantController $productVariantController,
+    ProductKitController $productKitController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
@@ -1496,6 +1498,11 @@ return static function (
             $productSimilarController->remove($request),
         $productMiddleware('productos.similares.editar')
     );
+    $router->get('/productos/kits/componentes', static fn (Request $request): Response => $productKitController->index($request), $productMiddleware('productos.kits.ver'));
+    $router->get('/productos/kits/componentes/buscar', static fn (Request $request): Response => $productKitController->search($request), $productMiddleware('productos.kits.editar'));
+    $router->post('/productos/kits/componentes/agregar', static fn (Request $request): Response => $productKitController->add($request), $productMiddleware('productos.kits.editar'));
+    $router->post('/productos/kits/componentes/actualizar', static fn (Request $request): Response => $productKitController->update($request), $productMiddleware('productos.kits.editar'));
+    $router->post('/productos/kits/componentes/quitar', static fn (Request $request): Response => $productKitController->remove($request), $productMiddleware('productos.kits.editar'));
 
     $inventoryBaseMiddleware = [
         $authMiddleware,

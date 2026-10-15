@@ -13,6 +13,7 @@ use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
 use App\Domain\Products\ProductSimilarService;
+use App\Domain\Products\ProductKitService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Support\Security\CsrfTokenService;
@@ -27,7 +28,8 @@ final class ProductController
         private readonly CsrfTokenService $csrf,
         private readonly ProductService $products,
         private readonly ProductImageService $images,
-        private readonly ProductSimilarService $similars
+        private readonly ProductSimilarService $similars,
+        private readonly ProductKitService $kits
     ) {
     }
 
@@ -144,6 +146,11 @@ final class ProductController
             'similarAbilities' => [
                 'view' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.ver'),
                 'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.editar'),
+            ],
+            'kitComponents' => $this->safeKitComponents($product),
+            'kitAbilities' => [
+                'view' => $this->permissions->allows($this->user()['user_id'], 'productos.kits.ver'),
+                'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.kits.editar'),
             ],
         ], 'Detalle de producto');
     }
@@ -339,6 +346,11 @@ final class ProductController
                 'view' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.ver'),
                 'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.similares.editar'),
             ],
+            'kitComponents' => $this->safeKitComponents($values),
+            'kitAbilities' => [
+                'view' => $this->permissions->allows($this->user()['user_id'], 'productos.kits.ver'),
+                'edit' => $this->permissions->allows($this->user()['user_id'], 'productos.kits.editar'),
+            ],
             'pricePermissions' => [
                 'create' => $this->permissions->allows(
                     $this->user()['user_id'],
@@ -389,6 +401,7 @@ final class ProductController
                 '/js/modules/product-sat-search.js',
                 '/js/modules/products-list.js',
                 '/js/modules/product-similar-search.js',
+                '/js/modules/product-kit-search.js',
             ],
             'stylesheets' => ['/css/modules/products.css'],
             'user' => $user,
@@ -700,6 +713,18 @@ final class ProductController
     {
         try {
             return $this->similars->listFor($productId);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function safeKitComponents(array $product): array
+    {
+        if (($product['tipo_codigo'] ?? $product['tipo_producto'] ?? '') !== 'KIT') {
+            return [];
+        }
+        try {
+            return $this->kits->listComponents((string) ($product['id_producto'] ?? ''));
         } catch (\Throwable) {
             return [];
         }

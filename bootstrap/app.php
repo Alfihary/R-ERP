@@ -39,6 +39,7 @@ use App\Domain\Products\ProductSimilarService;
 use App\Domain\Products\ProductFamilyService;
 use App\Domain\Products\ProductAttributeService;
 use App\Domain\Products\ProductVariantService;
+use App\Domain\Products\ProductKitService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -73,6 +74,7 @@ use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProductAttributeController;
 use App\Http\Controllers\ProductVariantController;
+use App\Http\Controllers\ProductKitController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
@@ -101,6 +103,7 @@ use App\Infrastructure\Repositories\ProductSimilarRepository;
 use App\Infrastructure\Repositories\ProductFamilyRepository;
 use App\Infrastructure\Repositories\ProductAttributeRepository;
 use App\Infrastructure\Repositories\ProductVariantRepository;
+use App\Infrastructure\Repositories\ProductKitRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
@@ -240,6 +243,7 @@ $products = new ProductService(
     $productRepository,
     $productPrices,
     new ProductCreateCore($productRepository),
+    new ProductKitRepository($connection),
 );
 $productImages = new ProductImageService(
     $productRepository,
@@ -252,6 +256,8 @@ $productSimilarService = new ProductSimilarService(
     new ProductSimilarRepository($connection),
     $audit
 );
+$productKitRepository = new ProductKitRepository($connection);
+$productKitService = new ProductKitService($connection, $productKitRepository, $audit);
 $productFamilyRepository = new ProductFamilyRepository($connection);
 $productAttributeRepository = new ProductAttributeRepository($connection);
 $productVariantRepository = new ProductVariantRepository($connection);
@@ -415,7 +421,8 @@ $productController = new ProductController(
     $csrf,
     $products,
     $productImages,
-    $productSimilarService
+    $productSimilarService,
+    $productKitService
 );
 $productSimilarController = new ProductSimilarController(
     $config,
@@ -424,6 +431,14 @@ $productSimilarController = new ProductSimilarController(
     $scopeContext,
     $csrf,
     $productSimilarService
+);
+$productKitController = new ProductKitController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productKitService
 );
 $productFamilyController = new ProductFamilyController(
     $config,
