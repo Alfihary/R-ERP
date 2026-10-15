@@ -35,6 +35,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSimilarController;
+use App\Http\Controllers\ProductFamilyController;
+use App\Http\Controllers\ProductAttributeController;
+use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ProductImportController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
@@ -70,6 +73,9 @@ return static function (
     PublicCredentialController $publicCredentialController,
     ProductController $productController,
     ProductSimilarController $productSimilarController,
+    ProductFamilyController $productFamilyController,
+    ProductAttributeController $productAttributeController,
+    ProductVariantController $productVariantController,
     PriceListController $priceListController,
     ProductPriceController $productPriceController,
     InventoryController $inventoryController,
@@ -1374,6 +1380,20 @@ return static function (
             $productController->index($request),
         $productBaseMiddleware
     );
+    $variantView = static function (string $permission) use ($authMiddleware, $auth, $permissions): array {
+        return [$authMiddleware, new PermissionMiddleware($auth, $permissions, $permission)];
+    };
+    $router->get('/productos/familias', static fn (Request $request): Response => $productFamilyController->index($request), $variantView('productos.familias.ver'));
+    $router->post('/productos/familias', static fn (Request $request): Response => $productFamilyController->store($request), $variantView('productos.familias.editar'));
+    $router->post('/productos/familias/actualizar', static fn (Request $request): Response => $productFamilyController->update($request), $variantView('productos.familias.editar'));
+    $router->get('/productos/atributos', static fn (Request $request): Response => $productAttributeController->index($request), $variantView('productos.atributos.ver'));
+    $router->post('/productos/atributos', static fn (Request $request): Response => $productAttributeController->store($request), $variantView('productos.atributos.editar'));
+    $router->post('/productos/atributos/valores', static fn (Request $request): Response => $productAttributeController->storeValue($request), $variantView('productos.atributos.editar'));
+    $router->get('/productos/variantes', static fn (Request $request): Response => $productVariantController->index($request), $variantView('productos.variantes.ver'));
+    $router->post('/productos/variantes/vincular', static fn (Request $request): Response => $productVariantController->link($request), $variantView('productos.variantes.editar'));
+    $router->post('/productos/variantes/desvincular', static fn (Request $request): Response => $productVariantController->unlink($request), $variantView('productos.variantes.editar'));
+    $router->post('/productos/variantes/atributos', static fn (Request $request): Response => $productVariantController->values($request), $variantView('productos.variantes.editar'));
+    $router->post('/productos/variantes/predeterminada', static fn (Request $request): Response => $productVariantController->default($request), $variantView('productos.variantes.editar'));
     $router->get(
         '/productos/crear',
         static fn (Request $request): Response =>

@@ -36,6 +36,9 @@ use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductCreateCore;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductSimilarService;
+use App\Domain\Products\ProductFamilyService;
+use App\Domain\Products\ProductAttributeService;
+use App\Domain\Products\ProductVariantService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
@@ -67,6 +70,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductSimilarController;
+use App\Http\Controllers\ProductFamilyController;
+use App\Http\Controllers\ProductAttributeController;
+use App\Http\Controllers\ProductVariantController;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Controllers\PublicCredentialController;
 use App\Http\Controllers\PublicVcardController;
@@ -92,6 +98,9 @@ use App\Infrastructure\Repositories\MailOutboxActionRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use App\Infrastructure\Repositories\ProductSimilarRepository;
+use App\Infrastructure\Repositories\ProductFamilyRepository;
+use App\Infrastructure\Repositories\ProductAttributeRepository;
+use App\Infrastructure\Repositories\ProductVariantRepository;
 use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
@@ -241,6 +250,25 @@ $productImages = new ProductImageService(
 $productSimilarService = new ProductSimilarService(
     $connection,
     new ProductSimilarRepository($connection),
+    $audit
+);
+$productFamilyRepository = new ProductFamilyRepository($connection);
+$productAttributeRepository = new ProductAttributeRepository($connection);
+$productVariantRepository = new ProductVariantRepository($connection);
+$productFamilyService = new ProductFamilyService(
+    $connection,
+    $productFamilyRepository,
+    $audit
+);
+$productAttributeService = new ProductAttributeService(
+    $productAttributeRepository,
+    $audit
+);
+$productVariantService = new ProductVariantService(
+    $connection,
+    $productFamilyRepository,
+    $productAttributeRepository,
+    $productVariantRepository,
     $audit
 );
 $inventoryRepository = new InventoryRepository($connection);
@@ -397,6 +425,31 @@ $productSimilarController = new ProductSimilarController(
     $csrf,
     $productSimilarService
 );
+$productFamilyController = new ProductFamilyController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productFamilyService
+);
+$productAttributeController = new ProductAttributeController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productAttributeService
+);
+$productVariantController = new ProductVariantController(
+    $config,
+    $auth,
+    $permissions,
+    $scopeContext,
+    $csrf,
+    $productFamilyService,
+    $productVariantService
+);
 $priceListController = new PriceListController(
     $config,
     $auth,
@@ -517,6 +570,9 @@ $registerRoutes(
     $publicCredentialController,
     $productController,
     $productSimilarController,
+    $productFamilyController,
+    $productAttributeController,
+    $productVariantController,
     $priceListController,
     $productPriceController,
     $inventoryController,
