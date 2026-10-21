@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domain\Products\History;
 
+use DateTimeImmutable;
 use InvalidArgumentException;
 
 /**
  * Normalized, read-only filters for a product history query.
+ *
+ * Date values are SQL-ready local boundaries in YYYY-MM-DD HH:MM:SS format.
+ * The service owns conversion from the public YYYY-MM-DD input.
  */
 final readonly class ProductHistoryFilters
 {
@@ -23,8 +27,18 @@ final readonly class ProductHistoryFilters
         }
 
         foreach (['dateFrom' => $this->dateFrom, 'dateTo' => $this->dateTo] as $name => $date) {
-            if ($date !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
-                throw new InvalidArgumentException($name . ' must use YYYY-MM-DD.');
+            if ($date !== null && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $date) !== 1) {
+                throw new InvalidArgumentException($name . ' must use SQL-ready YYYY-MM-DD HH:MM:SS.');
+            }
+            if ($date !== null) {
+                $parsed = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $date);
+                $errors = DateTimeImmutable::getLastErrors();
+                if (!$parsed instanceof DateTimeImmutable
+                    || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+                    || $parsed->format('Y-m-d H:i:s') !== $date
+                ) {
+                    throw new InvalidArgumentException($name . ' is not a valid calendar boundary.');
+                }
             }
         }
     }

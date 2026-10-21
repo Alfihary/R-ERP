@@ -6,7 +6,6 @@ namespace App\Infrastructure\Repositories;
 
 use App\Domain\Products\History\ProductHistoryFilters;
 use App\Infrastructure\Database\ConnectionProvider;
-use DateTimeImmutable;
 use InvalidArgumentException;
 use PDO;
 
@@ -307,22 +306,14 @@ final class ProductHistoryQueryRepository
             $params[$name] = $filters->actorId;
         }
         if ($filters->dateFrom !== null) {
-            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters->dateFrom);
-            if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $filters->dateFrom) {
-                throw new InvalidArgumentException('Invalid history start date.');
-            }
             $name = $prefix . '_date_from';
             $where[] = 'a.creado_en >= :' . $name;
-            $params[$name] = $filters->dateFrom . ' 00:00:00';
+            $params[$name] = $filters->dateFrom;
         }
         if ($filters->dateTo !== null) {
-            $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters->dateTo);
-            if (!$date instanceof DateTimeImmutable || $date->format('Y-m-d') !== $filters->dateTo) {
-                throw new InvalidArgumentException('Invalid history end date.');
-            }
             $name = $prefix . '_date_to';
             $where[] = 'a.creado_en < :' . $name;
-            $params[$name] = $date->modify('+1 day')->format('Y-m-d 00:00:00');
+            $params[$name] = $filters->dateTo;
         }
     }
 
