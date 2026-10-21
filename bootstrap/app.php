@@ -241,6 +241,7 @@ $productPrices = new ProductPriceService(
 $priceLists = new PriceListService(new PriceListRepository($connection));
 $products = new ProductService(
     $productRepository,
+    $audit,
     $productPrices,
     new ProductCreateCore($productRepository),
     new ProductKitRepository($connection),
@@ -588,6 +589,7 @@ $registerRoutes(
     $productFamilyController,
     $productAttributeController,
     $productVariantController,
+    $productKitController,
     $priceListController,
     $productPriceController,
     $inventoryController,

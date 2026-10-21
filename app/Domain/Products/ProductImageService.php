@@ -139,6 +139,10 @@ final class ProductImageService
                     [
                         'entidad' => 'productos',
                         'entidad_id' => $productId,
+                        'version_contrato' => 1,
+                        'modulo' => 'productos',
+                        'producto_id' => $productId,
+                        'subrecurso' => 'imagen',
                         'id_producto' => $productId,
                         'id_documento_nuevo' => $documentId,
                         'id_documento_anterior' => $previous['id'] ?? null,
@@ -230,6 +234,10 @@ final class ProductImageService
                 [
                     'entidad' => 'productos',
                     'entidad_id' => $productId,
+                    'version_contrato' => 1,
+                    'modulo' => 'productos',
+                    'producto_id' => $productId,
+                    'subrecurso' => 'imagen',
                     'id_producto' => $productId,
                     'id_documento_nuevo' => $documentId,
                     'mime' => $validated['mime_type'],
@@ -277,6 +285,10 @@ final class ProductImageService
                 [
                     'entidad' => 'productos',
                     'entidad_id' => $productId,
+                    'version_contrato' => 1,
+                    'modulo' => 'productos',
+                    'producto_id' => $productId,
+                    'subrecurso' => 'imagen',
                     'id_producto' => $productId,
                     'id_documento_anterior' => (int) $photo['id'],
                 ]

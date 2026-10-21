@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Pricing\ProductPriceService;
+use App\Domain\Audit\AuditService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
@@ -12,6 +13,7 @@ use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\AuditRepository;
 
 return new class implements DatabaseTest {
     private const PRODUCT_INITIAL = 'QAPRCINT001';
@@ -45,8 +47,10 @@ return new class implements DatabaseTest {
 
         $before = $this->counts($pdo);
         $connection = $GLOBALS['precios_producto_integracion_connection'];
+        $audit = new AuditService(new AuditRepository($connection));
         $products = new ProductService(
             new ProductRepository($connection),
+            $audit,
             new ProductPriceService(
                 new ProductPriceRepository($connection),
                 new PriceListRepository($connection),

@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Seed;
+use App\Domain\Audit\AuditService;
 use App\Domain\Products\ProductService;
+use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\ProductRepository;
 use Database\Tests\CrudProductos1FunctionalTest;
 
@@ -79,6 +81,7 @@ try {
 
     $connection = new ConnectionProvider($databaseConfig);
     $pdo = $connection->pdo();
+    $audit = new AuditService(new AuditRepository($connection));
     $seed = require BASE_PATH
         . '/database/seeds/crud_productos_1_seed_permissions.php';
     $test = require BASE_PATH
@@ -101,7 +104,7 @@ try {
         'db:test' => $test->run($pdo, $expectedDatabase),
         'functional:test' => $functionalTest->run(
             $pdo,
-            new ProductService(new ProductRepository($connection))
+            new ProductService(new ProductRepository($connection), $audit)
         ),
     };
 

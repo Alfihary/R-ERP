@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Products;
 
+use App\Domain\Audit\AuditRecorderInterface;
 use App\Domain\Pricing\PricingValidationException;
 use App\Domain\Pricing\ProductPriceService;
 use App\Infrastructure\Repositories\ProductRepository;
@@ -17,6 +18,7 @@ final class ProductService
 
     public function __construct(
         private readonly ProductRepository $products,
+        private readonly AuditRecorderInterface $audit,
         private readonly ?ProductPriceService $prices = null,
         private readonly ?ProductCreateCore $createCore = null,
         private readonly ?ProductKitRepository $kitRelations = null
@@ -212,6 +214,16 @@ final class ProductService
                         $actorId
                     );
                 }
+                $after = $this->products->find($productId);
+                if ($after === null) {
+                    throw new \RuntimeException('Created product could not be reloaded for audit.');
+                }
+                $snapshot = $this->productHistorySnapshot($after);
+                $this->audit->recordRequired(
+                    'productos.crear',
+                    $actorId,
+                    $this->canonicalProductAuditMetadata($productId, array_keys($snapshot), null, $snapshot)
+                );
             });
         } catch (PricingValidationException $exception) {
             throw new ProductValidationException($exception->errors());
@@ -244,6 +256,7 @@ final class ProductService
         }
 
         $data = $this->validate($input, $productId, false);
+        $beforeSnapshot = $this->productHistorySnapshot($current);
         $newTypeCode = strtoupper($this->text($input, 'tipo_producto'));
         if (
             $this->kitRelations !== null
@@ -284,7 +297,8 @@ final class ProductService
                 $currencyChanged,
                 $currencyPrices,
                 $newCurrencyId,
-                $newPrices
+                $newPrices,
+                $beforeSnapshot
             ): void {
                 if ($currencyChanged) {
                     $existingPrices = $this->prices === null
@@ -332,6 +346,25 @@ final class ProductService
                         $actorId
                     );
                 }
+                $after = $this->products->find($productId);
+                if ($after === null) {
+                    throw new \RuntimeException('Updated product could not be reloaded for audit.');
+                }
+                $afterSnapshot = $this->productHistorySnapshot($after);
+                $changedFields = $this->productHistoryChangedFields($beforeSnapshot, $afterSnapshot);
+                if ($changedFields !== []) {
+                    $beforeChanged = [];
+                    $afterChanged = [];
+                    foreach ($changedFields as $field) {
+                        $beforeChanged[$field] = $beforeSnapshot[$field];
+                        $afterChanged[$field] = $afterSnapshot[$field];
+                    }
+                    $this->audit->recordRequired(
+                        'productos.actualizar',
+                        $actorId,
+                        $this->canonicalProductAuditMetadata($productId, $changedFields, $beforeChanged, $afterChanged)
+                    );
+                }
             });
         } catch (PricingValidationException $exception) {
             throw new ProductValidationException($exception->errors());
@@ -353,7 +386,87 @@ final class ProductService
             return;
         }
 
-        $this->products->setActive($productId, $active, $actorId);
+        $beforeSnapshot = $this->productHistorySnapshot($product);
+        $this->products->transactional(function () use (
+            $productId,
+            $active,
+            $actorId,
+            $beforeSnapshot
+        ): void {
+            $this->products->setActive($productId, $active, $actorId);
+            $after = $this->products->find($productId);
+            if ($after === null) {
+                throw new \RuntimeException('Active product could not be reloaded for audit.');
+            }
+            $afterSnapshot = $this->productHistorySnapshot($after);
+            $this->audit->recordRequired(
+                $active ? 'productos.activar' : 'productos.desactivar',
+                $actorId,
+                $this->canonicalProductAuditMetadata(
+                    $productId,
+                    ['activo'],
+                    ['activo' => $beforeSnapshot['activo']],
+                    ['activo' => $afterSnapshot['activo']]
+                )
+            );
+        });
+    }
+
+    /** @return array<string, mixed> */
+    private function productHistorySnapshot(array $product): array
+    {
+        $contract = require BASE_PATH . '/config/products_history.php';
+        $snapshot = [];
+        foreach (array_keys($contract['fields']) as $field) {
+            $value = $product[$field] ?? null;
+            $type = $contract['fields'][$field]['type'] ?? 'string';
+            if ($field === 'id_producto') {
+                $snapshot[$field] = trim((string) $value);
+            } elseif ($field === 'activo') {
+                $snapshot[$field] = (bool) $value;
+            } elseif (str_starts_with($type, 'int')) {
+                $snapshot[$field] = $value === null ? null : (int) $value;
+            } elseif (is_int($value) || $value === null) {
+                $snapshot[$field] = $value;
+            } elseif (is_scalar($value)) {
+                $snapshot[$field] = trim(substr((string) $value, 0, 255));
+            }
+        }
+        return $snapshot;
+    }
+
+    /** @return list<string> */
+    private function productHistoryChangedFields(array $before, array $after): array
+    {
+        $contract = require BASE_PATH . '/config/products_history.php';
+        $changed = [];
+        foreach (array_keys($contract['fields']) as $field) {
+            if (($before[$field] ?? null) !== ($after[$field] ?? null)) {
+                $changed[] = $field;
+            }
+        }
+        return $changed;
+    }
+
+    /** @return array<string, mixed> */
+    private function canonicalProductAuditMetadata(
+        string $productId,
+        array $changedFields,
+        ?array $before,
+        ?array $after
+    ): array {
+        return [
+            'entidad' => 'producto',
+            'entidad_id' => $productId,
+            'resultado' => 'EXITO',
+            'version_contrato' => 1,
+            'modulo' => 'productos',
+            'producto_id' => $productId,
+            'subrecurso' => null,
+            'changed_fields' => $changedFields,
+            'before' => $before,
+            'after' => $after,
+        ];
     }
 
     /**

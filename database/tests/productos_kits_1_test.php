@@ -56,7 +56,13 @@ return new class implements DatabaseTest {
             $service->addComponent(self::KIT, self::COMPONENT, '2.25', $actor);
             $checks['QUANTITY_UPDATE'] = (string) $service->listComponents(self::KIT)[0]['cantidad'] === '2.250000';
             $checks['ACTIVE_DUPLICATE_POLICY_VALID'] = count($service->listComponents(self::KIT)) === 1;
-            $productService = new ProductService(new ProductRepository($provider), null, new ProductCreateCore(new ProductRepository($provider)), $repo);
+            $productService = new ProductService(
+                new ProductRepository($provider),
+                $audit,
+                null,
+                new ProductCreateCore(new ProductRepository($provider)),
+                $repo
+            );
             $checks['KIT_TO_NON_KIT_WITH_ACTIVE_COMPONENTS_REJECTED'] = $this->rejectProduct(fn () => $productService->update(self::KIT, $this->productUpdateInput($pdo, self::KIT, 'PRODUCTO'), $actor));
             $checks['TYPE_CHANGE_STATE_PRESERVED'] = $repo->isKitProduct(self::KIT) && count($service->listComponents(self::KIT)) === 1;
             $checks['SELF_REFERENCE_REJECTED'] = $this->reject(fn () => $service->addComponent(self::KIT, self::KIT, '1', $actor));

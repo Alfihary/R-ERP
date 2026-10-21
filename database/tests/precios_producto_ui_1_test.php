@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domain\Pricing\ProductPriceService;
+use App\Domain\Audit\AuditService;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductValidationException;
 use App\Http\Controllers\ProductController;
@@ -11,6 +12,7 @@ use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\AuditRepository;
 
 return new class implements DatabaseTest {
     private const PRODUCT_NO_PRICES = 'QAPRCUI001';
@@ -47,6 +49,7 @@ return new class implements DatabaseTest {
 
         $before = $this->counts($pdo);
         $connection = $GLOBALS['precios_producto_ui_connection'];
+        $audit = new AuditService(new AuditRepository($connection));
         $pricing = new ProductPriceService(
             new ProductPriceRepository($connection),
             new PriceListRepository($connection),
@@ -54,6 +57,7 @@ return new class implements DatabaseTest {
         );
         $products = new ProductService(
             new ProductRepository($connection),
+            $audit,
             $pricing
         );
         $lists = new PriceListRepository($connection);

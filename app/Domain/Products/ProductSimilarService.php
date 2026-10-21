@@ -40,6 +40,8 @@ final class ProductSimilarService
 
     public function add(string $origin, string $target, int $actorId): void
     {
+        $principal = $this->normalize($origin);
+        $related = $this->normalize($target);
         [$a, $b] = $this->canonical($origin, $target);
         $this->assertActive($a, 'producto_a_id');
         $this->assertActive($b, 'producto_b_id');
@@ -65,6 +67,11 @@ final class ProductSimilarService
                 'entidad_id' => $a . ':' . $b,
                 'producto_a_id' => $a,
                 'producto_b_id' => $b,
+                'version_contrato' => 1,
+                'modulo' => 'productos',
+                'producto_id' => $principal,
+                'producto_relacionado_id' => $related,
+                'subrecurso' => 'similar',
             ]);
             if ($owns) {
                 $pdo->commit();
@@ -83,6 +90,8 @@ final class ProductSimilarService
 
     public function remove(string $origin, string $target, int $actorId): void
     {
+        $principal = $this->normalize($origin);
+        $related = $this->normalize($target);
         [$a, $b] = $this->canonical($origin, $target);
         $pdo = $this->connection->pdo();
         $owns = !$pdo->inTransaction();
@@ -98,6 +107,11 @@ final class ProductSimilarService
                 'entidad_id' => $a . ':' . $b,
                 'producto_a_id' => $a,
                 'producto_b_id' => $b,
+                'version_contrato' => 1,
+                'modulo' => 'productos',
+                'producto_id' => $principal,
+                'producto_relacionado_id' => $related,
+                'subrecurso' => 'similar',
             ]);
             if ($owns) { $pdo->commit(); }
         } catch (ProductSimilarException $exception) {

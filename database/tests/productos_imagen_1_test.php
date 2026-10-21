@@ -130,7 +130,10 @@ $test = new class implements DatabaseTest {
             $storagePath,
             $audit
         );
-        $products = new ProductService(new ProductRepository($connection));
+        $products = new ProductService(
+            new ProductRepository($connection),
+            $audit
+        );
         $unitId = $this->unitId($pdo);
 
         $results = [];

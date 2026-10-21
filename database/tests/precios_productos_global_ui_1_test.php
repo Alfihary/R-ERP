@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Request;
 use App\Core\Session;
+use App\Domain\Audit\AuditService;
 use App\Domain\Auth\AuthService;
 use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Pricing\PricingValidationException;
@@ -15,6 +16,7 @@ use App\Http\Controllers\ProductPriceController;
 use App\Http\Middlewares\PermissionMiddleware;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Repositories\PermissionRepository;
+use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
@@ -52,12 +54,13 @@ return new class implements DatabaseTest {
 
         $before = $this->counts($pdo);
         $connection = $GLOBALS['precios_productos_global_ui_connection'];
+        $audit = new AuditService(new AuditRepository($connection));
         $pricing = new ProductPriceService(
             new ProductPriceRepository($connection),
             new PriceListRepository($connection),
             new ProductPriceHistoryRepository($connection)
         );
-        $products = new ProductService(new ProductRepository($connection), $pricing);
+        $products = new ProductService(new ProductRepository($connection), $audit, $pricing);
         $lists = new PriceListRepository($connection);
         $actorId = $this->adminId($pdo);
         $unitId = $this->unitId($pdo);
