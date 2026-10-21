@@ -34,6 +34,9 @@ use App\Domain\Pricing\ProductPriceService;
 use App\Domain\Profile\ProfileService;
 use App\Domain\Products\ProductImageService;
 use App\Domain\Products\ProductCreateCore;
+use App\Domain\Products\ProductHistoryService;
+use App\Domain\Products\History\ProductHistoryMapper;
+use App\Domain\Products\History\ProductHistoryPresenter;
 use App\Domain\Products\ProductService;
 use App\Domain\Products\ProductSimilarService;
 use App\Domain\Products\ProductFamilyService;
@@ -70,6 +73,7 @@ use App\Http\Controllers\PriceListController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductHistoryController;
 use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProductAttributeController;
@@ -99,6 +103,7 @@ use App\Infrastructure\Repositories\MailOutboxQueryRepository;
 use App\Infrastructure\Repositories\MailOutboxActionRepository;
 use App\Infrastructure\Repositories\PriceListRepository;
 use App\Infrastructure\Repositories\ProductRepository;
+use App\Infrastructure\Repositories\ProductHistoryQueryRepository;
 use App\Infrastructure\Repositories\ProductSimilarRepository;
 use App\Infrastructure\Repositories\ProductFamilyRepository;
 use App\Infrastructure\Repositories\ProductAttributeRepository;
@@ -245,6 +250,24 @@ $products = new ProductService(
     $productPrices,
     new ProductCreateCore($productRepository),
     new ProductKitRepository($connection),
+);
+$productHistoryRegistry = require BASE_PATH . '/config/products_history.php';
+$productHistoryRepository = new ProductHistoryQueryRepository(
+    $connection,
+    $productHistoryRegistry
+);
+$productHistoryPresenter = new ProductHistoryPresenter(
+    $productHistoryRegistry
+);
+$productHistoryMapper = new ProductHistoryMapper(
+    $productHistoryRegistry,
+    $productHistoryPresenter
+);
+$productHistoryService = new ProductHistoryService(
+    $productRepository,
+    $productHistoryRepository,
+    $productHistoryMapper,
+    $productHistoryRegistry
 );
 $productImages = new ProductImageService(
     $productRepository,
@@ -425,6 +448,7 @@ $productController = new ProductController(
     $productSimilarService,
     $productKitService
 );
+$productHistoryController = new ProductHistoryController($productHistoryService);
 $productSimilarController = new ProductSimilarController(
     $config,
     $auth,
@@ -585,6 +609,7 @@ $registerRoutes(
     $publicVcardController,
     $publicCredentialController,
     $productController,
+    $productHistoryController,
     $productSimilarController,
     $productFamilyController,
     $productAttributeController,
