@@ -35,6 +35,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductHistoryController;
+use App\Http\Controllers\ProductHistoryPageController;
 use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProductAttributeController;
@@ -75,6 +76,7 @@ return static function (
     PublicCredentialController $publicCredentialController,
     ProductController $productController,
     ProductHistoryController $productHistoryController,
+    ProductHistoryPageController $productHistoryPageController,
     ProductSimilarController $productSimilarController,
     ProductFamilyController $productFamilyController,
     ProductAttributeController $productAttributeController,
@@ -1444,6 +1446,12 @@ return static function (
         '/productos/historial',
         static fn (Request $request): Response =>
             $productHistoryController->index($request),
+        $productMiddleware('productos.ver')
+    );
+    $router->get(
+        '/productos/historial/ver',
+        static fn (Request $request): Response =>
+            $productHistoryPageController->index($request),
         $productMiddleware('productos.ver')
     );
     $router->get(

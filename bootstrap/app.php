@@ -74,6 +74,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductPriceController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductHistoryController;
+use App\Http\Controllers\ProductHistoryPageController;
 use App\Http\Controllers\ProductSimilarController;
 use App\Http\Controllers\ProductFamilyController;
 use App\Http\Controllers\ProductAttributeController;
@@ -252,22 +253,25 @@ $products = new ProductService(
     new ProductKitRepository($connection),
 );
 $productHistoryRegistry = require BASE_PATH . '/config/products_history.php';
+$productHistoryEvents = is_array($productHistoryRegistry['events'] ?? null)
+    ? $productHistoryRegistry['events']
+    : throw new RuntimeException('Product history events registry is invalid.');
 $productHistoryRepository = new ProductHistoryQueryRepository(
     $connection,
-    $productHistoryRegistry
+    $productHistoryEvents
 );
 $productHistoryPresenter = new ProductHistoryPresenter(
-    $productHistoryRegistry
+    $productHistoryEvents
 );
 $productHistoryMapper = new ProductHistoryMapper(
-    $productHistoryRegistry,
+    $productHistoryEvents,
     $productHistoryPresenter
 );
 $productHistoryService = new ProductHistoryService(
     $productRepository,
     $productHistoryRepository,
     $productHistoryMapper,
-    $productHistoryRegistry
+    $productHistoryEvents
 );
 $productImages = new ProductImageService(
     $productRepository,
@@ -449,6 +453,14 @@ $productController = new ProductController(
     $productKitService
 );
 $productHistoryController = new ProductHistoryController($productHistoryService);
+$productHistoryPageController = new ProductHistoryPageController(
+    $config,
+    $auth,
+    $scopeContext,
+    $csrf,
+    $products,
+    $productHistoryService
+);
 $productSimilarController = new ProductSimilarController(
     $config,
     $auth,
@@ -610,6 +622,7 @@ $registerRoutes(
     $publicCredentialController,
     $productController,
     $productHistoryController,
+    $productHistoryPageController,
     $productSimilarController,
     $productFamilyController,
     $productAttributeController,

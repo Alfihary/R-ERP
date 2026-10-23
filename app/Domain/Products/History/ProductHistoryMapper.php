@@ -42,7 +42,7 @@ final class ProductHistoryMapper
         $action = (string) ($row['action'] ?? '');
         $event = $this->registry[$action] ?? null;
         $metadata = $this->decodeMetadata($row['metadata_json'] ?? null);
-        $completeness = $metadata === null ? self::UNAVAILABLE : self::PARTIAL;
+        $completeness = $metadata === null ? self::UNAVAILABLE : self::COMPLETE;
         if ($event === null) {
             $completeness = self::UNAVAILABLE;
         }
@@ -115,12 +115,23 @@ final class ProductHistoryMapper
     ): string {
         $entityId = $row['entity_id'] === null ? null : (string) $row['entity_id'];
         $metadataId = is_array($metadata) && isset($metadata['producto_id'])
-            ? (string) $metadata['producto_id']
+            && is_scalar($metadata['producto_id']) && trim((string) $metadata['producto_id']) !== ''
+            ? trim((string) $metadata['producto_id'])
+            : null;
+        $kitMetadataId = is_array($metadata) && isset($metadata['kit_id_producto'])
+            && is_scalar($metadata['kit_id_producto']) && trim((string) $metadata['kit_id_producto']) !== ''
+            ? trim((string) $metadata['kit_id_producto'])
             : null;
         $isSubresource = is_array($event) && ($event['subresource'] ?? null) !== null;
-        $resolved = $isSubresource ? $metadataId : ($entityId ?? $metadataId);
+        $isKit = is_array($event) && ($event['subresource'] ?? null) === 'kit_componente';
+        $resolved = $isSubresource
+            ? ($isKit ? ($kitMetadataId ?? $metadataId) : $metadataId)
+            : ($entityId ?? $metadataId);
 
         if ($entityId !== null && $metadataId !== null && $entityId !== $metadataId) {
+            $completeness = self::PARTIAL;
+        }
+        if ($isKit && $kitMetadataId !== null && $metadataId !== null && $kitMetadataId !== $metadataId) {
             $completeness = self::PARTIAL;
         }
         if ($resolved === null || $resolved === '') {
@@ -136,6 +147,9 @@ final class ProductHistoryMapper
         if ($current === self::UNAVAILABLE) {
             return self::UNAVAILABLE;
         }
+        if ($current === self::PARTIAL) {
+            return self::PARTIAL;
+        }
         if (($event['subresource'] ?? null) !== null
             && ($event['contract'] ?? null) !== 'CANONICAL_V1'
         ) {
@@ -150,13 +164,25 @@ final class ProductHistoryMapper
     /** @param array<string,mixed> $event @param array<string,mixed> $metadata */
     private function hasRequiredFields(string $action, array $event, array $metadata): bool
     {
-        if (!array_key_exists('version_contrato', $metadata)
-            || !array_key_exists('producto_id', $metadata)
-        ) {
+        if (!array_key_exists('version_contrato', $metadata)) {
             return false;
         }
 
         $subresource = $event['subresource'] ?? null;
+        if ($subresource === 'kit_componente') {
+            $hasKitIdentity = array_key_exists('kit_id_producto', $metadata)
+                && is_scalar($metadata['kit_id_producto'])
+                && trim((string) $metadata['kit_id_producto']) !== '';
+            $hasLegacyIdentity = array_key_exists('producto_id', $metadata)
+                && is_scalar($metadata['producto_id'])
+                && trim((string) $metadata['producto_id']) !== '';
+            if (!$hasKitIdentity && !$hasLegacyIdentity) {
+                return false;
+            }
+        } elseif (!array_key_exists('producto_id', $metadata)) {
+            return false;
+        }
+
         if ($subresource === null) {
             if ($action === 'productos.crear') {
                 return is_array($metadata['changed_fields'] ?? null)

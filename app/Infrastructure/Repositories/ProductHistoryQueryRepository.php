@@ -186,9 +186,14 @@ final class ProductHistoryQueryRepository
                 && in_array($strategy, ['entity_id', null], true);
         }
 
-        return is_string($subresource)
-            && is_string($event['entity'] ?? null)
-            && ($event['product_id_strategy'] ?? null) === 'metadata.producto_id';
+        if (!is_string($subresource) || !is_string($event['entity'] ?? null)) {
+            return false;
+        }
+
+        $strategy = $event['product_id_strategy'] ?? null;
+        return $subresource === 'kit_componente'
+            ? $strategy === 'metadata.kit_id_producto'
+            : $strategy === 'metadata.producto_id';
     }
 
     /** @param array<string, array<string, mixed>> $registry @return list<string> */
@@ -212,7 +217,7 @@ final class ProductHistoryQueryRepository
         return $actions;
     }
 
-    /** @param array<string, array<string, mixed>> $registry @return array<string, string> */
+    /** @param array<string, array<string, mixed>> $registry @return array<string, array{entity:string,strategy:string}> */
     private function subresourceActions(ProductHistoryFilters $filters, array $registry): array
     {
         $actions = [];
@@ -222,7 +227,12 @@ final class ProductHistoryQueryRepository
             if (!is_string($subresource) || !is_string($entity)) {
                 continue;
             }
-            if (($event['product_id_strategy'] ?? null) !== 'metadata.producto_id') {
+            $strategy = $event['product_id_strategy'] ?? null;
+            if (!is_string($strategy)
+                || ($subresource === 'kit_componente'
+                    ? $strategy !== 'metadata.kit_id_producto'
+                    : $strategy !== 'metadata.producto_id')
+            ) {
                 continue;
             }
             if ($filters->action !== null && $filters->action !== $action) {
@@ -231,14 +241,17 @@ final class ProductHistoryQueryRepository
             if ($filters->subresource !== null && $filters->subresource !== $subresource) {
                 continue;
             }
-            $actions[$action] = $entity;
+            $actions[$action] = [
+                'entity' => $entity,
+                'strategy' => $strategy,
+            ];
         }
         return $actions;
     }
 
     /**
      * @param list<string> $actions
-     * @param array<string, string> $entitiesByAction
+     * @param array<string, array{entity:string,strategy:string}> $entitiesByAction
      * @param array<string, scalar> $params
      */
     private function branch(
@@ -261,16 +274,26 @@ final class ProductHistoryQueryRepository
         if ($prefix === 'direct') {
         } else {
             $entityConditions = [];
-            foreach (array_values($entitiesByAction) as $index => $entity) {
+            foreach (array_values($entitiesByAction) as $index => $definition) {
                 $actionName = $prefix . '_entity_action_' . $index;
                 $entityName = $prefix . '_entity_' . $index;
                 $entityConditions[] = '(a.accion = :' . $actionName
                     . ' AND a.entidad = :' . $entityName . ')';
                 $params[$actionName] = (string) array_keys($entitiesByAction)[$index];
-                $params[$entityName] = $entity;
+                $params[$entityName] = $definition['entity'];
             }
             $where[] = '(' . implode(' OR ', $entityConditions) . ')';
-            $where[] = "JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.producto_id')) = :{$prefix}_product_id";
+            $associationConditions = [];
+            foreach (array_values($entitiesByAction) as $index => $definition) {
+                $actionName = $prefix . '_association_action_' . $index;
+                $productName = $prefix . '_association_product_' . $index;
+                $associationConditions[] = '(a.accion = :' . $actionName . ' AND '
+                    . $this->associationExpression($definition['strategy'])
+                    . ' = :' . $productName . ')';
+                $params[$actionName] = (string) array_keys($entitiesByAction)[$index];
+                $params[$productName] = $productId;
+            }
+            $where[] = '(' . implode(' OR ', $associationConditions) . ')';
         }
         $productName = $prefix . '_product_id';
         if ($prefix === 'direct') {
@@ -279,7 +302,9 @@ final class ProductHistoryQueryRepository
             $params[$entityName] = 'producto';
             $where[] = 'a.entidad_id = :' . $productName;
         }
-        $params[$productName] = $productId;
+        if ($prefix === 'direct') {
+            $params[$productName] = $productId;
+        }
 
         $this->appendCommonFilters($where, $filters, $prefix, $params);
 
@@ -295,6 +320,16 @@ final class ProductHistoryQueryRepository
                 FROM auditoria_eventos a
                 LEFT JOIN usuarios u ON u.id = a.actor_usuario_id
                 WHERE ' . implode(' AND ', $where);
+    }
+
+    private function associationExpression(string $strategy): string
+    {
+        if ($strategy === 'metadata.kit_id_producto') {
+            return "COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.kit_id_producto')), ''), "
+                . "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.producto_id')), ''))";
+        }
+
+        return "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.metadata_json, '$.producto_id')), '')";
     }
 
     /** @param list<string> $where @param array<string, scalar> $params */

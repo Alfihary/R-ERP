@@ -58,6 +58,12 @@ $satUnit = trim(
                 href="/productos/editar?id_producto=<?= e(rawurlencode($productId)) ?>"
             >Editar producto</a>
         <?php endif; ?>
+        <?php if (($abilities['ver'] ?? false) === true): ?>
+            <a
+                class="button button--secondary"
+                href="/productos/historial/ver?id_producto=<?= e(rawurlencode($productId)) ?>"
+            >Historial</a>
+        <?php endif; ?>
         <a class="button button--secondary" href="/productos">Volver</a>
     </div>
 </header>

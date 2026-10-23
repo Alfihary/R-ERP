@@ -85,7 +85,7 @@ final class ProductHistoryService
             $knownSubresource = false;
             foreach ($this->registry as $event) {
                 if (($event['subresource'] ?? null) === $subresource
-                    && ($event['product_id_strategy'] ?? null) === 'metadata.producto_id'
+                    && $this->isQueryable($event)
                 ) {
                     $knownSubresource = true;
                     break;
@@ -123,9 +123,14 @@ final class ProductHistoryService
             return ($event['entity'] ?? 'producto') === 'producto'
                 && in_array($event['product_id_strategy'] ?? 'entity_id', ['entity_id', null], true);
         }
-        return is_string($subresource)
-            && is_string($event['entity'] ?? null)
-            && ($event['product_id_strategy'] ?? null) === 'metadata.producto_id';
+        if (!is_string($subresource) || !is_string($event['entity'] ?? null)) {
+            return false;
+        }
+
+        $strategy = $event['product_id_strategy'] ?? null;
+        return $subresource === 'kit_componente'
+            ? $strategy === 'metadata.kit_id_producto'
+            : $strategy === 'metadata.producto_id';
     }
 
     /** @param array<string,mixed> $raw */
