@@ -52,6 +52,7 @@ use App\Infrastructure\Database\ConnectionProvider;
 use App\Infrastructure\Import\PrivateProductImportPreviewStore;
 use App\Infrastructure\Import\ProductImportReader;
 use App\Infrastructure\Repositories\PdoProductImportBusinessLookup;
+use App\Infrastructure\Repositories\LazyProductImportBusinessLookup;
 use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\ProductImportRunRepository;
 use App\Infrastructure\Repositories\ProductRepository;
@@ -1343,7 +1344,7 @@ return static function (
     $productImportAudit = new AuditService(new AuditRepository($productImportConnection));
     $productImportReader = new ProductImportReader();
     $productImportValidator = new ProductImportBusinessValidator(
-        new PdoProductImportBusinessLookup($productImportConnection->pdo())
+        new LazyProductImportBusinessLookup($productImportConnection)
     );
     $productImportStore = new PrivateProductImportPreviewStore(
         (string) $config->get('paths.STORAGE_PATH', STORAGE_PATH)
