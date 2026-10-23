@@ -86,8 +86,9 @@ $canAccessAudit = ($canAccessAudit ?? false) === true;
 $canAccessAdminUsers = ($canAccessAdminUsers ?? false) === true;
 $stylesheets = is_array($stylesheets ?? null) ? $stylesheets : [];
 $scripts = is_array($scripts ?? null) ? $scripts : [];
-if (!in_array('/js/sidebar-collapse.js', $scripts, true)) {
-    $scripts[] = '/js/sidebar-collapse.js';
+$sidebarScript = '/js/sidebar-collapse.js?v=mobile-offcanvas-2';
+if (!in_array($sidebarScript, $scripts, true)) {
+    $scripts[] = $sidebarScript;
 }
 $activeCompany = is_array($context['active_company'] ?? null)
     ? $context['active_company']
@@ -103,7 +104,7 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <title><?= e($pageTitle ?? 'Inicio') ?> · <?= e($appName) ?></title>
-    <link rel="stylesheet" href="/css/core/app.css">
+    <link rel="stylesheet" href="/css/core/app.css?v=mobile-offcanvas-1">
     <?php foreach ($stylesheets as $stylesheet): ?>
         <?php if (
             is_string($stylesheet)
@@ -117,7 +118,11 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
     <a class="skip-link" href="#main-content">Saltar al contenido</a>
 
     <div class="app-shell">
-        <aside class="app-sidebar" aria-label="Navegación principal">
+        <aside class="app-sidebar" id="app-sidebar" aria-label="Navegación principal" data-mobile-open="false">
+            <button class="app-sidebar__mobile-close" type="button" data-sidebar-close aria-label="Cerrar navegación">
+                <span aria-hidden="true">×</span>
+                Cerrar navegación
+            </button>
             <a class="app-brand" href="/app" aria-label="<?= e($appName) ?>, inicio">
                 <span class="app-brand__mark" aria-hidden="true">SG</span>
                 <span>
@@ -421,8 +426,20 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
             </p>
         </aside>
 
+        <button class="app-sidebar__overlay" type="button" data-sidebar-overlay aria-label="Cerrar navegación" hidden></button>
+
         <div class="app-workspace">
             <header class="app-topbar">
+                <button
+                    class="app-sidebar__mobile-open"
+                    type="button"
+                    data-sidebar-open
+                    aria-controls="app-sidebar"
+                    aria-expanded="false"
+                >
+                    <span aria-hidden="true">☰</span>
+                    <span>Abrir navegación</span>
+                </button>
                 <div class="app-topbar__context">
                     <span>Área privada</span>
                     <strong><?= e($pageTitle ?? 'Inicio') ?></strong>
@@ -457,7 +474,7 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
     <?php foreach ($scripts as $script): ?>
         <?php if (
             is_string($script)
-            && preg_match('#^/js/[a-z0-9/_-]+\.js$#', $script) === 1
+            && preg_match('#^/js/[a-z0-9/_-]+\.js(?:\?[a-z0-9_-]+=[a-z0-9_-]+)?$#', $script) === 1
         ): ?>
             <script src="<?= e($script) ?>" defer></script>
         <?php endif; ?>
