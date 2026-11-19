@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Infrastructure\Database\Connection;
+use App\Infrastructure\Database\GlobalPrefixDuplicateClassifier;
 
 define('BASE_PATH', dirname(__DIR__, 2));
 
@@ -422,41 +423,9 @@ function assertReservation(PDO $pdo, int $seriesId, string $prefix): void
     }
 }
 
-function extractExpectedGlobalIndexReference(string $message): ?string
-{
-    $allowedReferences = [
-        "'uq_series_documentales_prefijo_global'",
-        '`uq_series_documentales_prefijo_global`',
-        "'series_documentales.uq_series_documentales_prefijo_global'",
-        '`series_documentales.uq_series_documentales_prefijo_global`',
-        "'r_erp_tickets_qa_2f.series_documentales.uq_series_documentales_prefijo_global'",
-        '`r_erp_tickets_qa_2f.series_documentales.uq_series_documentales_prefijo_global`',
-        '`series_documentales`.`uq_series_documentales_prefijo_global`',
-        '`r_erp_tickets_qa_2f`.`series_documentales`.`uq_series_documentales_prefijo_global`',
-    ];
-
-    foreach ($allowedReferences as $reference) {
-        $pattern = '/\ADuplicate entry[ \t]+\'([^\'\\\\\r\n\t]*)\'[ \t]+(?i:for[ \t]+key)[ \t]+' . preg_quote($reference, '/') . '\z/';
-        if (preg_match($pattern, $message) === 1) {
-            return $reference;
-        }
-    }
-
-    return null;
-}
-
-function isExpectedGlobalIndexReference(string $message): bool
-{
-    return extractExpectedGlobalIndexReference($message) !== null;
-}
-
 function isExpectedDuplicate(PDOException $exception): bool
 {
-    $info = $exception->errorInfo;
-    $message = (string) ($info[2] ?? $exception->getMessage());
-    return (string) ($info[0] ?? $exception->getCode()) === '23000'
-        && (int) ($info[1] ?? 0) === 1062
-        && isExpectedGlobalIndexReference($message);
+    return GlobalPrefixDuplicateClassifier::isExpected($exception);
 }
 
 /** @return array{duplicate_rejected: bool, constraint: string} */
