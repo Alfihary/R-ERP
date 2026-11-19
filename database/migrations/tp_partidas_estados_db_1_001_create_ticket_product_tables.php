@@ -48,13 +48,8 @@ return new class implements Migration {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-DB-1 requires its tables to be absent.');
         }
 
-        try {
-            foreach ($this->upStatements() as $statement) {
-                $pdo->exec($statement);
-            }
-        } catch (Throwable $exception) {
-            $this->down($pdo);
-            throw $exception;
+        foreach ($this->upStatements() as $statement) {
+            $pdo->exec($statement);
         }
     }
 
