@@ -13,6 +13,7 @@ return new class implements Seed {
         'tickets_productos.resolver' => 'Aprobar o rechazar partidas de tickets de productos.',
         'tickets_productos.cancelar' => 'Cancelar tickets de solicitud de alta de productos.',
         'tickets_productos.adjuntos.ver' => 'Ver adjuntos privados de tickets de productos.',
+        'tickets_productos.adjuntos.crear' => 'Crear adjuntos privados en tickets de productos.',
         'tickets_productos.comentarios.crear' => 'Agregar comentarios a tickets de productos.',
         'tickets_productos.correo.reenviar' => 'Reenviar correos documentales de tickets de productos.',
         'tickets_productos.eventos.ver' => 'Ver historial/eventos de tickets de productos.',
