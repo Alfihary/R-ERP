@@ -49,13 +49,8 @@ return new class implements Migration {
             );
         }
 
-        try {
-            foreach ($this->upStatements() as $statement) {
-                $pdo->exec($statement);
-            }
-        } catch (Throwable $exception) {
-            $this->down($pdo);
-            throw $exception;
+        foreach ($this->upStatements() as $statement) {
+            $pdo->exec($statement);
         }
     }
 
