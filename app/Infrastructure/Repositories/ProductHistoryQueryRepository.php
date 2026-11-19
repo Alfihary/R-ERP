@@ -36,6 +36,7 @@ final class ProductHistoryQueryRepository
      *         result:string,
      *         actor_id:int|null,
      *         actor_username:string|null,
+     *         actor_eliminado_en:string|null,
      *         entity:string,
      *         entity_id:string|null,
      *         metadata_json:string|null
@@ -95,6 +96,7 @@ final class ProductHistoryQueryRepository
         $dataset = $branches === []
             ? 'SELECT NULL AS audit_id, NULL AS occurred_at, NULL AS action,
                       NULL AS result, NULL AS actor_id, NULL AS actor_username,
+                      NULL AS actor_eliminado_en,
                       NULL AS entity, NULL AS entity_id, NULL AS metadata_json
                  WHERE 1 = 0'
             : implode("\nUNION ALL\n", $branches);
@@ -131,6 +133,9 @@ final class ProductHistoryQueryRepository
                 'actor_username' => $row['actor_username'] === null
                     ? null
                     : (string) $row['actor_username'],
+                'actor_eliminado_en' => $row['actor_eliminado_en'] === null
+                    ? null
+                    : (string) $row['actor_eliminado_en'],
                 'entity' => (string) $row['entity'],
                 'entity_id' => $row['entity_id'] === null ? null : (string) $row['entity_id'],
                 'metadata_json' => $row['metadata_json'] === null
@@ -314,6 +319,7 @@ final class ProductHistoryQueryRepository
                        a.resultado AS result,
                        a.actor_usuario_id AS actor_id,
                        u.username AS actor_username,
+                       u.eliminado_en AS actor_eliminado_en,
                        a.entidad AS entity,
                        a.entidad_id AS entity_id,
                        a.metadata_json AS metadata_json

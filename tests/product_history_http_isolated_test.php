@@ -106,6 +106,13 @@ $record('HTTP-C05_ERROR_HANDLER', static function (): void {
     check(!str_contains($errorResponse->body(), BASE_PATH), 'HTTP-C05', 'Internal path leaked with debug disabled.');
 });
 
+$record('HTTP-C09_ACTOR_PUBLIC_CONTRACT', static function (): void {
+    $controller = file_get_contents(BASE_PATH . '/app/Http/Controllers/ProductHistoryController.php') ?: '';
+    check(str_contains($controller, "'actor_id' => \$item->actorId"), 'HTTP-C09', 'actor_id is not preserved in the public contract.');
+    check(str_contains($controller, "'actor_display' => \$item->actorDisplay"), 'HTTP-C09', 'actor_display is not preserved in the public contract.');
+    check(!str_contains($controller, "'actor_username'"), 'HTTP-C09', 'actor_username must not be exposed as an independent field.');
+});
+
 $staticOnly = [
     'AUTH_MIDDLEWARE_LOGIN_REDIRECT',
     'PERMISSION_PRODUCT_ACCESS_403',

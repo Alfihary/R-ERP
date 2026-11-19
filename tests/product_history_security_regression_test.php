@@ -201,6 +201,7 @@ $sourcePaths = [
     'error_middleware' => 'app/Http/Middlewares/ErrorHandlingMiddleware.php',
     'error_handler' => 'app/Core/ErrorHandler.php',
     'csrf' => 'app/Http/Middlewares/CsrfMiddleware.php',
+    'runtime_runner' => 'tests/product_history_db_readonly_test.php',
 ];
 
 $loaded = [];
@@ -224,6 +225,47 @@ try {
     $permission = $loaded['permission']['compact'];
     $errorMiddleware = $loaded['error_middleware']['compact'];
     $errorHandler = $loaded['error_handler']['compact'];
+    $runtimeRunner = $loaded['runtime_runner']['compact'];
+
+    $runnerScenarioContract = compactHas($runtimeRunner, '/KIT-01/')
+        && compactHas($runtimeRunner, '/KIT-02/')
+        && compactHas($runtimeRunner, '/KIT-03/')
+        && compactHas($runtimeRunner, '/ACTOR-01/')
+        && compactHas($runtimeRunner, '/ACTOR-02/')
+        && compactHas($runtimeRunner, '/ACTOR-03/')
+        && compactHas($runtimeRunner, '/SKIP_DATA_NOT_AVAILABLE/')
+        && compactHas($runtimeRunner, '/PARTIAL_DATA_NOT_AVAILABLE/');
+    checkStatus('SEC-26-runtime-scenario-contract', $runnerScenarioContract ? 'STATIC_PASS' : 'STATIC_FAIL', 'extended_runtime_scenarios_and_data_skip_statuses_declared', $checks);
+    $runnerReadOnlyContract = compactHas($runtimeRunner, '/WRITE_SQL_BLOCKED/')
+        && compactHas($runtimeRunner, '/SHOW GRANTS/')
+        && compactHas($runtimeRunner, '/assertReadOnlyPrivileges/')
+        && compactHas($runtimeRunner, '/normalizeSqlForGuard/')
+        && compactHas($runtimeRunner, '/assertGrantTextReadOnly/')
+        && compactHas($runtimeRunner, '/TEMPORARY\\s+TABLE/')
+        && compactHas($runtimeRunner, '/ALL PRIVILEGES/');
+    checkStatus('SEC-27-runtime-readonly-allowlist', $runnerReadOnlyContract ? 'STATIC_PASS' : 'STATIC_FAIL', 'runtime_runner_select_show_grants_only', $checks);
+    checkStatus('SEC-28-runtime-no-hardcoded-product', !str_contains($runtimeRunner, '102016169') && !str_contains($runtimeRunner, 'PROTECTED_PRODUCT_ID') ? 'STATIC_PASS' : 'STATIC_FAIL', 'dynamic_product_selection_only', $checks);
+    $interceptorContract = compactHas($runtimeRunner, '/ReadOnlyInstrumentedPdo/')
+        && compactHas($runtimeRunner, '/functionquery\(/')
+        && compactHas($runtimeRunner, '/functionprepare\(/')
+        && compactHas($runtimeRunner, '/functionexecute\(/')
+        && compactHas($runtimeRunner, '/sql_fingerprint/')
+        && compactHas($runtimeRunner, '/ALL_EXECUTED_STATEMENTS_LEDGERED/');
+    checkStatus('SEC-29-global-sql-interceptor', $interceptorContract ? 'STATIC_PASS' : 'STATIC_FAIL', 'pdo_query_prepare_execute_and_ledger_contract', $checks);
+    $ledgerMetricsContract = compactHas($runtimeRunner, '/prevalidation/')
+        && compactHas($runtimeRunner, '/execution/')
+        && compactHas($runtimeRunner, '/TOTAL_SQL_STATEMENTS_EXECUTION_LEDGERED/')
+        && compactHas($runtimeRunner, '/UNLEDGERED_EXECUTION_COUNT/');
+    checkStatus('SEC-30-ledger-phase-metrics', $ledgerMetricsContract ? 'STATIC_PASS' : 'STATIC_FAIL', 'prevalidation_and_execution_metrics_are_separated', $checks);
+    $diagnosticContract = compactHas($runtimeRunner, '/RuntimeHarnessContext/')
+        && compactHas($runtimeRunner, '/sanitizeRuntimeException/')
+        && compactHas($runtimeRunner, '/failure_stage/')
+        && compactHas($runtimeRunner, '/exception_class/')
+        && compactHas($runtimeRunner, '/PDO_CONSTRUCTOR_FAILED/')
+        && compactHas($runtimeRunner, '/sqlstate/')
+        && compactHas($runtimeRunner, '/driver_error_code/')
+        && compactHas($runtimeRunner, '/SQL statement redacted/');
+    checkStatus('SEC-31-harness-diagnostic-context', $diagnosticContract ? 'STATIC_PASS' : 'STATIC_FAIL', 'stage_exception_and_sanitized_message_preserved', $checks);
 
     $routePattern = '/\$router->get\(\x27\/productos\/historial\x27,.*?\$productHistoryController->index/s';
     $routeRegistered = compactHas($routes, $routePattern);
@@ -303,6 +345,16 @@ try {
     checkStatus('SEC-20-debug-error-safety', $errorSafe ? 'STATIC_PASS' : 'STATIC_UNVERIFIED', 'requires_APP_DEBUG_false_for_runtime_safety', $checks);
     checkStatus('SEC-21-json-response', compactHas($controller, '/Response::json\(/') ? 'STATIC_PASS' : 'STATIC_FAIL', 'controller_uses_json_factory', $checks);
     checkStatus('SEC-22-authorized-event-filtering', compactHas($repository, '/registry/') && compactHas($service, '/isQueryable/') ? 'STATIC_PASS' : 'STATIC_UNVERIFIED', 'registry_and_queryable_event_contract', $checks);
+
+    $actorPolicy = compactHas($mapper, '/actorDisplay/')
+        && compactHas($mapper, '/Usuario eliminado/')
+        && compactHas($mapper, '/Sistema/')
+        && !compactHas($controller, '/\x27actor_username\x27/');
+    checkStatus('SEC-23-global-actor-policy', $actorPolicy ? 'STATIC_PASS' : 'STATIC_FAIL', 'actor_id_and_actor_display_only_with_global_fallbacks', $checks);
+    $kitAssociation = compactHas($repository, '~metadata\.kit_id_producto.*?metadata\.producto_id~s')
+        && compactHas($repository, '~COALESCE\(~s');
+    checkStatus('SEC-24-kit-association-priority', $kitAssociation ? 'STATIC_PASS' : 'STATIC_FAIL', 'kit_id_producto_precedes_producto_id', $checks);
+    checkStatus('SEC-25-global-history-no-effective-scope', !compactHas($service, '/EffectiveScope/') && !compactHas($repository, '/empresa_id|almacen_id/') ? 'STATIC_PASS' : 'STATIC_FAIL', 'global_product_history_has_no_operational_scope_filter', $checks);
 
     $regressionFiles = [
         'app/Domain/Products/ProductService.php',

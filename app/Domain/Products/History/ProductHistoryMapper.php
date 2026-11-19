@@ -61,9 +61,12 @@ final class ProductHistoryMapper
 
         $actorId = $row['actor_id'] === null ? null : (int) $row['actor_id'];
         $actorUsername = trim((string) ($row['actor_username'] ?? ''));
+        $actorDeletedAt = $row['actor_eliminado_en'] ?? null;
         $actorDisplay = $actorId === null
             ? 'Sistema'
-            : ($actorUsername !== '' ? $actorUsername : 'Usuario eliminado (#' . $actorId . ')');
+            : ($actorDeletedAt !== null
+                ? 'Usuario eliminado'
+                : ($actorUsername !== '' ? $actorUsername : 'Usuario eliminado'));
 
         $safeMetadata = $metadata === null ? null : $this->sanitize($metadata);
         $before = $this->mapState($metadata, 'before');
