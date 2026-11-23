@@ -7,11 +7,15 @@ use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
+use App\Domain\Scope\EffectiveScope;
+use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\UserScopeService;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 
 return new class implements DatabaseTest {
@@ -20,6 +24,7 @@ return new class implements DatabaseTest {
     private PDO $pdo;
     private ProductRequestTicketRepository $repository;
     private ProductRequestTicketService $service;
+    private EffectiveScope $fixtureScope;
 
     /**
      * @return array<string, mixed>
@@ -41,7 +46,7 @@ return new class implements DatabaseTest {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-COMENTARIOS-1 dependencies are invalid.');
         }
 
-        $runner = new MigrationRunner($pdo);
+        $runner = new MigrationRunner($pdo, MigrationRunner::MODE_TEST_EXECUTION);
         $migrationState = $runner->migrate($migration);
         $before = $this->operationalCounts();
         $results = [];
@@ -49,6 +54,7 @@ return new class implements DatabaseTest {
         try {
             $pdo->beginTransaction();
             $fixture = $this->fixture();
+            $this->fixtureScope = $this->scopeForFixture($fixture);
             $ticket = $this->createTicket($fixture);
             $otherTicket = $this->createTicket($fixture);
             $partida = $this->firstPartida((int) $ticket['id']);
@@ -60,19 +66,24 @@ return new class implements DatabaseTest {
                 (int) $ticket['id'],
                 null,
                 'Comentario general documental.',
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $line = $this->service->agregarComentario(
                 (int) $ticket['id'],
                 (int) $partida['id'],
                 'Comentario documental de partida.',
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
-            $afterCommentTicket = $this->repository->findTicketById((int) $ticket['id']) ?? [];
+            $afterCommentTicket = $this->repository->findTicketById(
+                (int) $ticket['id'],
+                $this->fixtureScope
+            ) ?? [];
             $afterCommentPartida = $this->firstPartida((int) $ticket['id']);
             $comments = $this->repository->listComentarios((int) $ticket['id']);
             $events = $this->repository->listEventos((int) $ticket['id']);
-            $controllerResponse = $this->controllerFor($fixture['user_id'])->comment(
+            $controllerResponse = $this->controllerFor($fixture)->comment(
                 new Request('POST', '/tickets/productos/' . (int) $ticket['id'] . '/comentarios', [], [
                     'comentario' => 'Comentario desde controlador.',
                 ]),
@@ -82,7 +93,8 @@ return new class implements DatabaseTest {
                 (int) $ticket['id'],
                 null,
                 '<script>alert(1)</script>',
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
 
             $results['route_security'] = $this->routeSecurityCases();
@@ -170,7 +182,7 @@ return new class implements DatabaseTest {
             'no_public_comment_route' => !str_contains($routes, '/v/{slug}/comentarios'),
             'authorized_attachment_runtime_route_allowed' => str_contains($routes, "'/tickets/productos/{id}/adjuntos'")
                 && str_contains($routes, '->attachment($request, $params)')
-                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
+                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.crear')"),
             'no_email_routes_created' => !str_contains(str_replace([
                 '/admin/correo/cuentas',
                 '/admin/correo/reglas',
@@ -234,7 +246,13 @@ return new class implements DatabaseTest {
             'service_has_method' => method_exists($this->service, 'agregarComentario')
                 && str_contains($service, 'function agregarComentario('),
             'service_validates_empty_comment' => $this->failsValidation(
-                fn () => $this->service->agregarComentario((int) $ticket['id'], null, '   ', $userId),
+                fn () => $this->service->agregarComentario(
+                    (int) $ticket['id'],
+                    null,
+                    '   ',
+                    $userId,
+                    $this->fixtureScope
+                ),
                 'comentario'
             ),
             'service_rejects_foreign_partida' => $this->failsValidation(
@@ -242,12 +260,19 @@ return new class implements DatabaseTest {
                     (int) $ticket['id'],
                     (int) $foreignPartida['id'],
                     'Comentario inválido.',
-                    $userId
+                    $userId,
+                    $this->fixtureScope
                 ),
                 'partida_id'
             ),
             'service_rejects_missing_ticket' => $this->failsValidation(
-                fn () => $this->service->agregarComentario(999999999, null, 'Comentario inválido.', $userId),
+                fn () => $this->service->agregarComentario(
+                    999999999,
+                    null,
+                    'Comentario inválido.',
+                    $userId,
+                    $this->fixtureScope
+                ),
                 'ticket_id'
             ),
             'service_records_comment_event' => str_contains($service, 'COMENTARIO_AGREGADO')
@@ -337,10 +362,8 @@ return new class implements DatabaseTest {
                 'TP-PARTIDAS-ESTADOS-COMENTARIOS-1'
             ),
             'only_authorized_ticket_create_js_runtime' => $this->onlyAuthorizedTicketCreateJsRuntime(),
-            'no_mail_runtime_created' =>
-                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
-                && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
-            'no_real_attachments_created' => !$this->hasFiles('storage', '/tickets-productos|ticket|solicitud/i'),
+            'comment_has_no_mail_runtime_coupling' => $this->commentHasNoMailRuntimeCoupling(),
+            'comment_has_no_attachment_runtime_coupling' => $this->commentHasNoAttachmentRuntimeCoupling(),
             'no_product_created' => $before['productos'] === $during['productos'],
             'no_price_created' => $before['producto_precios'] === $during['producto_precios'],
             'no_stock_created' => $before['existencias_producto'] === $during['existencias_producto'],
@@ -359,12 +382,93 @@ return new class implements DatabaseTest {
         $userId = $this->createUser('qa_tp_comentarios_1');
         $companyId = $this->createCompany($userId);
         $warehouseId = $this->createWarehouse($companyId, $userId);
+        $this->assignFixtureScope($userId, $companyId, $warehouseId);
+        $this->createProductTicketSeries($companyId, $warehouseId, $userId);
 
         return [
             'user_id' => $userId,
             'empresa_id' => $companyId,
             'almacen_id' => $warehouseId,
         ];
+    }
+
+    private function createProductTicketSeries(
+        int $companyId,
+        int $warehouseId,
+        int $actorId
+    ): void {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO series_documentales (
+                empresa_id,
+                almacen_id,
+                tipo_documento,
+                codigo_serie,
+                prefijo,
+                codigo_almacen_snapshot,
+                formato,
+                separador,
+                siguiente_numero,
+                longitud,
+                reinicio_anual,
+                anio_actual,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :empresa_id,
+                :almacen_id,
+                :tipo_documento,
+                :codigo_serie,
+                :prefijo,
+                :codigo_almacen_snapshot,
+                :formato,
+                :separador,
+                :siguiente_numero,
+                :longitud,
+                :reinicio_anual,
+                :anio_actual,
+                :activo,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'tipo_documento' => 'TICKET_PRODUCTO',
+            'codigo_serie' => 'TP',
+            'prefijo' => 'COM',
+            'codigo_almacen_snapshot' => 'COM',
+            'formato' => '{ALMACEN}-{NUMERO}',
+            'separador' => '-',
+            'siguiente_numero' => 10,
+            'longitud' => 6,
+            'reinicio_anual' => 0,
+            'anio_actual' => null,
+            'activo' => 1,
+            'creado_por' => $actorId,
+            'actualizado_por' => $actorId,
+        ]);
+    }
+
+    /**
+     * @param array<string, int> $fixture
+     */
+    private function scopeForFixture(array $fixture): EffectiveScope
+    {
+        return EffectiveScope::fromRecords(
+            [[
+                'id' => (int) $fixture['empresa_id'],
+                'code' => 'QA-COMENTARIOS',
+                'name' => 'Empresa QA comentarios',
+            ]],
+            [[
+                'id' => (int) $fixture['almacen_id'],
+                'company_id' => (int) $fixture['empresa_id'],
+                'code' => 'QA-COMENTARIOS',
+                'name' => 'Almacén QA comentarios',
+            ]]
+        );
     }
 
     /**
@@ -383,7 +487,7 @@ return new class implements DatabaseTest {
                 'marca_texto' => 'Marca documental',
                 'proveedor_texto' => 'Proveedor documental',
             ]],
-        ], $fixture['user_id']);
+        ], $fixture['user_id'], null, $this->fixtureScope);
     }
 
     /**
@@ -396,7 +500,10 @@ return new class implements DatabaseTest {
         return $partidas[0] ?? [];
     }
 
-    private function controllerFor(int $userId): ProductRequestTicketController
+    /**
+     * @param array{user_id:int, empresa_id:int, almacen_id:int} $fixture
+     */
+    private function controllerFor(array $fixture): ProductRequestTicketController
     {
         $this->closeSession();
         session_save_path(sys_get_temp_dir());
@@ -407,18 +514,80 @@ return new class implements DatabaseTest {
         }
 
         $_SESSION['auth_user'] = [
-            'user_id' => $userId,
+            'user_id' => $fixture['user_id'],
             'username' => 'qa_tp_comentarios_1',
             'email' => 'qa_tp_comentarios_1@example.test',
         ];
 
         $session = new Session([]);
+        $session->put(ScopeContextService::COMPANY_SESSION_KEY, $fixture['empresa_id']);
+        $session->put(ScopeContextService::WAREHOUSE_SESSION_KEY, $fixture['almacen_id']);
         $auth = new AuthService(
             new UserRepository($GLOBALS['tp_product_ticket_comentarios_connection']),
             $session
         );
 
-        return new ProductRequestTicketController($auth, $this->service);
+        return new ProductRequestTicketController(
+            $auth,
+            $this->service,
+            null,
+            null,
+            null,
+            new ScopeContextService(
+                new UserScopeService(new ScopeRepository($GLOBALS['tp_product_ticket_comentarios_connection'])),
+                $session
+            )
+        );
+    }
+
+    private function assignFixtureScope(int $userId, int $companyId, int $warehouseId): void
+    {
+        $company = $this->pdo->prepare(
+            'INSERT INTO usuario_empresas (
+                usuario_id,
+                empresa_id,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :usuario_id,
+                :empresa_id,
+                1,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $company->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'creado_por' => $userId,
+            'actualizado_por' => $userId,
+        ]);
+
+        $warehouse = $this->pdo->prepare(
+            'INSERT INTO usuario_almacenes (
+                usuario_id,
+                empresa_id,
+                almacen_id,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :usuario_id,
+                :empresa_id,
+                :almacen_id,
+                1,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $warehouse->execute([
+            'usuario_id' => $userId,
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'creado_por' => $userId,
+            'actualizado_por' => $userId,
+        ]);
     }
 
     /**
@@ -563,6 +732,120 @@ return new class implements DatabaseTest {
         $statement->execute(['table_name' => $table]);
 
         return (int) $statement->fetchColumn() === 1;
+    }
+
+    private function commentHasNoMailRuntimeCoupling(): bool
+    {
+        $method = $this->extractMethodBody(
+            $this->read('app/Domain/Tickets/ProductRequestTicketService.php'),
+            'public function agregarComentario('
+        );
+
+        return preg_match(
+            '/\b(?:notify|outbox|smtp)\b|ProductTicketEmailNotificationService|'
+                . 'ProductTicketEmailOutboxService|tickets_productos_correos/i',
+            $method
+        ) !== 1;
+    }
+
+    private function commentHasNoAttachmentRuntimeCoupling(): bool
+    {
+        $method = $this->extractMethodBody(
+            $this->read('app/Domain/Tickets/ProductRequestTicketService.php'),
+            'public function agregarComentario('
+        );
+
+        return preg_match(
+            '~agregarAdjunto\s*\(|SafeUpload|tickets_productos_adjuntos|'
+                . 'storage/private/tickets_productos|'
+                . 'move_uploaded_file\s*\(|file_put_contents\s*\(|'
+                . '\b(?:rename|copy)\s*\(~i',
+            $method
+        ) !== 1;
+    }
+
+    private function extractMethodBody(string $source, string $signature): string
+    {
+        $signaturePosition = strpos($source, $signature);
+
+        if ($signaturePosition === false) {
+            return '';
+        }
+
+        $openingBrace = strpos($source, '{', $signaturePosition);
+
+        if ($openingBrace === false) {
+            return '';
+        }
+
+        $length = strlen($source);
+        $depth = 0;
+        $quote = null;
+        $inLineComment = false;
+        $inBlockComment = false;
+
+        for ($index = $openingBrace; $index < $length; $index++) {
+            $character = $source[$index];
+            $next = $index + 1 < $length ? $source[$index + 1] : '';
+
+            if ($inLineComment) {
+                if ($character === "\n") {
+                    $inLineComment = false;
+                }
+
+                continue;
+            }
+
+            if ($inBlockComment) {
+                if ($character === '*' && $next === '/') {
+                    $inBlockComment = false;
+                    $index++;
+                }
+
+                continue;
+            }
+
+            if ($quote !== null) {
+                if ($character === '\\') {
+                    $index++;
+                } elseif ($character === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if (($character === '/' && $next === '/') || $character === '#') {
+                $inLineComment = true;
+                if ($character === '/') {
+                    $index++;
+                }
+                continue;
+            }
+
+            if ($character === '/' && $next === '*') {
+                $inBlockComment = true;
+                $index++;
+                continue;
+            }
+
+            if ($character === "'" || $character === '"') {
+                $quote = $character;
+                continue;
+            }
+
+            if ($character === '{') {
+                $depth++;
+            } elseif ($character === '}') {
+                $depth--;
+
+                if ($depth === 0) {
+                    return substr($source, $openingBrace + 1, $index - $openingBrace - 1);
+                }
+            }
+        }
+
+        return '';
     }
 
     private function hasFiles(string $relativeDirectory, string $pattern): bool

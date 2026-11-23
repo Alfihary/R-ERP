@@ -7,6 +7,9 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
+use App\Domain\Scope\EffectiveScope;
+use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Http\Controllers\ProductRequestTicketController;
 use App\Http\Middlewares\AuthMiddleware;
@@ -18,6 +21,7 @@ use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Database\Seed;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 use App\Support\Security\CsrfTokenService;
 
@@ -28,6 +32,7 @@ return new class implements DatabaseTest {
 
     private PDO $pdo;
     private ProductRequestTicketService $service;
+    private EffectiveScope $fixtureScope;
 
     /**
      * @return array<string, mixed>
@@ -51,7 +56,7 @@ return new class implements DatabaseTest {
             throw new RuntimeException('Ticket routes/controller test dependencies are invalid.');
         }
 
-        $runner = new MigrationRunner($pdo);
+        $runner = new MigrationRunner($pdo, MigrationRunner::MODE_TEST_EXECUTION);
         $migrationState = $this->ensureTicketTables($runner, $migration);
         $this->service = new ProductRequestTicketService(
             new ProductRequestTicketRepository(
@@ -66,6 +71,7 @@ return new class implements DatabaseTest {
             $pdo->beginTransaction();
             $seed->run($pdo);
             $fixture = $this->fixture();
+            $this->fixtureScope = $this->scopeForFixture($fixture);
 
             $results['static_contract'] = $this->staticContractCases();
             $results['route_security'] = $this->routeSecurityCases($fixture);
@@ -287,7 +293,7 @@ return new class implements DatabaseTest {
             'empresa_id' => $fixture['company_id'],
             'almacen_id' => $fixture['warehouse_id'],
             'partidas' => [['descripcion' => 'Partida para cancelar']],
-        ], $fixture['admin_user_id']);
+        ], $fixture['admin_user_id'], null, $this->fixtureScope);
         $cancelWithoutReason = $router->dispatch(new Request(
             'POST',
             '/tickets/productos/' . $cancelTicket['id'] . '/cancelar',
@@ -304,7 +310,7 @@ return new class implements DatabaseTest {
             [],
             ['_token' => $token, 'motivo' => 'Solicitud duplicada.']
         ));
-        $cancelled = $this->service->obtenerTicket((int) $cancelTicket['id']);
+        $cancelled = $this->service->obtenerTicket((int) $cancelTicket['id'], $this->fixtureScope);
         $resolvedParts = $this->partidas((int) $ticket['id']);
 
         return [
@@ -357,6 +363,7 @@ return new class implements DatabaseTest {
         $warehouseId = $this->createWarehouse($companyId, $adminUserId);
         $this->assignScope($adminUserId, $companyId, $warehouseId);
         $this->assignScope($limitedUserId, $companyId, $warehouseId);
+        $this->createProductTicketSeries($companyId, $warehouseId, $adminUserId);
 
         return [
             'admin_user_id' => $adminUserId,
@@ -364,6 +371,77 @@ return new class implements DatabaseTest {
             'company_id' => $companyId,
             'warehouse_id' => $warehouseId,
         ];
+    }
+
+    private function createProductTicketSeries(int $companyId, int $warehouseId, int $actorId): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO series_documentales (
+                empresa_id,
+                almacen_id,
+                tipo_documento,
+                codigo_serie,
+                prefijo,
+                codigo_almacen_snapshot,
+                formato,
+                separador,
+                siguiente_numero,
+                longitud,
+                reinicio_anual,
+                anio_actual,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :empresa_id,
+                :almacen_id,
+                :tipo_documento,
+                :codigo_serie,
+                :prefijo,
+                :codigo_almacen_snapshot,
+                :formato,
+                :separador,
+                10,
+                6,
+                0,
+                NULL,
+                1,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'tipo_documento' => 'TICKET_PRODUCTO',
+            'codigo_serie' => 'TP',
+            'prefijo' => 'GU',
+            'codigo_almacen_snapshot' => 'GU',
+            'formato' => '{ALMACEN}-{NUMERO}',
+            'separador' => '-',
+            'creado_por' => $actorId,
+            'actualizado_por' => $actorId,
+        ]);
+    }
+
+    /**
+     * @param array<string, int> $fixture
+     */
+    private function scopeForFixture(array $fixture): EffectiveScope
+    {
+        return EffectiveScope::fromRecords(
+            [[
+                'id' => (int) $fixture['company_id'],
+                'code' => 'QA-ROUTES',
+                'name' => 'Empresa QA rutas',
+            ]],
+            [[
+                'id' => (int) $fixture['warehouse_id'],
+                'company_id' => (int) $fixture['company_id'],
+                'code' => 'QA-ROUTES',
+                'name' => 'Almacén QA rutas',
+            ]]
+        );
     }
 
     /**
@@ -381,7 +459,17 @@ return new class implements DatabaseTest {
         );
         $repository = new ProductRequestTicketRepository($GLOBALS['tp_product_ticket_routes_controller_connection']);
         $csrf = new CsrfTokenService($session, 7200);
-        $controller = new ProductRequestTicketController($auth, $this->service, $permissions, $repository);
+        $controller = new ProductRequestTicketController(
+            $auth,
+            $this->service,
+            $permissions,
+            $repository,
+            null,
+            new ScopeContextService(
+                new UserScopeService(new ScopeRepository($GLOBALS['tp_product_ticket_routes_controller_connection'])),
+                $session
+            )
+        );
         $router = new Router();
         $router->middleware(new CsrfMiddleware($csrf));
         $authMiddleware = new AuthMiddleware($auth);
@@ -624,10 +712,11 @@ return new class implements DatabaseTest {
                     'public/css/modules/tickets-productos.css',
                 ]),
             'only_authorized_ticket_create_js_runtime' => $this->onlyAuthorizedTicketCreateJsRuntime(),
-            'no_mail_runtime_created' =>
-                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
-                && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
-            'no_product_created' => $before['productos'] === $during['productos'],
+            'routes_controller_has_no_mail_runtime_coupling' =>
+                $this->routesControllerHasNoMailRuntimeCoupling(),
+            'routes_controller_has_no_product_master_coupling' =>
+                $this->routesControllerHasNoProductMasterCoupling()
+                && $before['productos'] === $during['productos'],
             'no_price_created' => $before['producto_precios'] === $during['producto_precios'],
             'no_stock_created' => $before['existencias_producto'] === $during['existencias_producto'],
             'no_inventory_created' => $before['inventario_existencias'] === $during['inventario_existencias'],
@@ -654,16 +743,16 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, int|null>
      */
     private function operationalCounts(): array
     {
         return [
-            'productos' => $this->countTable('productos'),
-            'producto_precios' => $this->countTable('producto_precios'),
+            'productos' => $this->countTableIfExists('productos'),
+            'producto_precios' => $this->countTableIfExists('producto_precios'),
             'existencias_producto' => $this->countTableIfExists('existencias_producto'),
             'inventario_existencias' => $this->countTableIfExists('inventario_existencias'),
-            'movimientos_inventario' => $this->countTable('movimientos_inventario'),
+            'movimientos_inventario' => $this->countTableIfExists('movimientos_inventario'),
             'compras' => $this->countTableIfExists('compras'),
             'proveedores' => $this->countTableIfExists('proveedores'),
         ];
@@ -674,9 +763,39 @@ return new class implements DatabaseTest {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
     }
 
-    private function countTableIfExists(string $table): int
+    private function countTableIfExists(string $table): ?int
     {
-        return $this->tableExists($table) ? $this->countTable($table) : 0;
+        return $this->tableExists($table) ? $this->countTable($table) : null;
+    }
+
+    private function routesControllerHasNoMailRuntimeCoupling(): bool
+    {
+        $test = $this->read('database/tests/tickets_productos_partidas_estados_routes_controller_1_test.php');
+        $servicePosition = strpos($test, 'new ProductRequestTicketService(');
+        $serviceConstruction = $servicePosition === false
+            ? ''
+            : substr($test, $servicePosition, 300);
+        $controller = $this->read('app/Http/Controllers/ProductRequestTicketController.php');
+
+        return preg_match(
+            '/ProductTicketEmailNotificationService|ProductTicketEmailOutboxService|'
+                . 'tickets_productos_correos|\b(?:smtp|outbox)\b/i',
+            $serviceConstruction . "\n" . $controller
+        ) !== 1;
+    }
+
+    private function routesControllerHasNoProductMasterCoupling(): bool
+    {
+        $controller = $this->read('app/Http/Controllers/ProductRequestTicketController.php');
+        $service = $this->read('app/Domain/Tickets/ProductRequestTicketService.php');
+        $repository = $this->read('app/Infrastructure/Repositories/ProductRequestTicketRepository.php');
+
+        return preg_match(
+            '/ProductRepository|->createProduct\s*\(|INSERT\s+INTO\s+`?productos`?\b|'
+                . 'INSERT\s+INTO\s+`?producto_precios`?\b|'
+                . 'INSERT\s+INTO\s+`?movimientos_inventario`?\b/i',
+            $controller . "\n" . $service . "\n" . $repository
+        ) !== 1;
     }
 
     private function tableExists(string $table): bool

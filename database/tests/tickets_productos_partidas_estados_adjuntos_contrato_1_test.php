@@ -23,7 +23,7 @@ return new class implements DatabaseTest {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-ADJUNTOS-CONTRATO-1 dependencies are invalid.');
         }
 
-        $runner = new MigrationRunner($pdo);
+        $runner = new MigrationRunner($pdo, MigrationRunner::MODE_TEST_EXECUTION);
         $beforeCounts = $this->operationalCounts($pdo);
         $beforeStorage = $this->storageSnapshot();
         $migrationState = $runner->migrate($migration);
@@ -70,6 +70,7 @@ return new class implements DatabaseTest {
             'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
             'max_file_size' => '5 MB',
             'view_permission' => 'tickets_productos.adjuntos.ver',
+            'create_permission' => 'tickets_productos.adjuntos.crear',
             'cases' => $audit,
             'operational_counts_before' => $beforeCounts,
             'operational_counts_after' => $afterCounts,
@@ -154,7 +155,7 @@ return new class implements DatabaseTest {
         return [
             'authorized_attachment_upload_route_exists' => str_contains($routes, "'/tickets/productos/{id}/adjuntos'")
                 && str_contains($routes, '->attachment($request, $params)')
-                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
+                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.crear')"),
             'authorized_attachment_upload_uses_private_stack' => str_contains(
                 $routes,
                 'new PermissionMiddleware($auth, $permissions, $permission)'
@@ -175,10 +176,12 @@ return new class implements DatabaseTest {
                 'storage/private/tickets_productos',
                 'random_bytes',
             ]),
-            'no_attachment_download_or_preview_route' => !preg_match(
-                '#/tickets/productos/\{id\}/(?:adjuntos|archivos|attachments)/\{[^}]+\}/(?:descargar|download|preview|ver)#i',
+            'private_attachment_download_route_exists' => preg_match(
+                '#/tickets/productos/\{id\}/adjuntos/\{adjuntoId\}/descargar#i',
                 $routes
-            ),
+            ) === 1
+                && str_contains($routes, 'downloadAttachment($request, $params)')
+                && str_contains($routes, "\$productTicketMiddleware('tickets_productos.adjuntos.ver')"),
             'no_public_attachment_route' => !preg_match('#/v/\{slug\}.*(?:adjuntos|archivos|attachments)#i', $routes),
             'no_attachment_controller_created' => $this->relativeFiles(
                 'app/Http/Controllers',
@@ -192,7 +195,13 @@ return new class implements DatabaseTest {
                 && str_contains($show, 'enctype="multipart/form-data"')
                 && str_contains($show, 'name="adjunto"')
                 && str_contains($show, 'name="partida_id"'),
-            'no_direct_download_headers' => !preg_match('/Content-Disposition|application\/octet-stream|X-Accel-Redirect/i', $ticketRuntime),
+            'private_download_headers' => str_contains($controller, 'Response::binary(')
+                && str_contains($controller, 'private, no-store')
+                && str_contains($controller, 'Content-Disposition'),
+            'upload_permission_declared' => str_contains(
+                $this->read('database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'),
+                'tickets_productos.adjuntos.crear'
+            ),
             'attachments_runtime_replaces_placeholder' => str_contains($show, 'Los adjuntos sirven como soporte para revisar la solicitud.')
                 && !str_contains($show, 'Adjuntos documentales pendientes de fase posterior.'),
             'comments_route_is_not_attachment_route' => str_contains($routes, '/tickets/productos/{id}/comentarios')
@@ -322,12 +331,15 @@ return new class implements DatabaseTest {
                 'public/js',
                 '/ticket|solicitud|alta|adjunto|archivo/i'
             ) === ['public/js/modules/tickets-productos-create.js'],
-            'no_ticket_mail_runtime_created' =>
-                !$this->hasFiles('app/Domain/Mail', '/ticket|solicitud|alta/i')
-                && !$this->hasFiles('app/Domain/Notifications', '/ticket|solicitud|alta/i'),
-            'no_new_attachment_permission_declared' =>
-                !str_contains($this->read('database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'), 'tickets_productos.adjuntos.crear')
-                && !str_contains($this->read('database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'), 'tickets_productos.adjuntos.descargar'),
+            'attachment_flow_has_no_mail_runtime_coupling' =>
+                $this->attachmentFlowHasNoMailRuntimeCoupling($service),
+            'new_attachment_permission_declared' => str_contains(
+                $this->read('database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'),
+                'tickets_productos.adjuntos.crear'
+            ) && !str_contains(
+                $this->read('database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php'),
+                'tickets_productos.adjuntos.descargar'
+            ),
             'no_migration_for_attachment_contract_created' => !$this->hasFiles(
                 'database/migrations',
                 '/adjuntos.*contrato|attachments.*contract|ADJUNTOS-CONTRATO/i'
@@ -356,6 +368,20 @@ return new class implements DatabaseTest {
             'no_purchase_created' => $before['compras'] === $during['compras'],
             'no_supplier_created' => $before['proveedores'] === $during['proveedores'],
         ];
+    }
+
+    private function attachmentFlowHasNoMailRuntimeCoupling(string $service): bool
+    {
+        $methodPattern = '/public function agregarAdjunto\\s*\\(.*?(?=\\n\\s*(?:public|protected|private) function |\\z)/s';
+
+        if (preg_match($methodPattern, $service, $matches) !== 1) {
+            return false;
+        }
+
+        return preg_match(
+            '/notify\\s*\\(|ProductTicketEmail|Outbox|SMTP|smtp|mail|correo/i',
+            $matches[0]
+        ) !== 1;
     }
 
     /**

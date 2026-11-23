@@ -4,17 +4,74 @@ declare(strict_types=1);
 
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
+use App\Domain\Scope\EffectiveScope;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Database\Migration;
 use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+
+final class ProductTicketServiceScopeProxy
+{
+    public function __construct(
+        private readonly ProductRequestTicketService $service,
+        private readonly EffectiveScope $scope
+    ) {
+    }
+
+    /** @param array<string, mixed> $input */
+    public function crearTicket(array $input, int $usuarioId, ?string $actorEmail = null): array
+    {
+        return $this->service->crearTicket($input, $usuarioId, $actorEmail, $this->scope);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function resolverPartida(
+        int $ticketId,
+        int $partidaId,
+        string $accion,
+        array $input,
+        int $usuarioId,
+        ?string $actorEmail = null
+    ): array {
+        return $this->service->resolverPartida(
+            $ticketId,
+            $partidaId,
+            $accion,
+            $input,
+            $usuarioId,
+            $actorEmail,
+            $this->scope
+        );
+    }
+
+    public function cancelarTicket(
+        int $ticketId,
+        string $motivo,
+        int $usuarioId,
+        ?string $actorEmail = null
+    ): array {
+        return $this->service->cancelarTicket(
+            $ticketId,
+            $motivo,
+            $usuarioId,
+            $actorEmail,
+            $this->scope
+        );
+    }
+
+    public function obtenerTicket(int $ticketId): ?array
+    {
+        return $this->service->obtenerTicket($ticketId, $this->scope);
+    }
+}
 
 return new class implements DatabaseTest {
     private const MIGRATION = 'tp_partidas_estados_db_1_001_create_ticket_product_tables';
 
     private PDO $pdo;
     private string $database;
-    private ProductRequestTicketService $service;
+    private ProductTicketServiceScopeProxy $service;
+    private EffectiveScope $fixtureScope;
 
     /**
      * @return array<string, mixed>
@@ -37,14 +94,8 @@ return new class implements DatabaseTest {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-DB-1 migration contract is invalid.');
         }
 
-        $runner = new MigrationRunner($pdo);
+        $runner = new MigrationRunner($pdo, MigrationRunner::MODE_TEST_EXECUTION);
         $migrationState = $this->ensureTicketTables($runner, $migration);
-        $this->service = new ProductRequestTicketService(
-            new ProductRequestTicketRepository(
-                $GLOBALS['tp_product_ticket_service_connection']
-            )
-        );
-
         $before = $this->operationalCounts();
         $results = [];
 
@@ -53,6 +104,15 @@ return new class implements DatabaseTest {
 
             try {
                 $fixture = $this->fixture();
+                $this->fixtureScope = $this->scopeForFixture($fixture);
+                $this->service = new ProductTicketServiceScopeProxy(
+                    new ProductRequestTicketService(
+                        new ProductRequestTicketRepository(
+                            $GLOBALS['tp_product_ticket_service_connection']
+                        )
+                    ),
+                    $this->fixtureScope
+                );
 
                 $results['static_contract'] = $this->staticContractCases();
                 $results['create_ticket'] = $this->createTicketCases($fixture);
@@ -86,7 +146,7 @@ return new class implements DatabaseTest {
                 'migration' => self::MIGRATION,
                 'migration_state' => $migrationState,
                 'cases' => $results,
-                'folio_sample' => 'GU-000010',
+                'folio_sample' => 'GUA-000010',
                 'ticket_states' => [
                     'EN_REVISION',
                     'RESUELTO_PARCIAL',
@@ -135,10 +195,15 @@ return new class implements DatabaseTest {
             'has_obtener_ticket' => str_contains($service, 'function obtenerTicket('),
             'uses_prepared_statements' => substr_count($repository, '->prepare(') >= 10,
             'uses_for_update' => str_contains($repository, 'FOR UPDATE'),
-            'documents_folio_fallback' => $this->fileContains(
-                'docs/tickets-productos-partidas-estados-service-1.md',
-                'GU-000010'
-            ),
+            'documents_folio_fallback' =>
+                $this->fileContains(
+                    'docs/tickets-productos-partidas-estados-service-1.md',
+                    'documentos_folios'
+                )
+                && $this->fileContains(
+                    'docs/tickets-productos-partidas-estados-service-1.md',
+                    'CODIGOALMACEN-000000'
+                ),
             'no_routes_created' => !$this->hasFiles('routes', '/ticket.*producto/i'),
             'no_controllers_created' => !$this->hasFiles('app/Http/Controllers', '/Ticket.*Product/i'),
             'only_expected_ticket_ui_views_created' => $this->onlyExpectedFiles(
@@ -167,14 +232,19 @@ return new class implements DatabaseTest {
      */
     private function createTicketCases(array $fixture): array
     {
-        $ticket = $this->createTicket($fixture, [
-            ['descripcion' => 'Producto documental uno', 'costo_sugerido' => '10.5', 'peso' => '1.25', 'lleva_serie' => true],
-            ['descripcion' => 'Producto documental dos', 'modelo' => 'MDL-2'],
-            ['descripcion' => 'Producto documental tres', 'marca_texto' => 'Marca QA'],
-        ]);
+        try {
+            $ticket = $this->createTicket($fixture, [
+                ['descripcion' => 'Producto documental uno', 'costo_sugerido' => '10.5', 'peso' => '1.25', 'lleva_serie' => true],
+                ['descripcion' => 'Producto documental dos', 'modelo' => 'MDL-2'],
+                ['descripcion' => 'Producto documental tres', 'marca_texto' => 'Marca QA'],
+            ]);
+        } catch (\Throwable $exception) {
+            $this->emitFirstCreateDiagnostic($exception);
+            throw $exception;
+        }
 
         return [
-            'folio_gu_000010' => $ticket['folio'] === 'GU-000010',
+            'folio_gua_000010' => $ticket['folio'] === 'GUA-000010',
             'ticket_id_created' => (int) $ticket['id'] > 0,
             'initial_state' => $ticket['estado'] === 'EN_REVISION',
             'three_lines' => count($ticket['partidas']) === 3,
@@ -187,8 +257,75 @@ return new class implements DatabaseTest {
                 && (int) $ticket['partidas_rechazadas'] === 0,
             'folio_sequence_second_ticket' => $this->createTicket($fixture, [
                 ['descripcion' => 'Producto documental cuatro'],
-            ])['folio'] === 'GU-000011',
+            ])['folio'] === 'GUA-000011',
         ];
+    }
+
+    private function emitFirstCreateDiagnostic(\Throwable $exception): void
+    {
+        $keys = $exception instanceof ProductRequestTicketValidationException
+            ? array_keys($exception->errors())
+            : [];
+        sort($keys, SORT_STRING);
+
+        fwrite(STDERR, 'QA_DIAGNOSTIC_PHASE=createTicketCases.firstCreate' . PHP_EOL);
+        fwrite(STDERR, 'QA_DIAGNOSTIC_EXCEPTION_CLASS=' . get_class($exception) . PHP_EOL);
+        fwrite(STDERR, 'QA_DIAGNOSTIC_ERROR_KEYS=' . implode(',', $keys) . PHP_EOL);
+        fwrite(STDERR, 'QA_DIAGNOSTIC_ERROR_CATEGORY=' . $this->diagnosticCategory($keys) . PHP_EOL);
+
+        $previous = $exception->getPrevious();
+        $sqlState = 'UNKNOWN';
+        $mysqlErrorCode = 'UNKNOWN';
+
+        if ($previous instanceof PDOException) {
+            $candidateSqlState = (string) $previous->getCode();
+            if (preg_match('/^[0-9A-Z]{5}$/i', $candidateSqlState) === 1) {
+                $sqlState = strtoupper($candidateSqlState);
+            }
+
+            $candidateErrorCode = $previous->errorInfo[1] ?? null;
+            if (is_int($candidateErrorCode)) {
+                $candidateErrorCode = (string) $candidateErrorCode;
+            }
+            if (is_string($candidateErrorCode)
+                && preg_match('/^[0-9]{1,6}$/', $candidateErrorCode) === 1
+            ) {
+                $mysqlErrorCode = $candidateErrorCode;
+            }
+        }
+
+        fwrite(STDERR, 'QA_DIAGNOSTIC_SQLSTATE=' . $sqlState . PHP_EOL);
+        fwrite(STDERR, 'QA_DIAGNOSTIC_MYSQL_ERROR_CODE=' . $mysqlErrorCode . PHP_EOL);
+    }
+
+    /** @param list<string> $keys */
+    private function diagnosticCategory(array $keys): string
+    {
+        foreach ($keys as $key) {
+            if ($key === 'database') {
+                return 'DATABASE';
+            }
+            if ($key === 'alcance') {
+                return 'SCOPE';
+            }
+            if ($key === 'usuario_id') {
+                return 'ACTOR';
+            }
+            if ($key === 'empresa_id' || $key === 'almacen_id') {
+                return 'COMPANY_WAREHOUSE';
+            }
+            if (str_starts_with($key, 'folio') || str_starts_with($key, 'serie')) {
+                return 'FOLIO';
+            }
+            if (str_starts_with($key, 'partidas.') || in_array($key, [
+                'partidas',
+                'observaciones_generales',
+            ], true)) {
+                return 'INPUT_VALIDATION';
+            }
+        }
+
+        return 'UNKNOWN';
     }
 
     /**
@@ -545,8 +682,14 @@ return new class implements DatabaseTest {
         $inactiveUserId = $this->createUser('qa.tp.service.inactive', 0);
         $companyId = $this->createCompany($activeUserId, 'QATPSVC');
         $otherCompanyId = $this->createCompany($activeUserId, 'QATPSV2');
-        $warehouseId = $this->createWarehouse($companyId, $activeUserId, 'GU');
-        $foreignWarehouseId = $this->createWarehouse($otherCompanyId, $activeUserId, 'MT');
+        $warehouseId = $this->createWarehouse($companyId, $activeUserId, 'GUA');
+        $foreignWarehouseId = $this->createWarehouse($otherCompanyId, $activeUserId, 'MTA');
+        $this->createProductTicketSeries(
+            $companyId,
+            $warehouseId,
+            $activeUserId,
+            'GUA'
+        );
         $unitId = $this->createSatUnit($activeUserId);
         $satKeyId = $this->createSatKey($activeUserId);
         $currencyId = $this->currencyId();
@@ -562,6 +705,26 @@ return new class implements DatabaseTest {
             'sat_key_id' => $satKeyId,
             'currency_id' => $currencyId,
         ];
+    }
+
+    /**
+     * @param array<string, int> $fixture
+     */
+    private function scopeForFixture(array $fixture): EffectiveScope
+    {
+        return EffectiveScope::fromRecords(
+            [[
+                'id' => (int) $fixture['company_id'],
+                'code' => 'QA-SERVICE',
+                'name' => 'Empresa QA service',
+            ]],
+            [[
+                'id' => (int) $fixture['warehouse_id'],
+                'company_id' => (int) $fixture['company_id'],
+                'code' => 'QA-SERVICE',
+                'name' => 'Almacén QA service',
+            ]]
+        );
     }
 
     private function ensureTicketTables(
@@ -637,6 +800,66 @@ return new class implements DatabaseTest {
         ]);
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    private function createProductTicketSeries(
+        int $companyId,
+        int $warehouseId,
+        int $actorId,
+        string $prefix
+    ): void {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO series_documentales (
+                empresa_id,
+                almacen_id,
+                tipo_documento,
+                codigo_serie,
+                prefijo,
+                codigo_almacen_snapshot,
+                formato,
+                separador,
+                siguiente_numero,
+                longitud,
+                reinicio_anual,
+                anio_actual,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :empresa_id,
+                :almacen_id,
+                :tipo_documento,
+                :codigo_serie,
+                :prefijo,
+                :codigo_almacen_snapshot,
+                :formato,
+                :separador,
+                :siguiente_numero,
+                :longitud,
+                :reinicio_anual,
+                :anio_actual,
+                :activo,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'tipo_documento' => 'TICKET_PRODUCTO',
+            'codigo_serie' => 'TP',
+            'prefijo' => $prefix,
+            'codigo_almacen_snapshot' => $prefix,
+            'formato' => '{ALMACEN}-{NUMERO}',
+            'separador' => '-',
+            'siguiente_numero' => 10,
+            'longitud' => 6,
+            'reinicio_anual' => 0,
+            'anio_actual' => null,
+            'activo' => 1,
+            'creado_por' => $actorId,
+            'actualizado_por' => $actorId,
+        ]);
     }
 
     private function createSatUnit(int $adminId): int
@@ -745,7 +968,7 @@ return new class implements DatabaseTest {
             'subido_por_usuario_id' => $userId,
             'nombre_original' => 'ficha.pdf',
             'nombre_guardado' => 'qa-ficha.pdf',
-            'ruta_relativa' => 'tickets-productos/GU-000010/ficha.pdf',
+            'ruta_relativa' => 'tickets-productos/GUA-000010/ficha.pdf',
             'mime' => 'application/pdf',
             'extension' => 'pdf',
             'tamano_bytes' => 1024,

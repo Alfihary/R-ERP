@@ -598,6 +598,12 @@ return static function (
         '/tickets/productos/{id}/adjuntos',
         static fn (Request $request, array $params): Response =>
             $productRequestTicketController->attachment($request, $params),
+        $productTicketMiddleware('tickets_productos.adjuntos.crear')
+    );
+    $router->get(
+        '/tickets/productos/{id}/adjuntos/{adjuntoId}/descargar',
+        static fn (Request $request, array $params): Response =>
+            $productRequestTicketController->downloadAttachment($request, $params),
         $productTicketMiddleware('tickets_productos.adjuntos.ver')
     );
     $router->post(

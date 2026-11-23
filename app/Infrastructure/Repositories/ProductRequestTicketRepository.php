@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Repositories;
 
+use App\Domain\Folios\DocumentaryPrefixValidator;
+use App\Domain\Folios\FolioValidationException;
+use App\Domain\Scope\EffectiveScope;
+use App\Domain\Tickets\ProductRequestTicketScopePolicy;
 use App\Infrastructure\Database\ConnectionProvider;
 use PDO;
 
@@ -54,13 +58,36 @@ final class ProductRequestTicketRepository
      *     filters: array<string, mixed>
      * }
      */
-    public function listar(array $filters, int $page = 1, int $perPage = 20): array
+    public function listar(
+        array $filters,
+        int $page = 1,
+        int $perPage = 20,
+        ?EffectiveScope $scope = null
+    ): array
     {
         $filters = $this->normalizeListFilters($filters);
         $page = max(1, $page);
         $perPage = in_array($perPage, [10, 20, 50], true) ? $perPage : 20;
         $where = ['tp.deleted_at IS NULL'];
         $params = [];
+
+        if (
+            !$scope instanceof EffectiveScope
+            || ProductRequestTicketScopePolicy::pairs($scope) === []
+        ) {
+            return [
+                'items' => [],
+                'pagination' => [
+                    'page' => 1,
+                    'perPage' => $perPage,
+                    'total' => 0,
+                    'totalPages' => 1,
+                ],
+                'filters' => $filters,
+            ];
+        }
+
+        $where[] = $this->buildScopePredicate($scope, 'tp', $params);
 
         if ($filters['folio'] !== '') {
             $where[] = "tp.folio LIKE :folio ESCAPE '\\\\'";
@@ -234,6 +261,38 @@ final class ProductRequestTicketRepository
     private function escapeLike(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
+    /**
+     * @param array<string, int> $params
+     */
+    private function buildScopePredicate(
+        EffectiveScope $scope,
+        string $alias,
+        array &$params
+    ): string {
+        $pairs = ProductRequestTicketScopePolicy::pairs($scope);
+
+        if ($pairs === []) {
+            return '1 = 0';
+        }
+
+        $conditions = [];
+        foreach ($pairs as $index => $pair) {
+            $companyKey = 'ticket_scope_empresa_' . $index;
+            $warehouseKey = 'ticket_scope_almacen_' . $index;
+            $conditions[] = sprintf(
+                '(%s.empresa_id = :%s AND %s.almacen_id = :%s)',
+                $alias,
+                $companyKey,
+                $alias,
+                $warehouseKey
+            );
+            $params[$companyKey] = $pair['empresa_id'];
+            $params[$warehouseKey] = $pair['almacen_id'];
+        }
+
+        return '(' . implode(' OR ', $conditions) . ')';
     }
 
     public function activeUserExists(int $userId): bool
@@ -702,19 +761,42 @@ final class ProductRequestTicketRepository
         $warehouse = $this->warehouseById($companyId, $warehouseId);
 
         if ($warehouse === null) {
-            throw new \RuntimeException('Warehouse scope not available.');
+            throw new FolioValidationException(
+                'Almacén no disponible para emitir el folio.'
+            );
         }
 
-        $warehouseCode = strtoupper(trim($warehouse['codigo']));
-        $series = $this->findOrCreateProductTicketSeriesForUpdate(
-            $companyId,
-            $warehouseId,
-            $warehouseCode,
-            $actorId
+        $series = $this->findSeriesForUpdate($companyId, $warehouseId);
+
+        if ($series === null) {
+            throw new FolioValidationException(
+                'Serie documental no configurada.'
+            );
+        }
+
+        $validator = new DocumentaryPrefixValidator();
+        $prefix = $validator->validatePrefix($series['prefijo'] ?? null);
+        $number = $validator->validateConsecutive(
+            $series['siguiente_numero'] ?? null
         );
-        $number = (int) $series['siguiente_numero'];
-        $nextNumber = $number + 1;
-        $folio = $warehouseCode . '-' . str_pad((string) $number, 6, '0', STR_PAD_LEFT);
+
+        if (($series['formato'] ?? null) !== self::FOLIO_FORMAT) {
+            throw new FolioValidationException(
+                'Formato de serie documental no soportado.'
+            );
+        }
+
+        $warehouseSnapshot = (string) ($series['codigo_almacen_snapshot'] ?? '');
+
+        if ($warehouseSnapshot === '') {
+            throw new FolioValidationException(
+                'Snapshot de almacén no configurado.'
+            );
+        }
+
+        // 1000000 is an exhaustion sentinel; it cannot be emitted.
+        $nextNumber = $number === 999999 ? 1000000 : $number + 1;
+        $folio = $validator->formatFolio($prefix, $number);
 
         $folioId = $this->insertDocumentoFolio([
             'serie_documental_id' => (int) $series['id'],
@@ -722,8 +804,8 @@ final class ProductRequestTicketRepository
             'almacen_id' => $warehouseId,
             'tipo_documento' => self::FOLIO_TYPE,
             'codigo_serie' => self::FOLIO_SERIES,
-            'prefijo_documento' => $warehouseCode,
-            'codigo_almacen_snapshot' => $warehouseCode,
+            'prefijo_documento' => $prefix,
+            'codigo_almacen_snapshot' => $warehouseSnapshot,
             'formato' => self::FOLIO_FORMAT,
             'folio' => $folio,
             'numero' => $number,
@@ -860,8 +942,20 @@ final class ProductRequestTicketRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function findTicketById(int $ticketId): ?array
+    public function findTicketById(
+        int $ticketId,
+        ?EffectiveScope $scope = null
+    ): ?array
     {
+        if (
+            !$scope instanceof EffectiveScope
+            || ProductRequestTicketScopePolicy::pairs($scope) === []
+        ) {
+            return null;
+        }
+
+        $params = ['id' => $ticketId];
+        $scopePredicate = $this->buildScopePredicate($scope, 'tp', $params);
         $statement = $this->connection->pdo()->prepare(
             'SELECT
                 tp.*,
@@ -870,13 +964,7 @@ final class ProductRequestTicketRepository
                 a.codigo AS almacen_codigo,
                 a.nombre AS almacen_nombre,
                 u.username AS solicitante_username,
-                NULLIF(TRIM(CONCAT_WS(
-                    \' \',
-                    pu.primer_nombre,
-                    pu.segundo_nombre,
-                    pu.apellido_paterno,
-                    pu.apellido_materno
-                )), \'\') AS solicitante_nombre_completo
+                NULL AS solicitante_nombre_completo
              FROM tickets_productos tp
              LEFT JOIN empresas e
                 ON e.id = tp.empresa_id
@@ -887,13 +975,12 @@ final class ProductRequestTicketRepository
              LEFT JOIN usuarios u
                 ON u.id = tp.solicitante_usuario_id
                AND u.eliminado_en IS NULL
-             LEFT JOIN perfiles_usuario pu
-                ON pu.usuario_id = u.id
              WHERE tp.id = :id
                AND tp.deleted_at IS NULL
+               AND ' . $scopePredicate . '
              LIMIT 1'
         );
-        $statement->execute(['id' => $ticketId]);
+        $statement->execute($params);
         $row = $statement->fetch();
 
         return is_array($row) ? $row : null;
@@ -902,17 +989,30 @@ final class ProductRequestTicketRepository
     /**
      * @return array<string, mixed>|null
      */
-    public function findTicketByIdForUpdate(int $ticketId): ?array
+    public function findTicketByIdForUpdate(
+        int $ticketId,
+        ?EffectiveScope $scope = null
+    ): ?array
     {
+        if (
+            !$scope instanceof EffectiveScope
+            || ProductRequestTicketScopePolicy::pairs($scope) === []
+        ) {
+            return null;
+        }
+
+        $params = ['id' => $ticketId];
+        $scopePredicate = $this->buildScopePredicate($scope, 'tickets_productos', $params);
         $statement = $this->connection->pdo()->prepare(
             'SELECT *
              FROM tickets_productos
              WHERE id = :id
                AND deleted_at IS NULL
+               AND ' . $scopePredicate . '
              LIMIT 1
              FOR UPDATE'
         );
-        $statement->execute(['id' => $ticketId]);
+        $statement->execute($params);
         $row = $statement->fetch();
 
         return is_array($row) ? $row : null;
@@ -1217,13 +1317,7 @@ final class ProductRequestTicketRepository
                 m.codigo AS moneda_codigo,
                 m.nombre AS moneda_nombre,
                 ru.username AS resuelto_por_username,
-                NULLIF(TRIM(CONCAT_WS(
-                    \' \',
-                    rpu.primer_nombre,
-                    rpu.segundo_nombre,
-                    rpu.apellido_paterno,
-                    rpu.apellido_materno
-                )), \'\') AS resuelto_por_nombre_completo
+                NULL AS resuelto_por_nombre_completo
              FROM tickets_productos_partidas tpp
              LEFT JOIN unidades_sat us
                 ON us.id = tpp.unidad_sat_id
@@ -1243,8 +1337,6 @@ final class ProductRequestTicketRepository
              LEFT JOIN usuarios ru
                 ON ru.id = tpp.resuelto_por_usuario_id
                AND ru.eliminado_en IS NULL
-             LEFT JOIN perfiles_usuario rpu
-                ON rpu.usuario_id = ru.id
              WHERE tpp.ticket_producto_id = :ticket_id
                AND tpp.deleted_at IS NULL
              ORDER BY tpp.numero_partida ASC, tpp.id ASC'
@@ -1289,6 +1381,56 @@ final class ProductRequestTicketRepository
         $statement->execute(['ticket_id' => $ticketId]);
 
         return $statement->fetchAll();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findAttachmentForDownload(
+        int $ticketId,
+        int $attachmentId,
+        EffectiveScope $scope
+    ): ?array {
+        $params = [
+            'ticket_id' => $ticketId,
+            'attachment_id' => $attachmentId,
+        ];
+        $scopePredicate = $this->buildScopePredicate($scope, 'tp', $params);
+
+        if ($scopePredicate === '1 = 0') {
+            return null;
+        }
+
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT
+                a.id,
+                a.ticket_producto_id,
+                a.partida_id,
+                a.nombre_original,
+                a.ruta_relativa,
+                a.mime,
+                a.extension,
+                a.tamano_bytes,
+                a.hash_sha256
+             FROM tickets_productos_adjuntos a
+             INNER JOIN tickets_productos tp
+                ON tp.id = a.ticket_producto_id
+               AND tp.deleted_at IS NULL
+             LEFT JOIN tickets_productos_partidas p
+                ON p.id = a.partida_id
+               AND p.ticket_producto_id = a.ticket_producto_id
+               AND p.deleted_at IS NULL
+             WHERE a.id = :attachment_id
+               AND a.ticket_producto_id = :ticket_id
+               AND a.deleted_at IS NULL
+               AND (' . $scopePredicate . ')
+               AND (a.partida_id IS NULL OR p.id IS NOT NULL)
+             LIMIT 1'
+        );
+        $statement->execute($params);
+        $row = $statement->fetch();
+
+        return is_array($row) ? $row : null;
     }
 
     /**
@@ -1388,7 +1530,8 @@ final class ProductRequestTicketRepository
         int $warehouseId
     ): ?array {
         $statement = $this->connection->pdo()->prepare(
-            'SELECT id, siguiente_numero
+            'SELECT id, prefijo, codigo_almacen_snapshot, formato,
+                    siguiente_numero
              FROM series_documentales
              WHERE empresa_id = :empresa_id
                AND almacen_id = :almacen_id

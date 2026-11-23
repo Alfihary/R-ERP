@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Tickets;
 
+use App\Domain\Folios\FolioValidationException;
+use App\Domain\Scope\EffectiveScope;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
 use App\Support\SafeUpload;
 use PDOException;
@@ -32,13 +34,25 @@ final class ProductRequestTicketService
      * @param array<string, mixed> $input
      * @return array<string, mixed>
      */
-    public function crearTicket(array $input, int $usuarioId, ?string $actorEmail = null): array
+    public function crearTicket(
+        array $input,
+        int $usuarioId,
+        ?string $actorEmail = null,
+        ?EffectiveScope $scope = null
+    ): array
     {
         $request = $this->validateTicketInput($input, $usuarioId);
         $storedPaths = [];
 
         try {
-            $ticket = $this->transactional(function () use ($request, &$storedPaths): array {
+            $ticket = $this->transactional(function () use (
+                $request,
+                &$storedPaths,
+                $scope,
+                $usuarioId,
+                $actorEmail
+            ): array {
+                $this->assertScope($scope, $request['empresa_id'], $request['almacen_id']);
                 $this->assertActiveUser($request['solicitante_usuario_id']);
                 $this->assertCompany($request['empresa_id']);
                 $this->assertWarehouseScope(
@@ -115,16 +129,17 @@ final class ProductRequestTicketService
                     );
                 }
 
-                return $this->obtenerTicketOrFail($ticketId);
-            });
+                $ticket = $this->obtenerTicketOrFail($ticketId, $scope);
+                $ticket['notification'] = $this->notify(
+                    'TICKET_CREADO',
+                    $ticketId,
+                    null,
+                    $usuarioId,
+                    $actorEmail
+                );
 
-            $ticket['notification'] = $this->notify(
-                'TICKET_CREADO',
-                (int) $ticket['id'],
-                null,
-                $usuarioId,
-                $actorEmail
-            );
+                return $ticket;
+            });
 
             return $ticket;
         } catch (Throwable $exception) {
@@ -148,7 +163,8 @@ final class ProductRequestTicketService
         string $accion,
         array $input,
         int $usuarioId,
-        ?string $actorEmail = null
+        ?string $actorEmail = null,
+        ?EffectiveScope $scope = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $partidaId = $this->positiveIdValue($partidaId, 'partida_id');
@@ -190,10 +206,12 @@ final class ProductRequestTicketService
             $input,
             $comment,
             $rejectReason,
-            $usuarioId
+            $usuarioId,
+            $scope,
+            $actorEmail
         ): array {
             $this->assertActiveUser($usuarioId);
-            $ticket = $this->assertTicketForUpdate($ticketId);
+            $ticket = $this->assertTicketForUpdate($ticketId, $scope);
             $partida = $this->assertPartidaForUpdate($ticketId, $partidaId);
 
             if ((string) $ticket['estado'] === self::TICKET_CANCELADO) {
@@ -245,32 +263,32 @@ final class ProductRequestTicketService
                 ]
             );
 
-            return $this->obtenerTicketOrFail($ticketId);
-        });
+            $ticket = $this->obtenerTicketOrFail($ticketId, $scope);
+            $eventNotifications = [
+                $this->notify($event, $ticketId, $partidaId, $usuarioId, $actorEmail),
+            ];
+            $ticketState = (string) ($ticket['estado'] ?? '');
+            if ($ticketState === self::TICKET_RESUELTO_PARCIAL) {
+                $eventNotifications[] = $this->notify(
+                    'TICKET_RESUELTO_PARCIAL',
+                    $ticketId,
+                    null,
+                    $usuarioId,
+                    $actorEmail
+                );
+            } elseif (in_array($ticketState, [self::TICKET_APROBADO, self::TICKET_RECHAZADO], true)) {
+                $eventNotifications[] = $this->notify(
+                    'TICKET_RESUELTO_TOTAL',
+                    $ticketId,
+                    null,
+                    $usuarioId,
+                    $actorEmail
+                );
+            }
+            $ticket['notifications'] = $eventNotifications;
 
-        $event = $accion === 'APROBAR' ? 'PARTIDA_APROBADA' : 'PARTIDA_RECHAZADA';
-        $notifications = [
-            $this->notify($event, $ticketId, $partidaId, $usuarioId, $actorEmail),
-        ];
-        $ticketState = (string) ($ticket['estado'] ?? '');
-        if ($ticketState === self::TICKET_RESUELTO_PARCIAL) {
-            $notifications[] = $this->notify(
-                'TICKET_RESUELTO_PARCIAL',
-                $ticketId,
-                null,
-                $usuarioId,
-                $actorEmail
-            );
-        } elseif (in_array($ticketState, [self::TICKET_APROBADO, self::TICKET_RECHAZADO], true)) {
-            $notifications[] = $this->notify(
-                'TICKET_RESUELTO_TOTAL',
-                $ticketId,
-                null,
-                $usuarioId,
-                $actorEmail
-            );
-        }
-        $ticket['notifications'] = $notifications;
+            return $ticket;
+        });
 
         return $ticket;
     }
@@ -282,7 +300,8 @@ final class ProductRequestTicketService
         int $ticketId,
         string $motivo,
         int $usuarioId,
-        ?string $actorEmail = null
+        ?string $actorEmail = null,
+        ?EffectiveScope $scope = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
@@ -302,15 +321,28 @@ final class ProductRequestTicketService
         $ticket = $this->transactional(function () use (
             $ticketId,
             $motivo,
-            $usuarioId
+            $usuarioId,
+            $scope,
+            $actorEmail
         ): array {
             $this->assertActiveUser($usuarioId);
-            $ticket = $this->assertTicketForUpdate($ticketId);
+            $ticket = $this->assertTicketForUpdate($ticketId, $scope);
 
             if ((string) $ticket['estado'] === self::TICKET_CANCELADO) {
                 throw new ProductRequestTicketValidationException([
                     'ticket_id' => 'El ticket ya está cancelado.',
                 ]);
+            }
+
+            foreach ($this->tickets->listPartidas($ticketId) as $partida) {
+                if (in_array((string) ($partida['estado'] ?? ''), [
+                    self::PARTIDA_APROBADA,
+                    self::PARTIDA_RECHAZADA,
+                ], true)) {
+                    throw new ProductRequestTicketValidationException([
+                        'ticket_id' => 'No se puede cancelar un ticket con partidas resueltas.',
+                    ]);
+                }
             }
 
             $this->tickets->cancelTicket($ticketId, $motivo, $usuarioId);
@@ -323,16 +355,17 @@ final class ProductRequestTicketService
                 ['motivo' => $motivo]
             );
 
-            return $this->obtenerTicketOrFail($ticketId);
-        });
+            $ticket = $this->obtenerTicketOrFail($ticketId, $scope);
+            $ticket['notification'] = $this->notify(
+                'TICKET_CANCELADO',
+                $ticketId,
+                null,
+                $usuarioId,
+                $actorEmail
+            );
 
-        $ticket['notification'] = $this->notify(
-            'TICKET_CANCELADO',
-            $ticketId,
-            null,
-            $usuarioId,
-            $actorEmail
-        );
+            return $ticket;
+        });
 
         return $ticket;
     }
@@ -344,7 +377,8 @@ final class ProductRequestTicketService
         int $ticketId,
         ?int $partidaId,
         string $comentario,
-        int $usuarioId
+        int $usuarioId,
+        ?EffectiveScope $scope = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
@@ -369,10 +403,11 @@ final class ProductRequestTicketService
             $ticketId,
             $partidaId,
             $comentario,
-            $usuarioId
+            $usuarioId,
+            $scope
         ): array {
             $this->assertActiveUser($usuarioId);
-            $this->assertTicketForUpdate($ticketId);
+            $this->assertTicketForUpdate($ticketId, $scope);
 
             if ($partidaId !== null) {
                 $this->assertPartidaForUpdate($ticketId, $partidaId);
@@ -395,7 +430,7 @@ final class ProductRequestTicketService
                 ['alcance' => $partidaId === null ? 'ticket' : 'partida']
             );
 
-            return $this->obtenerTicketOrFail($ticketId);
+            return $this->obtenerTicketOrFail($ticketId, $scope);
         });
     }
 
@@ -407,7 +442,8 @@ final class ProductRequestTicketService
         int $ticketId,
         ?int $partidaId,
         array $file,
-        int $usuarioId
+        int $usuarioId,
+        ?EffectiveScope $scope = null
     ): array {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
         $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
@@ -422,10 +458,17 @@ final class ProductRequestTicketService
                 $partidaId,
                 $file,
                 $usuarioId,
+                $scope,
                 &$storedPath
             ): array {
                 $this->assertActiveUser($usuarioId);
-                $this->assertTicketForUpdate($ticketId);
+                $ticket = $this->assertTicketForUpdate($ticketId, $scope);
+
+                if ((string) ($ticket['estado'] ?? '') === self::TICKET_CANCELADO) {
+                    throw new ProductRequestTicketValidationException([
+                        'ticket_id' => 'No se pueden agregar adjuntos a un ticket cancelado.',
+                    ]);
+                }
 
                 if ($partidaId !== null) {
                     $this->assertPartidaForUpdate($ticketId, $partidaId);
@@ -454,7 +497,7 @@ final class ProductRequestTicketService
                     ]
                 );
 
-                return $this->obtenerTicketOrFail($ticketId);
+                return $this->obtenerTicketOrFail($ticketId, $scope);
             });
         } catch (Throwable $exception) {
             if (is_string($storedPath) && is_file($storedPath)) {
@@ -466,12 +509,121 @@ final class ProductRequestTicketService
     }
 
     /**
+     * @return array{body:string,mime:string,filename:string}
+     */
+    public function descargarAdjunto(
+        int $ticketId,
+        int $attachmentId,
+        int $usuarioId,
+        EffectiveScope $scope
+    ): array {
+        $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
+        $attachmentId = $this->positiveIdValue($attachmentId, 'adjunto_id');
+        $usuarioId = $this->positiveIdValue($usuarioId, 'usuario_id');
+        $this->assertActiveUser($usuarioId);
+        $attachment = $this->tickets->findAttachmentForDownload(
+            $ticketId,
+            $attachmentId,
+            $scope
+        );
+
+        if ($attachment === null) {
+            throw new ProductRequestTicketValidationException([
+                'adjunto' => 'El adjunto no está disponible.',
+            ]);
+        }
+
+        $relativePath = (string) ($attachment['ruta_relativa'] ?? '');
+        $root = BASE_PATH . '/storage/private/tickets_productos';
+        $rootReal = realpath($root);
+
+        if (
+            $relativePath === ''
+            || str_contains($relativePath, "\0")
+            || preg_match('/^[a-zA-Z]:[\\\/]/', $relativePath) === 1
+            || str_starts_with($relativePath, '/')
+            || preg_match('~(^|[\\/])\.\.([\\/]|$)~', $relativePath) === 1
+            || !str_starts_with(str_replace('\\', '/', $relativePath), 'private/tickets_productos/')
+            || !is_string($rootReal)
+        ) {
+            throw new ProductRequestTicketValidationException([
+                'adjunto' => 'El adjunto no está disponible.',
+            ]);
+        }
+
+        $path = BASE_PATH . '/storage/' . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $relativePath);
+        $pathReal = realpath($path);
+        $rootPrefix = rtrim($rootReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+
+        if (
+            !is_string($pathReal)
+            || !str_starts_with($pathReal, $rootPrefix)
+            || !is_file($pathReal)
+            || !is_readable($pathReal)
+        ) {
+            throw new ProductRequestTicketValidationException([
+                'adjunto' => 'El adjunto no está disponible.',
+            ]);
+        }
+
+        $size = filesize($pathReal);
+        $expectedSize = (int) ($attachment['tamano_bytes'] ?? 0);
+        $hash = hash_file('sha256', $pathReal);
+        $expectedHash = (string) ($attachment['hash_sha256'] ?? '');
+        $mime = (string) ($attachment['mime'] ?? '');
+        $allowedMime = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'image/webp',
+        ];
+
+        if (
+            !is_int($size)
+            || $size <= 0
+            || $size > 5 * 1024 * 1024
+            || $expectedSize !== $size
+            || !is_string($hash)
+            || !hash_equals($expectedHash, $hash)
+            || !in_array($mime, $allowedMime, true)
+        ) {
+            throw new ProductRequestTicketValidationException([
+                'adjunto' => 'El adjunto no está disponible.',
+            ]);
+        }
+
+        $body = file_get_contents($pathReal);
+
+        if (!is_string($body)) {
+            throw new ProductRequestTicketValidationException([
+                'adjunto' => 'El adjunto no está disponible.',
+            ]);
+        }
+
+        $filename = preg_replace('/[\x00-\x1F\x7F"\\\/]+/u', '_', (string) ($attachment['nombre_original'] ?? 'adjunto'));
+        $filename = is_string($filename) ? trim($filename, " .") : '';
+
+        if ($filename === '') {
+            $filename = 'adjunto';
+        }
+
+        return [
+            'body' => $body,
+            'mime' => $mime,
+            'filename' => $filename,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
-    public function obtenerTicket(int $ticketId): ?array
+    public function obtenerTicket(
+        int $ticketId,
+        ?EffectiveScope $scope = null
+    ): ?array
     {
         $ticketId = $this->positiveIdValue($ticketId, 'ticket_id');
-        $ticket = $this->tickets->findTicketById($ticketId);
+        $ticket = $this->tickets->findTicketById($ticketId, $scope);
 
         if ($ticket === null) {
             return null;
@@ -497,11 +649,16 @@ final class ProductRequestTicketService
         } catch (ProductRequestTicketValidationException $exception) {
             $this->tickets->rollBack($ownsTransaction);
             throw $exception;
-        } catch (PDOException) {
+        } catch (FolioValidationException $exception) {
+            $this->tickets->rollBack($ownsTransaction);
+            throw new ProductRequestTicketValidationException([
+                'folio' => 'No fue posible emitir el folio documental.',
+            ], $exception);
+        } catch (PDOException $exception) {
             $this->tickets->rollBack($ownsTransaction);
             throw new ProductRequestTicketValidationException([
                 'database' => 'No fue posible procesar el ticket documental.',
-            ]);
+            ], $exception);
         } catch (Throwable $exception) {
             $this->tickets->rollBack($ownsTransaction);
             throw $exception;
@@ -535,6 +692,21 @@ final class ProductRequestTicketService
         );
     }
 
+    private function assertScope(
+        ?EffectiveScope $scope,
+        int $companyId,
+        int $warehouseId
+    ): void {
+        if (
+            !$scope instanceof EffectiveScope
+            || !ProductRequestTicketScopePolicy::allowsPair($scope, $companyId, $warehouseId)
+        ) {
+            throw new ProductRequestTicketValidationException([
+                'alcance' => 'La empresa y el almacén no están disponibles para tu usuario.',
+            ]);
+        }
+    }
+
     private function assertActiveUser(int $userId): void
     {
         if (!$this->tickets->activeUserExists($userId)) {
@@ -566,9 +738,12 @@ final class ProductRequestTicketService
     /**
      * @return array<string, mixed>
      */
-    private function assertTicketForUpdate(int $ticketId): array
+    private function assertTicketForUpdate(
+        int $ticketId,
+        ?EffectiveScope $scope
+    ): array
     {
-        $ticket = $this->tickets->findTicketByIdForUpdate($ticketId);
+        $ticket = $this->tickets->findTicketByIdForUpdate($ticketId, $scope);
 
         if ($ticket === null) {
             throw new ProductRequestTicketValidationException([
@@ -722,7 +897,7 @@ final class ProductRequestTicketService
         $errors = [];
         $companyId = $this->positiveId($input['empresa_id'] ?? null);
         $warehouseId = $this->positiveId($input['almacen_id'] ?? null);
-        $requesterId = $this->positiveId($input['solicitante_usuario_id'] ?? $usuarioId);
+        $requesterId = $this->positiveId($usuarioId);
         $notes = $this->nullableText($input, 'observaciones_generales', 2000);
 
         if ($companyId === null) {
@@ -904,9 +1079,9 @@ final class ProductRequestTicketService
     /**
      * @return array<string, mixed>
      */
-    private function obtenerTicketOrFail(int $ticketId): array
+    private function obtenerTicketOrFail(int $ticketId, ?EffectiveScope $scope): array
     {
-        $ticket = $this->obtenerTicket($ticketId);
+        $ticket = $this->obtenerTicket($ticketId, $scope);
 
         if ($ticket === null) {
             throw new \RuntimeException('Ticket documental no encontrado.');

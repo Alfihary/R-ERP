@@ -7,6 +7,9 @@ use App\Core\Router;
 use App\Core\Session;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
+use App\Domain\Scope\EffectiveScope;
+use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
 use App\Http\Controllers\ProductRequestTicketController;
@@ -19,6 +22,7 @@ use App\Infrastructure\Database\MigrationRunner;
 use App\Infrastructure\Database\Seed;
 use App\Infrastructure\Repositories\PermissionRepository;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ScopeRepository;
 use App\Infrastructure\Repositories\UserRepository;
 use App\Support\Security\CsrfTokenService;
 
@@ -28,6 +32,7 @@ return new class implements DatabaseTest {
     private PDO $pdo;
     private ProductRequestTicketRepository $repository;
     private ProductRequestTicketService $service;
+    private EffectiveScope $fixtureScope;
     /** @var list<string> */
     private array $filesToDelete = [];
 
@@ -55,7 +60,7 @@ return new class implements DatabaseTest {
             throw new RuntimeException('TP-PARTIDAS-ESTADOS-ADJUNTOS-RUNTIME-1 dependencies are invalid.');
         }
 
-        $runner = new MigrationRunner($pdo);
+        $runner = new MigrationRunner($pdo, MigrationRunner::MODE_TEST_EXECUTION);
         $migrationState = $runner->migrate($migration);
         $before = $this->operationalCounts();
         $results = [];
@@ -65,6 +70,7 @@ return new class implements DatabaseTest {
             $pdo->beginTransaction();
             $seed->run($pdo);
             $fixture = $this->fixture();
+            $this->fixtureScope = $this->scopeForFixture($fixture);
             $ticket = $this->createTicket($fixture);
             $otherTicket = $this->createTicket($fixture);
             $partida = $this->firstPartida((int) $ticket['id']);
@@ -76,103 +82,120 @@ return new class implements DatabaseTest {
                 (int) $ticket['id'],
                 null,
                 $this->upload('soporte.pdf', "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $jpg = $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 (int) $partida['id'],
                 $this->upload('foto.jpg', base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2w==') ?: ''),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $jpeg = $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 (int) $partida['id'],
                 $this->upload('foto.jpeg', base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2w==') ?: ''),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $png = $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('captura.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=') ?: ''),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $webp = $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('imagen.webp', base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/vuUAAA=') ?: ''),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             );
             $invalidPhp = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('script.php', "<?php echo 'x';"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $invalidJs = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('script.js', "alert('x');"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $invalidHtml = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('page.html', '<!doctype html><script></script>'),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $invalidSvg = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('vector.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $invalidZip = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('archivo.zip', "PK\x03\x04"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $doubleExtension = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('factura.php.pdf', "%PDF-1.4\n%%EOF\n"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $fakeMime = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('falso.pdf', 'not a real pdf'),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $tooLarge = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('grande.pdf', str_repeat('A', 5 * 1024 * 1024 + 1)),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $empty = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 $this->upload('vacio.pdf', ''),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $missingTicket = $this->fails(fn () => $this->service->agregarAdjunto(
                 999999999,
                 null,
                 $this->upload('soporte.pdf', "%PDF-1.4\n%%EOF\n"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $foreignPartidaCase = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 (int) $foreignPartida['id'],
                 $this->upload('soporte.pdf', "%PDF-1.4\n%%EOF\n"),
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
             $missingFile = $this->fails(fn () => $this->service->agregarAdjunto(
                 (int) $ticket['id'],
                 null,
                 [],
-                $fixture['user_id']
+                $fixture['user_id'],
+                $this->fixtureScope
             ));
 
             [$auth, $csrf, $router] = $this->stack('runtime', $fixture['user_id']);
@@ -195,7 +218,10 @@ return new class implements DatabaseTest {
                 ['adjunto' => $controllerUpload]
             ));
 
-            $afterTicket = $this->repository->findTicketById((int) $ticket['id']) ?? [];
+            $afterTicket = $this->repository->findTicketById(
+                (int) $ticket['id'],
+                $this->fixtureScope
+            ) ?? [];
             $afterPartida = $this->firstPartida((int) $ticket['id']);
             $attachments = $this->repository->listAdjuntos((int) $ticket['id']);
             $events = $this->repository->listEventos((int) $ticket['id']);
@@ -222,10 +248,11 @@ return new class implements DatabaseTest {
                     'route_uses_auth_permission_stack' =>
                         str_contains($routes, 'AuthMiddleware')
                         && str_contains($routes, 'PermissionMiddleware')
-                        && str_contains($routes, 'tickets_productos.adjuntos.ver'),
+                        && str_contains($routes, 'tickets_productos.adjuntos.crear'),
                     'csrf_required' => $withoutCsrf->status() === 419,
                     'controller_route_redirects_after_upload' => $withCsrf->status() === 302,
-                    'no_download_route' => !preg_match('#/tickets/productos/\{id\}/adjuntos/\{[^}]+\}/(?:descargar|download)#i', $routes),
+                    'download_route' => preg_match('#/tickets/productos/\{id\}/adjuntos/\{adjuntoId\}/descargar#i', $routes) === 1
+                        && str_contains($routes, 'downloadAttachment($request, $params)'),
                     'no_preview_route' => !preg_match('#/tickets/productos/\{id\}/adjuntos/\{[^}]+\}/(?:preview|ver)#i', $routes),
                 ],
                 'controller_contract' => [
@@ -286,10 +313,10 @@ return new class implements DatabaseTest {
                         str_contains($show->body(), 'enctype="multipart/form-data"')
                         && str_contains($show->body(), 'name="adjunto"')
                         && str_contains($show->body(), 'partida_id'),
-                    'show_documents_future_download' => str_contains(
-                        $show->body(),
-                        'La descarga se habilitará en una fase posterior.'
-                    ),
+                    'show_backend_download_contract' =>
+                        str_contains($show->body(), '/adjuntos/')
+                        && str_contains($show->body(), '/descargar')
+                        && str_contains($show->body(), 'Descargar'),
                     'show_exposes_no_routes_or_internal_names' =>
                         !str_contains($show->body(), 'private/tickets_productos')
                         && !str_contains($show->body(), 'ruta_relativa')
@@ -297,10 +324,8 @@ return new class implements DatabaseTest {
                         && !str_contains($show->body(), 'storage/private')
                         && !str_contains($show->body(), 'C:\\')
                         && !str_contains($show->body(), '/var/'),
-                    'show_has_no_download_or_preview_links' =>
-                        !str_contains($show->body(), 'Descargar adjunto')
-                        && !str_contains($show->body(), 'Vista previa')
-                        && !str_contains($show->body(), '/descargar')
+                    'show_has_no_preview_contract' =>
+                        !str_contains($show->body(), 'Vista previa')
                         && !str_contains($show->body(), '/preview'),
                     'view_uses_escape_helper' => substr_count($view, 'e(') >= 25,
                 ],
@@ -371,6 +396,26 @@ return new class implements DatabaseTest {
     }
 
     /**
+     * @param array<string, int|string> $fixture
+     */
+    private function scopeForFixture(array $fixture): EffectiveScope
+    {
+        return EffectiveScope::fromRecords(
+            [[
+                'id' => (int) $fixture['empresa_id'],
+                'code' => 'QA-ADJUNTOS',
+                'name' => 'Empresa QA adjuntos',
+            ]],
+            [[
+                'id' => (int) $fixture['almacen_id'],
+                'company_id' => (int) $fixture['empresa_id'],
+                'code' => 'QA-ADJUNTOS',
+                'name' => 'Almacén QA adjuntos',
+            ]]
+        );
+    }
+
+    /**
      * @return array{user_id: int, username: string, empresa_id: int, almacen_id: int}
      */
     private function fixture(): array
@@ -380,6 +425,7 @@ return new class implements DatabaseTest {
         $this->assignAdminRole($userId);
         $companyId = $this->createCompany($userId);
         $warehouseId = $this->createWarehouse($companyId, $userId);
+        $this->createProductTicketSeries($companyId, $warehouseId, $userId);
         $this->assignScope($userId, $companyId, $warehouseId);
 
         return [
@@ -388,6 +434,65 @@ return new class implements DatabaseTest {
             'empresa_id' => $companyId,
             'almacen_id' => $warehouseId,
         ];
+    }
+
+    private function createProductTicketSeries(
+        int $companyId,
+        int $warehouseId,
+        int $actorId
+    ): void {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO series_documentales (
+                empresa_id,
+                almacen_id,
+                tipo_documento,
+                codigo_serie,
+                prefijo,
+                codigo_almacen_snapshot,
+                formato,
+                separador,
+                siguiente_numero,
+                longitud,
+                reinicio_anual,
+                anio_actual,
+                activo,
+                creado_por,
+                actualizado_por
+             ) VALUES (
+                :empresa_id,
+                :almacen_id,
+                :tipo_documento,
+                :codigo_serie,
+                :prefijo,
+                :codigo_almacen_snapshot,
+                :formato,
+                :separador,
+                :siguiente_numero,
+                :longitud,
+                :reinicio_anual,
+                :anio_actual,
+                :activo,
+                :creado_por,
+                :actualizado_por
+             )'
+        );
+        $statement->execute([
+            'empresa_id' => $companyId,
+            'almacen_id' => $warehouseId,
+            'tipo_documento' => 'TICKET_PRODUCTO',
+            'codigo_serie' => 'TP',
+            'prefijo' => 'ADJ',
+            'codigo_almacen_snapshot' => 'ADJ',
+            'formato' => '{ALMACEN}-{NUMERO}',
+            'separador' => '-',
+            'siguiente_numero' => 10,
+            'longitud' => 6,
+            'reinicio_anual' => 0,
+            'anio_actual' => null,
+            'activo' => 1,
+            'creado_por' => $actorId,
+            'actualizado_por' => $actorId,
+        ]);
     }
 
     /**
@@ -403,8 +508,10 @@ return new class implements DatabaseTest {
             'partidas' => [[
                 'descripcion' => 'Partida QA adjuntos runtime.',
                 'modelo' => 'ADJ-RUNTIME',
+                'costo_sugerido' => '100.000000',
+                'peso' => '2.000000',
             ]],
-        ], (int) $fixture['user_id']);
+        ], (int) $fixture['user_id'], null, $this->fixtureScope);
     }
 
     private function firstPartida(int $ticketId): array
@@ -438,11 +545,18 @@ return new class implements DatabaseTest {
             'email' => 'qa.tp.adjuntos.runtime@example.test',
         ];
 
+        $session = new Session([]);
+
         return new ProductRequestTicketController(
-            new AuthService(new UserRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection']), new Session([])),
+            new AuthService(new UserRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection']), $session),
             $this->service,
             new PermissionService(new PermissionRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection'])),
-            $this->repository
+            $this->repository,
+            null,
+            new ScopeContextService(
+                new UserScopeService(new ScopeRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection'])),
+                $session
+            )
         );
     }
 
@@ -471,12 +585,22 @@ return new class implements DatabaseTest {
             new PermissionRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection'])
         );
         $csrf = new CsrfTokenService($session, 7200);
-        $controller = new ProductRequestTicketController($auth, $this->service, $permissions, $this->repository);
+        $controller = new ProductRequestTicketController(
+            $auth,
+            $this->service,
+            $permissions,
+            $this->repository,
+            null,
+            new ScopeContextService(
+                new UserScopeService(new ScopeRepository($GLOBALS['tp_product_ticket_adjuntos_runtime_connection'])),
+                $session
+            )
+        );
         $router = new Router();
         $router->middleware(new CsrfMiddleware($csrf));
         $middleware = [
             new AuthMiddleware($auth),
-            new PermissionMiddleware($auth, $permissions, 'tickets_productos.adjuntos.ver'),
+            new PermissionMiddleware($auth, $permissions, 'tickets_productos.adjuntos.crear'),
         ];
         $router->post(
             '/tickets/productos/{id}/adjuntos',

@@ -12,6 +12,7 @@ use App\Core\View;
 use App\Domain\Auth\AuthService;
 use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
+use App\Domain\Scope\EffectiveScope;
 use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
 use App\Domain\Tickets\ProductRequestTicketValidationException;
@@ -28,6 +29,7 @@ final class ProductRequestTicketController
         'canResolve' => 'tickets_productos.resolver',
         'canCancel' => 'tickets_productos.cancelar',
         'canViewAttachments' => 'tickets_productos.adjuntos.ver',
+        'canCreateAttachments' => 'tickets_productos.adjuntos.crear',
         'canCreateComments' => 'tickets_productos.comentarios.crear',
         'canResendEmail' => 'tickets_productos.correo.reenviar',
         'canViewEvents' => 'tickets_productos.eventos.ver',
@@ -71,7 +73,8 @@ final class ProductRequestTicketController
             $ticket = $this->tickets->crearTicket(
                 $this->ticketInput($request),
                 $this->userId(),
-                $this->user()['email']
+                $this->user()['email'],
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->validationResponse($exception, $request);
@@ -85,7 +88,10 @@ final class ProductRequestTicketController
      */
     public function show(Request $request, array $params): Response
     {
-        $ticket = $this->tickets->obtenerTicket($this->id($params['id'] ?? null));
+        $ticket = $this->tickets->obtenerTicket(
+            $this->id($params['id'] ?? null),
+            $this->effectiveScope()
+        );
 
         if ($ticket === null) {
             return $this->notFound();
@@ -116,7 +122,8 @@ final class ProductRequestTicketController
                     'comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion'),
                 ],
                 $this->userId(),
-                $this->user()['email']
+                $this->user()['email'],
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -140,7 +147,8 @@ final class ProductRequestTicketController
                     'comentario_resolucion' => $this->nullableText($request, 'comentario_resolucion'),
                 ],
                 $this->userId(),
-                $this->user()['email']
+                $this->user()['email'],
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -160,7 +168,8 @@ final class ProductRequestTicketController
                 $ticketId,
                 $this->optionalId($request->input('partida_id')),
                 (string) $request->input('comentario', ''),
-                $this->userId()
+                $this->userId(),
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -180,13 +189,69 @@ final class ProductRequestTicketController
                 $ticketId,
                 $this->optionalId($request->input('partida_id')),
                 $this->uploadedFile($request, 'adjunto'),
-                $this->userId()
+                $this->userId(),
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
         }
 
         return Response::redirect('/tickets/productos/' . $ticketId);
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    public function downloadAttachment(Request $request, array $params): Response
+    {
+        try {
+            $download = $this->tickets->descargarAdjunto(
+                $this->id($params['id'] ?? null),
+                $this->id($params['adjuntoId'] ?? null),
+                $this->userId(),
+                $this->effectiveScope()
+            );
+        } catch (ProductRequestTicketValidationException) {
+            return Response::html('', 404);
+        } catch (\Throwable) {
+            return Response::html('', 404);
+        }
+
+        return Response::binary(
+            $download['body'],
+            $download['mime'],
+            [
+                'Cache-Control' => 'private, no-store',
+                'Content-Disposition' => self::contentDisposition((string) $download['filename']),
+            ]
+        );
+    }
+
+    private static function contentDisposition(string $filename): string
+    {
+        $safeName = preg_replace('/[\x00-\x1F\x7F"\\\\;]+/', '_', trim($filename));
+        $safeName = is_string($safeName) ? trim($safeName, " .") : '';
+
+        if ($safeName === '') {
+            $safeName = 'adjunto';
+        }
+
+        if (function_exists('mb_substr')) {
+            $safeName = mb_substr($safeName, 0, 180, 'UTF-8');
+        } else {
+            $safeName = substr($safeName, 0, 180);
+        }
+
+        $fallback = preg_replace('/[^\x20-\x7E]/', '_', $safeName);
+        $fallback = is_string($fallback) ? trim($fallback, " .") : '';
+
+        if ($fallback === '') {
+            $fallback = 'adjunto';
+        }
+
+        $encoded = rawurlencode($safeName);
+
+        return 'attachment; filename="' . $fallback . '"; filename*=UTF-8\'\'' . $encoded;
     }
 
     /**
@@ -199,7 +264,8 @@ final class ProductRequestTicketController
                 $this->id($params['id'] ?? null),
                 (string) $request->input('motivo', ''),
                 $this->userId(),
-                $this->user()['email']
+                $this->user()['email'],
+                $this->effectiveScope()
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -351,7 +417,10 @@ final class ProductRequestTicketController
         array $params
     ): Response {
         try {
-            $ticket = $this->tickets->obtenerTicket($this->id($params['id'] ?? null));
+            $ticket = $this->tickets->obtenerTicket(
+                $this->id($params['id'] ?? null),
+                $this->effectiveScope()
+            );
         } catch (ProductRequestTicketValidationException) {
             $ticket = null;
         }
@@ -841,8 +910,16 @@ final class ProductRequestTicketController
                 'fecha_hasta' => $query['fecha_hasta'] ?? '',
             ],
             $this->positiveInteger($query['page'] ?? null, 1),
-            $this->perPage($query['per_page'] ?? null)
+            $this->perPage($query['per_page'] ?? null),
+            $this->effectiveScope()
         );
+    }
+
+    private function effectiveScope(): EffectiveScope
+    {
+        return $this->scopeContext()
+            ->resolveForUser($this->userId())
+            ->effectiveScope();
     }
 
     private function repository(): ?ProductRequestTicketRepository
