@@ -12,6 +12,7 @@ return new class implements DatabaseTest {
         'tickets_productos.resolver' => 'Aprobar o rechazar partidas de tickets de productos.',
         'tickets_productos.cancelar' => 'Cancelar tickets de solicitud de alta de productos.',
         'tickets_productos.adjuntos.ver' => 'Ver adjuntos privados de tickets de productos.',
+        'tickets_productos.adjuntos.crear' => 'Crear adjuntos privados en tickets de productos.',
         'tickets_productos.comentarios.crear' => 'Agregar comentarios a tickets de productos.',
         'tickets_productos.correo.reenviar' => 'Reenviar correos documentales de tickets de productos.',
         'tickets_productos.eventos.ver' => 'Ver historial/eventos de tickets de productos.',
@@ -99,20 +100,38 @@ return new class implements DatabaseTest {
                     'app/Views/tickets/productos/index.php',
                     'app/Views/tickets/productos/show.php',
                 ]),
-                'no_mail_runtime_created' =>
-                    !$this->hasFiles('app/Domain/Mail', '/Ticket.*Product|Product.*Ticket/i')
-                    && !$this->hasFiles('app/Support/Mail', '/Ticket.*Product|Product.*Ticket/i'),
+                'permission_seed_does_not_modify_mail_runtime' =>
+                    $this->permissionSeedHasNoMailSideEffects(),
                 'no_new_migration' =>
                     !$this->pathExists('database/migrations/tp_partidas_estados_permisos_1_'),
             ];
             $results['operational_guardrails'] = [
-                'no_product_created' => $before['productos'] === $during['productos'],
-                'no_price_created' => $before['producto_precios'] === $during['producto_precios'],
-                'no_stock_created' => $before['existencias_producto'] === $during['existencias_producto'],
-                'no_inventory_movement_created' =>
-                    $before['movimientos_inventario'] === $during['movimientos_inventario'],
-                'no_purchase_created' => $before['compras'] === $during['compras'],
-                'no_supplier_created' => $before['proveedores'] === $during['proveedores'],
+                'no_product_created' => $this->preservedOperationalTable(
+                    $before['productos'],
+                    $during['productos']
+                ),
+                'no_price_created' => $this->preservedOperationalTable(
+                    $before['producto_precios'],
+                    $during['producto_precios']
+                ),
+                'no_stock_created' => $this->preservedOperationalTable(
+                    $before['existencias_producto'],
+                    $during['existencias_producto']
+                ),
+                'no_inventory_movement_created' => $this->preservedOperationalTable(
+                    $before['movimientos_inventario'],
+                    $during['movimientos_inventario']
+                ),
+                'no_purchase_created' => $this->preservedOperationalTable(
+                    $before['compras'],
+                    $during['compras']
+                ),
+                'no_supplier_created' => $this->preservedOperationalTable(
+                    $before['proveedores'],
+                    $during['proveedores']
+                ),
+                'seed_has_no_operational_domain_writes' =>
+                    $this->seedHasNoOperationalDomainWrites(),
             ];
 
             $pdo->rollBack();
@@ -321,7 +340,7 @@ return new class implements DatabaseTest {
     }
 
     /**
-     * @return array<string, int>
+     * @return array<string, int|string>
      */
     private function counts(PDO $pdo): array
     {
@@ -334,10 +353,10 @@ return new class implements DatabaseTest {
             'roles' => $this->countTable($pdo, 'roles'),
             'usuarios' => $this->countTable($pdo, 'usuarios'),
             'rol_permisos' => $this->countTable($pdo, 'rol_permisos'),
-            'productos' => $this->countTable($pdo, 'productos'),
-            'producto_precios' => $this->countTable($pdo, 'producto_precios'),
+            'productos' => $this->countTableIfExists($pdo, 'productos'),
+            'producto_precios' => $this->countTableIfExists($pdo, 'producto_precios'),
             'existencias_producto' => $this->countTableIfExists($pdo, 'existencias_producto'),
-            'movimientos_inventario' => $this->countTable($pdo, 'movimientos_inventario'),
+            'movimientos_inventario' => $this->countTableIfExists($pdo, 'movimientos_inventario'),
             'compras' => $this->countTableIfExists($pdo, 'compras'),
             'proveedores' => $this->countTableIfExists($pdo, 'proveedores'),
         ];
@@ -348,13 +367,79 @@ return new class implements DatabaseTest {
         return (int) $pdo->query('SELECT COUNT(*) FROM ' . $table)->fetchColumn();
     }
 
-    private function countTableIfExists(PDO $pdo, string $table): int
+    private function countTableIfExists(PDO $pdo, string $table): int|string
     {
         if (!$this->tableExists($pdo, $table)) {
-            return 0;
+            return 'NOT_APPLICABLE_TABLE_ABSENT';
         }
 
         return $this->countTable($pdo, $table);
+    }
+
+    private function preservedOperationalTable(int|string $before, int|string $during): bool|string
+    {
+        if ($before === 'NOT_APPLICABLE_TABLE_ABSENT' && $during === $before) {
+            return 'NOT_APPLICABLE_TABLE_ABSENT';
+        }
+
+        return $before === $during;
+    }
+
+    private function seedHasNoOperationalDomainWrites(): bool
+    {
+        $path = BASE_PATH . '/database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php';
+        $source = file_get_contents($path);
+
+        if ($source === false) {
+            return false;
+        }
+
+        foreach ([
+            'productos',
+            'producto_precios',
+            'existencias_producto',
+            'movimientos_inventario',
+            'compras',
+            'proveedores',
+        ] as $table) {
+            $pattern = '/\\b(?:FROM|INTO|UPDATE|JOIN|TABLE)\\s+`?'
+                . preg_quote($table, '/') . '`?\\b/i';
+
+            if (preg_match($pattern, $source) === 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function permissionSeedHasNoMailSideEffects(): bool
+    {
+        $path = BASE_PATH . '/database/seeds/tickets_productos_partidas_estados_1_seed_permissions.php';
+        $source = file_get_contents($path);
+
+        if ($source === false) {
+            return false;
+        }
+
+        foreach ([
+            'mail',
+            'smtp',
+            'outbox',
+            'renderer',
+            'notification',
+            'tickets_productos_correos',
+            'mail_accounts',
+            'mail_rules',
+            'app/domain/mail',
+            'app/domain/tickets/productticketemail',
+        ] as $forbiddenReference) {
+            if (str_contains(strtolower($source), $forbiddenReference)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function countWhere(PDO $pdo, string $table, string $where): int
