@@ -7,7 +7,6 @@ namespace App\Domain\Tickets;
 use App\Domain\Mail\MailConfigurationService;
 use App\Domain\Mail\QaMailContext;
 use App\Domain\Mail\QaMailValidationException;
-use Throwable;
 
 final class ProductTicketEmailNotificationService
 {
@@ -18,8 +17,9 @@ final class ProductTicketEmailNotificationService
     }
 
     /**
-     * Runs only after the ticket transaction has committed. Notification
-     * failures are reported as safe metadata and never roll back ticket data.
+     * May run inside the caller's ticket transaction. Legitimate configuration
+     * omissions are returned as metadata; persistence failures propagate so the
+     * caller can roll back the ticket and its events together with the outbox.
      *
      * @return array{notification_enqueued:bool,notification_reason:string,outbox:array<string,mixed>|null}
      */
@@ -30,22 +30,18 @@ final class ProductTicketEmailNotificationService
         int $actorUserId,
         ?string $actorEmail = null
     ): array {
-        try {
-            $configuration = $this->activeRule($event);
-            if ($configuration['reason'] !== null) {
-                return $this->skipped($configuration['reason']);
-            }
-
-            return $this->outbox->enqueueConfigured([
-                'ticket_id' => $ticketId,
-                'partida_id' => $partidaId,
-                'evento' => $event,
-                'creado_por_usuario_id' => $actorUserId,
-                'responsable_email' => $actorEmail,
-            ], $configuration['rule']);
-        } catch (Throwable) {
-            return $this->skipped('notification_configuration_error');
+        $configuration = $this->activeRule($event);
+        if ($configuration['reason'] !== null) {
+            return $this->skipped($configuration['reason']);
         }
+
+        return $this->outbox->enqueueConfigured([
+            'ticket_id' => $ticketId,
+            'partida_id' => $partidaId,
+            'evento' => $event,
+            'creado_por_usuario_id' => $actorUserId,
+            'responsable_email' => $actorEmail,
+        ], $configuration['rule']);
     }
 
     /**
@@ -65,11 +61,7 @@ final class ProductTicketEmailNotificationService
     ): array {
         $context->assertEvent($event);
 
-        try {
-            $configuration = $this->activeRule($event);
-        } catch (Throwable) {
-            return $this->skipped('notification_configuration_error');
-        }
+        $configuration = $this->activeRule($event);
 
         if ($configuration['reason'] !== null) {
             return $this->skipped($configuration['reason']);

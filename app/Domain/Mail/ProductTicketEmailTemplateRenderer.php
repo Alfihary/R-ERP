@@ -122,9 +122,6 @@ final class ProductTicketEmailTemplateRenderer
         }
 
         if ($payload->event === 'TICKET_CREADO') {
-            if ($payload->items !== []) {
-                throw new ProductTicketEmailTemplateValidationException('TICKET_CREADO does not render item cards in v1.');
-            }
             if (!$this->dateValue($payload->ticket['created_at'] ?? null) instanceof DateTimeImmutable) {
                 throw new ProductTicketEmailTemplateValidationException('ticket.created_at is required.');
             }
@@ -220,7 +217,7 @@ final class ProductTicketEmailTemplateRenderer
                 'status_label' => 'APROBADA',
                 'status_tone' => 'success',
                 'summary' => 'La partida fue aprobada correctamente durante la revisión del ticket.',
-                'section' => 'PARTIDA APROBADA',
+                'section' => 'DATOS DE APROBACIÓN',
             ],
             'PARTIDA_RECHAZADA' => [
                 'title' => 'Partida rechazada',
@@ -256,12 +253,45 @@ final class ProductTicketEmailTemplateRenderer
             ['label' => 'Empresa', 'value' => (string) $payload->ticket['empresa_nombre']],
             ['label' => 'Almacén', 'value' => (string) $payload->ticket['almacen_nombre']],
         ];
+        $htmlMetadata = $metadata;
         if ($payload->event === 'TICKET_CREADO') {
             $metadata[] = [
                 'label' => 'Creado',
                 'value' => $this->formatDate($payload->ticket['created_at'], $payload->timezone),
             ];
             $metadata[] = ['label' => 'Total de partidas', 'value' => (string) $payload->totalItems];
+            $htmlMetadata = [
+                ['label' => 'Empresa', 'value' => (string) $payload->ticket['empresa_nombre']],
+                ['label' => 'Almacén', 'value' => (string) $payload->ticket['almacen_nombre']],
+                ['label' => 'Fecha', 'value' => $this->formatDateOnly($payload->ticket['created_at'], $payload->timezone)],
+                ['label' => 'Total de partidas', 'value' => (string) $payload->totalItems],
+            ];
+        }
+        if (in_array($payload->event, ['TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL', 'TICKET_CANCELADO'], true)) {
+            $htmlMetadata = [
+                ['label' => 'Almacén', 'value' => (string) $payload->ticket['almacen_nombre']],
+                ['label' => 'Fecha', 'value' => $this->formatDateOnly($payload->ticket['created_at'], $payload->timezone)],
+                ['label' => 'Total de partidas', 'value' => (string) $payload->totalItems],
+            ];
+        }
+        if (in_array($payload->event, ['PARTIDA_APROBADA', 'PARTIDA_RECHAZADA'], true)) {
+            $item = $payload->items[0];
+            $htmlMetadata = [
+                ['label' => 'Empresa', 'value' => (string) $payload->ticket['empresa_nombre']],
+                ['label' => 'Almacén', 'value' => (string) $payload->ticket['almacen_nombre']],
+                ['label' => 'Partida', 'value' => (string) $item['partida_numero']],
+                ['label' => 'Resultado', 'value' => self::ITEM_STATUS[(string) $item['item_status']]['label']],
+            ];
+        } elseif (in_array($payload->event, ['TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL', 'TICKET_CANCELADO'], true)) {
+            $date = $payload->event === 'TICKET_CANCELADO'
+                ? $payload->ticket['cancelled_at']
+                : $payload->ticket['created_at'];
+            $htmlMetadata = [
+                ['label' => 'Empresa', 'value' => (string) $payload->ticket['empresa_nombre']],
+                ['label' => 'Almacén', 'value' => (string) $payload->ticket['almacen_nombre']],
+                ['label' => 'Fecha', 'value' => $this->formatDateOnly($date, $payload->timezone)],
+                ['label' => 'Total de partidas', 'value' => (string) $payload->totalItems],
+            ];
         }
         if (in_array($payload->event, ['TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL'], true)) {
             $metadata[] = [
@@ -301,10 +331,15 @@ final class ProductTicketEmailTemplateRenderer
         return $eventContent + [
             'event' => $payload->event,
             'subtitle' => 'Notificación automática del sistema',
+            'preheader' => $eventContent['title'] . ' · ' . $folio . ' · ' . $eventContent['status_label'],
             'folio' => $folio,
             'greeting' => 'Hola ' . $payload->displayName . ',',
             'metadata' => $metadata,
+            'html_metadata' => $htmlMetadata,
+            'html_section' => $eventContent['section'],
             'items' => $items,
+            'total_items' => $payload->totalItems,
+            'omitted_items' => max($payload->totalItems - count($items), 0),
             'attachments_count' => $payload->attachmentsCount,
             'note' => $note,
             'truncated' => $payload->totalItems > self::MAX_ITEMS_RENDERED,
@@ -313,6 +348,9 @@ final class ProductTicketEmailTemplateRenderer
             'system_name' => $payload->systemName,
             'brand_label' => $payload->brandLabel,
             'footer' => 'Este mensaje informa sobre una operación registrada en el sistema.',
+            'footer_note' => $payload->event === 'TICKET_CREADO'
+                ? 'La aprobación documental no crea automáticamente productos, precios ni inventario.'
+                : null,
         ];
     }
 
@@ -335,34 +373,69 @@ final class ProductTicketEmailTemplateRenderer
     private function html(array $model): string
     {
         $tone = self::TONES[$model['status_tone']];
-        $metadata = $this->htmlMetadata($model['metadata']);
-        $items = $this->htmlItems($model['items']);
-        $attachments = $model['attachments_count'] > 0
-            ? '<table role="presentation" width="100%" style="margin-top:20px;border:1px solid #CBD7E6;background:#F4F7FB"><tr><td style="padding:18px 20px;color:#152238"><strong>Adjuntos</strong><br>Este ticket tiene ' . (int) $model['attachments_count'] . ' archivo(s) de soporte. Consulta el ticket para revisarlos.</td></tr></table>'
-            : '';
-        $note = is_string($model['note']) && trim($model['note']) !== ''
-            ? '<table role="presentation" width="100%" style="margin-top:20px;border:1px solid #CBD7E6;border-left:5px solid ' . $tone['accent'] . ';background:#F4F7FB"><tr><td style="padding:16px 18px"><strong>Nota</strong><br>' . $this->escape($model['note']) . '</td></tr></table>'
-            : '';
+        $headerPalette = match ($model['event']) {
+            'TICKET_CREADO' => ['end' => '#1686D7', 'badge_bg' => '#164F80', 'badge_border' => '#6EB6E8', 'badge_text' => '#D9F0FF'],
+            'PARTIDA_APROBADA', 'TICKET_RESUELTO_TOTAL' => ['end' => '#22B573', 'badge_bg' => '#145A47', 'badge_border' => '#70D6AC', 'badge_text' => '#D9F8EA'],
+            'PARTIDA_RECHAZADA' => ['end' => '#E64B50', 'badge_bg' => '#762C3D', 'badge_border' => '#F27A80', 'badge_text' => '#FFFFFF'],
+            'TICKET_RESUELTO_PARCIAL' => ['end' => '#E5A52B', 'badge_bg' => '#5C4A1B', 'badge_border' => '#E6C46B', 'badge_text' => '#FFF3C4'],
+            'TICKET_CANCELADO' => ['end' => '#D53D3D', 'badge_bg' => '#5A2028', 'badge_border' => '#E28A8A', 'badge_text' => '#FFD9D9'],
+            default => throw new ProductTicketEmailTemplateValidationException('Unsupported header event.'),
+        };
+        $brandMarkup = '<span aria-hidden="true" style="display:inline-block;margin-right:6px;color:#25C3CF;font-size:14px;line-height:1">&#8226;</span><span style="color:#9ED8FF">' . $this->escape($model['brand_label']) . '</span>';
+        $headerLeftPadding = '32px 28px 30px';
+        $headerBrandMargin = 'margin:0 0 14px';
+        $headerFolioPadding = '32px 28px 30px';
+        $headerFolioMargin = 'margin:0 0 12px';
+        $headerBackground = 'background-color:#0B2A4A;background-image:linear-gradient(90deg,#0B2A4A 0%,#174B8D 100%);padding:0';
+        $badgeStyle = 'display:inline-block;padding:6px 11px;border:1px solid ' . $headerPalette['badge_border'] . ';border-radius:16px;background:' . $headerPalette['badge_bg'] . ';color:' . $headerPalette['badge_text'] . ';font-size:11px;font-weight:bold;letter-spacing:.3px';
+        $stripeGradient = $model['event'] === 'PARTIDA_RECHAZADA'
+            ? 'linear-gradient(90deg,#1686D7 0%,#25C3CF 40%,#D53D3D 68%,#E64B50 100%)'
+            : 'linear-gradient(90deg,#1686D7 0%,#25C3CF 50%,' . $headerPalette['end'] . ' 100%)';
+        $headerStripe = '<tr><td style="height:5px;background:' . $headerPalette['end'] . ';background:' . $stripeGradient . ';font-size:0;line-height:0">&nbsp;</td></tr>';
+        $metadata = $this->htmlMetadata($model['html_metadata']);
+        $items = $this->htmlItems($model['items'], $model['event']);
+        $attachments = '';
+        if ($model['attachments_count'] > 0) {
+            $attachments = $model['event'] === 'PARTIDA_RECHAZADA'
+                ? '<table role="presentation" width="100%" style="margin-top:18px;border:1px solid #D4E0ED;background:#F4F7FB;border-radius:8px;border-collapse:separate;border-spacing:0"><tr><td style="padding:13px 16px;color:#465C77;line-height:1.45"><span style="display:block;margin-bottom:3px;color:#163A62;font-size:13px">&#128206; <strong>Adjuntos</strong></span><span>Este ticket tiene ' . (int) $model['attachments_count'] . ' archivo(s) de soporte. Consulta el ticket para revisarlos.</span></td></tr></table>'
+                : '<table role="presentation" width="100%" style="margin-top:20px;border:1px solid #CBD7E6;background:#F4F7FB"><tr><td style="padding:18px 20px;color:#152238"><strong>Adjuntos</strong><br>Este ticket tiene ' . (int) $model['attachments_count'] . ' archivo(s) de soporte. Consulta el ticket para revisarlos.</td></tr></table>';
+        }
+        $note = '';
+        if (is_string($model['note']) && trim($model['note']) !== '') {
+            $note = $model['event'] === 'TICKET_CANCELADO'
+                ? '<table role="presentation" width="100%" style="margin-top:18px;border:1px solid #EABAB7;background:#FFF0EF;border-radius:8px;border-collapse:separate;border-spacing:0"><tr><td style="padding:12px 14px;color:#713534;line-height:1.5;overflow-wrap:anywhere"><strong style="display:block;margin-bottom:4px;color:#A12727;font-size:11px;letter-spacing:.7px">NOTA DE CANCELACIÓN</strong>' . $this->escape($model['note']) . '</td></tr></table>'
+                : '<table role="presentation" width="100%" style="margin-top:20px;border:1px solid #CBD7E6;border-left:5px solid ' . $tone['accent'] . ';background:#F4F7FB"><tr><td style="padding:16px 18px"><strong>Nota</strong><br>' . $this->escape($model['note']) . '</td></tr></table>';
+        }
         $truncated = $model['truncated']
-            ? '<p style="margin:20px 0 0;color:#465B74">Este ticket contiene más partidas. Consulta el ticket completo en R-ERP.</p>'
+            ? '<p style="margin:20px 0 0;color:#465B74">Mostrando ' . count($model['items']) . ' de ' . (int) $model['total_items'] . ' partidas. Consulta el ticket completo en R-ERP.</p>'
+            : '';
+        $itemsHeading = $model['items'] !== []
+            ? '<table role="presentation" width="100%" style="margin:2px 0 12px"><tr><td style="font-size:11px;font-weight:bold;letter-spacing:1px;color:#465B74">PARTIDAS DEL TICKET</td><td style="border-bottom:1px solid #CBD7E6"></td></tr></table>'
+            : '';
+
+        $preheader = '<div style="display:none!important;max-height:0;max-width:0;overflow:hidden;opacity:0;color:transparent;mso-hide:all;font-size:1px;line-height:1px">' . $this->escape($model['preheader']) . '</div>';
+        $ctaFallback = '<p style="margin:12px 0 0;text-align:center;color:#465B74;font-size:12px;line-height:1.45">Si el botón no funciona, abre este enlace:<br><a href="' . $this->escape($model['cta_url']) . '" style="color:#14579B;overflow-wrap:anywhere">' . $this->escape($model['cta_url']) . '</a></p>';
+        $footerNote = is_string($model['footer_note']) && $model['footer_note'] !== ''
+            ? '<br><span>' . $this->escape($model['footer_note']) . '</span>'
             : '';
 
         return '<!doctype html>' . "\n"
             . '<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
             . '<title>' . $this->escape($model['title']) . '</title>'
-            . '<style>@media only screen and (max-width:600px){.mail-shell{width:100%!important}.mail-pad{padding:24px 18px!important}.head-cell{display:block!important;width:100%!important;text-align:left!important}.data-cell{display:block!important;width:auto!important;border-right:0!important}.cta{display:block!important;width:auto!important}}</style>'
+            . '<style>@media only screen and (max-width:600px){html,body{width:100%!important;min-width:0!important}body{overflow-x:hidden!important}.mail-shell{width:calc(100vw - 16px)!important;max-width:calc(100vw - 16px)!important;table-layout:fixed!important;border-radius:0!important}.mail-shell table{width:100%!important;max-width:100%!important;table-layout:fixed!important}.mail-pad{padding:24px 18px!important;overflow-wrap:anywhere!important}.mail-pad p{max-width:100%!important;overflow-wrap:anywhere!important;word-break:break-word!important}.head-cell{display:block!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;text-align:left!important;word-break:break-word!important}.head-cell h1{font-size:24px!important;word-break:break-word!important;overflow-wrap:anywhere!important}.data-cell{display:block!important;width:auto!important;border-right:0!important}.summary-cell{display:block!important;width:100%!important;max-width:100%!important;padding:4px 0!important;box-sizing:border-box!important}.summary-cell table{width:100%!important;max-width:100%!important}.summary-cell tr{display:block!important;width:100%!important}.cta{display:block!important;width:auto!important}.partida-card{width:100%!important;max-width:100%!important;table-layout:fixed!important;border-left-width:4px!important}.partida-card td{max-width:100%!important;overflow-wrap:anywhere!important}.partida-card span{white-space:normal!important}.partida-card > tbody > tr > td > table tr{display:block!important}.partida-card > tbody > tr > td > table tr > td{display:block!important;width:100%!important;text-align:left!important;padding-left:0!important}.item-detail-cell{display:block!important;width:auto!important;border-right:0!important;border-bottom:1px solid #CBD7E6!important}}</style>'
             . '</head><body style="margin:0;padding:0;background:#E7EDF6;color:#152238;font-family:Arial,Helvetica,sans-serif">'
-            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#E7EDF6"><tr><td align="center" style="padding:24px 8px">'
-            . '<table class="mail-shell" role="presentation" width="720" cellspacing="0" cellpadding="0" style="width:100%;max-width:720px;background:#FFFFFF;border:1px solid #CBD7E6">'
-            . '<tr><td style="background:#0B2A4A;padding:0"><table role="presentation" width="100%"><tr>'
-            . '<td class="head-cell" width="60%" style="padding:28px 30px;color:#FFFFFF;vertical-align:top"><p style="margin:0 0 12px;font-size:13px;letter-spacing:1px;font-weight:bold">' . $this->escape($model['brand_label']) . '</p><h1 style="margin:0 0 8px;font-size:30px;line-height:1.15">' . $this->escape($model['title']) . '</h1><p style="margin:0;color:#FFFFFF">' . $this->escape($model['subtitle']) . '</p></td>'
-            . '<td class="head-cell" width="40%" style="padding:28px 30px;color:#FFFFFF;text-align:right;vertical-align:top"><p style="margin:0 0 12px;font-size:28px;font-weight:bold">' . $this->escape($model['folio']) . '</p><span style="display:inline-block;padding:7px 12px;border-radius:16px;background:' . $tone['badge'] . ';color:#FFFFFF;font-size:12px;font-weight:bold">' . $this->escape($model['status_label']) . '</span></td>'
-            . '</tr></table></td></tr><tr><td style="height:4px;background:' . $tone['accent'] . '"></td></tr>'
-            . '<tr><td class="mail-pad" style="padding:34px 32px"><h2 style="margin:0 0 16px;font-size:23px">' . $this->escape($model['greeting']) . '</h2><p style="margin:0 0 24px;color:#465B74;line-height:1.55">' . $this->escape($model['summary']) . '</p>'
-            . '<table role="presentation" width="100%" style="margin:0 0 18px"><tr><td style="font-size:12px;font-weight:bold;letter-spacing:1px;color:#465B74">' . $this->escape($model['section']) . '</td><td style="border-bottom:1px solid #CBD7E6"></td></tr></table>'
-            . $metadata . $items . $attachments . $note . $truncated
-            . '<table role="presentation" width="100%" style="margin-top:26px"><tr><td align="center"><a class="cta" aria-label="Ver ticket" href="' . $this->escape($model['cta_url']) . '" style="display:inline-block;padding:15px 38px;background:#14579B;color:#FFFFFF;text-decoration:none;font-weight:bold;border-radius:7px">' . $this->escape($model['cta_label']) . '</a></td></tr></table>'
-            . '</td></tr><tr><td style="padding:24px 28px;border-top:1px solid #CBD7E6;background:#F4F7FB;text-align:center;color:#465B74;font-size:13px"><strong style="color:#152238">' . $this->escape($model['system_name']) . ' · Correo automático</strong><br><span>' . $this->escape($model['footer']) . '</span></td></tr>'
+            . $preheader
+            . '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:100%;table-layout:fixed;background:#E7EDF6"><tr><td align="center" style="padding:24px 8px;max-width:100%;overflow:hidden">'
+            . '<table class="mail-shell" role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#FFFFFF;border:1px solid #CBD7E6;border-radius:14px;overflow:hidden;table-layout:fixed">'
+            . '<tr><td style="' . $headerBackground . '"><table role="presentation" width="100%"><tr>'
+            . '<td class="head-cell" width="60%" style="padding:' . $headerLeftPadding . ';color:#FFFFFF;vertical-align:top"><p style="' . $headerBrandMargin . ';font-size:12px;letter-spacing:1px;font-weight:bold;opacity:.9">' . $brandMarkup . '</p><h1 style="margin:0 0 8px;font-size:29px;line-height:1.15">' . $this->escape($model['title']) . '</h1><p style="margin:0;color:#E7F3FF;line-height:1.4">' . $this->escape($model['subtitle']) . '</p></td>'
+            . '<td class="head-cell" width="40%" style="padding:' . $headerFolioPadding . ';color:#FFFFFF;text-align:right;vertical-align:top"><p style="' . $headerFolioMargin . ';font-size:24px;line-height:1.2;font-weight:bold;word-break:break-word">' . $this->escape($model['folio']) . '</p><span style="' . $badgeStyle . '">' . $this->escape($model['status_label']) . '</span></td>'
+            . '</tr></table></td></tr>' . $headerStripe
+            . '<tr><td class="mail-pad" style="padding:30px 28px"><h2 style="margin:0 0 12px;font-size:22px;line-height:1.3">' . $this->escape($model['greeting']) . '</h2><p style="margin:0 0 24px;color:#465B74;line-height:1.55">' . $this->escape($model['summary']) . '</p>'
+            . '<table role="presentation" width="100%" style="margin:0 0 18px"><tr><td style="font-size:11px;font-weight:bold;letter-spacing:1px;color:#465B74">' . $this->escape($model['html_section']) . '</td><td style="border-bottom:1px solid #CBD7E6"></td></tr></table>'
+            . $metadata . $itemsHeading . $items . $attachments . $note . $truncated
+            . '<table role="presentation" width="100%" style="margin-top:26px"><tr><td align="center"><a class="cta" aria-label="Ver ticket" href="' . $this->escape($model['cta_url']) . '" style="display:inline-block;padding:13px 30px;background:#14579B;color:#FFFFFF;text-decoration:none;font-weight:bold;border-radius:7px">' . $this->escape($model['cta_label']) . '</a>' . $ctaFallback . '</td></tr></table>'
+            . '</td></tr><tr><td style="padding:20px 24px;border-top:1px solid #CBD7E6;background:#F4F7FB;text-align:center;color:#465B74;font-size:12px;line-height:1.55"><strong style="color:#152238">' . $this->escape($model['system_name']) . ' · Correo automático</strong><br><span>' . $this->escape($model['footer']) . '</span>' . $footerNote . '</td></tr>'
             . '</table></td></tr></table></body></html>';
     }
 
@@ -373,16 +446,44 @@ final class ProductTicketEmailTemplateRenderer
             return '';
         }
 
-        $cells = '';
-        foreach ($metadata as $entry) {
-            $cells .= '<td class="data-cell" width="50%" style="padding:13px 15px;border-right:1px solid #CBD7E6;border-bottom:1px solid #CBD7E6;vertical-align:top"><span style="display:block;margin-bottom:5px;color:#64748B;font-size:11px;font-weight:bold;letter-spacing:.7px;text-transform:uppercase">' . $this->escape($entry['label']) . '</span><strong>' . $this->escape($entry['value']) . '</strong></td>';
+        if (count($metadata) === 3) {
+            $isApprovalSummary = strtolower($metadata[1]['label']) === 'partida'
+                && strtolower($metadata[2]['label']) === 'resultado';
+            $widths = $isApprovalSummary ? ['48%', '22%', '30%'] : ['48%', '27%', '25%'];
+            $cells = '';
+            foreach ($metadata as $index => $entry) {
+                $isTotal = strtolower($entry['label']) === 'total de partidas';
+                $isApprovalResult = $isApprovalSummary && strtolower($entry['label']) === 'resultado';
+                $background = $isApprovalResult ? '#EAF8F3' : ($isTotal ? '#EAF4FF' : '#F4F7FB');
+                $border = $isApprovalResult ? '#A7DCC8' : ($isTotal ? '#9DC8EF' : '#D9E2EC');
+                $visibleLabel = $isTotal ? 'PARTIDAS' : $entry['label'];
+                $cells .= '<td class="summary-cell" width="' . $widths[$index] . '" align="center" style="width:' . $widths[$index] . ';padding:2px;text-align:center;vertical-align:middle"><div style="padding:8px 10px;background:' . $background . ';border:1px solid ' . $border . ';border-radius:8px;overflow-wrap:anywhere"><span style="display:block;margin-bottom:2px;color:#64748B;font-size:10px;font-weight:bold;letter-spacing:.65px;text-transform:uppercase;text-align:center;line-height:1.2">' . $this->escape($visibleLabel) . '</span><strong style="display:block;color:#152238;font-size:14px;line-height:1.2;overflow-wrap:anywhere;text-align:center">' . $this->escape($entry['value']) . '</strong></div></td>';
+            }
+
+            return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:-3px -3px 14px;width:calc(100% + 6px);border-collapse:collapse;border-spacing:0;table-layout:fixed"><tr>' . $cells . '</tr></table>';
         }
 
-        return '<table role="presentation" width="100%" style="margin-bottom:18px;border:1px solid #CBD7E6;background:#FFFFFF"><tr>' . $cells . '</tr></table>';
+        $rows = '';
+        $rowGroups = count($metadata) === 3 ? [$metadata] : array_chunk($metadata, 2);
+        foreach ($rowGroups as $row) {
+            $rows .= '<tr>';
+            foreach ($row as $entry) {
+                $isTotal = strtolower($entry['label']) === 'total de partidas';
+                $background = $isTotal ? '#EAF4FF' : '#F4F7FB';
+                $border = $isTotal ? '#9DC8EF' : '#D9E2EC';
+                $rows .= '<td class="summary-cell" width="50%" style="padding:4px;vertical-align:top"><table role="presentation" width="100%" style="border-collapse:separate;border-spacing:0"><tr><td style="padding:12px 13px;background:' . $background . ';border:1px solid ' . $border . ';border-radius:8px;vertical-align:top"><span style="display:block;margin-bottom:5px;color:#64748B;font-size:10px;font-weight:bold;letter-spacing:.7px;text-transform:uppercase">' . $this->escape($entry['label']) . '</span><strong style="display:block;color:#152238;font-size:15px;line-height:1.35;overflow-wrap:anywhere">' . $this->escape($entry['value']) . '</strong></td></tr></table></td>';
+            }
+            if (count($row) === 1) {
+                $rows .= '<td class="summary-cell" width="50%" style="padding:4px;vertical-align:top"></td>';
+            }
+            $rows .= '</tr>';
+        }
+
+        return '<table role="presentation" width="100%" style="margin:-4px -4px 14px;width:calc(100% + 8px);border-collapse:collapse;border-spacing:0">' . $rows . '</table>';
     }
 
     /** @param list<array<string, mixed>> $items */
-    private function htmlItems(array $items): string
+    private function htmlItems(array $items, string $event): string
     {
         $html = '';
         foreach ($items as $item) {
@@ -391,29 +492,35 @@ final class ProductTicketEmailTemplateRenderer
                 'rejected' => ['accent' => '#B42318', 'bg' => '#FFF1F0'],
                 default => ['accent' => '#0D9EC4', 'bg' => '#EEF8FB'],
             };
-            $reference = $this->optionalText($item['reference'] ?? null, 'items.reference')
-                ?? 'Partida ' . (int) $item['partida_numero'];
-            $details = '';
-            foreach ([
+            $reference = $this->optionalText($item['reference'] ?? null, 'items.reference');
+            $details = '<tr>';
+            $detailEntries = [
                 'Resultado' => (string) $item['item_status_label'],
                 'Unidad SAT' => $item['unidad_sat_label'] ?? null,
                 'Clave SAT' => $item['clave_sat_label'] ?? null,
-            ] as $label => $value) {
-                if (is_string($value) && trim($value) !== '') {
-                    $details .= '<tr><td style="padding:12px 14px;border-bottom:1px solid #CBD7E6"><span style="display:block;margin-bottom:4px;color:#64748B;font-size:11px;font-weight:bold;letter-spacing:.7px;text-transform:uppercase">' . $this->escape($label) . '</span><strong>' . $this->escape($value) . '</strong></td></tr>';
-                }
+            ];
+            $detailIndex = 0;
+            foreach ($detailEntries as $label => $value) {
+                $displayValue = is_string($value) && trim($value) !== '' ? $value : '—';
+                $separator = $detailIndex < count($detailEntries) - 1 ? 'border-right:1px solid #CBD7E6;' : '';
+                $details .= '<td class="item-detail-cell" width="33%" style="padding:9px 10px;' . $separator . 'vertical-align:top"><span style="display:block;margin-bottom:3px;color:#64748B;font-size:10px;font-weight:bold;letter-spacing:.6px;text-transform:uppercase">' . $this->escape($label) . '</span><strong style="font-size:13px;line-height:1.35;overflow-wrap:anywhere">' . $this->escape($displayValue) . '</strong></td>';
+                $detailIndex++;
             }
+            $details .= '</tr>';
             $response = $this->optionalText($item['response'] ?? null, 'items.response');
             $reason = $this->optionalText($item['reason'] ?? null, 'items.reason');
             $extra = '';
-            if ($reason !== null) {
-                $extra .= '<p style="margin:16px 0 0;line-height:1.5"><strong>Motivo:</strong> ' . $this->escape($reason) . '</p>';
+            if ($reason !== null && in_array($event, ['PARTIDA_RECHAZADA', 'TICKET_RESUELTO_PARCIAL'], true) && (string) $item['item_status'] === 'RECHAZADA') {
+                $extra .= '<table role="presentation" width="100%" style="margin-top:14px;border:1px solid #EABAB7;background:#FFF0EF;border-radius:8px;border-collapse:separate;border-spacing:0"><tr><td style="padding:12px 14px;color:#713534;line-height:1.5;overflow-wrap:anywhere"><strong style="display:block;margin-bottom:4px;color:#A12727;font-size:11px;letter-spacing:.7px">MOTIVO DEL RECHAZO</strong>' . $this->escape($reason) . '</td></tr></table>';
             }
-            if ($response !== null) {
+            if ($response !== null && in_array($event, ['TICKET_RESUELTO_TOTAL', 'PARTIDA_APROBADA', 'TICKET_RESUELTO_PARCIAL'], true) && (string) $item['item_status'] === 'APROBADA') {
+                $extra .= '<table role="presentation" width="100%" style="margin-top:14px;border:1px solid #B7DEC4;background:#EEF9F2;border-radius:8px;border-collapse:separate;border-spacing:0"><tr><td style="padding:12px 14px;color:#285C41;line-height:1.5;overflow-wrap:anywhere"><strong style="display:block;margin-bottom:4px;color:#1F7A4D;font-size:11px;letter-spacing:.7px">RESPUESTA DE APROBACIÓN</strong>' . $this->escape($response) . '</td></tr></table>';
+            } elseif ($response !== null) {
                 $extra .= '<p style="margin:16px 0 0;line-height:1.5"><strong>Respuesta:</strong> ' . $this->escape($response) . '</p>';
             }
 
-            $html .= '<table role="presentation" width="100%" style="margin:0 0 18px;border-left:5px solid ' . $tone['accent'] . ';background:#F4F7FB"><tr><td style="padding:20px 17px"><h3 style="margin:0 0 7px;font-size:20px">' . $this->escape($reference) . '</h3><p style="margin:0 0 13px;color:#465B74;line-height:1.5">' . $this->escape((string) $item['description']) . '</p><span style="display:inline-block;margin-bottom:16px;padding:6px 10px;border:1px solid ' . $tone['accent'] . ';border-radius:15px;background:' . $tone['bg'] . ';color:' . $tone['accent'] . ';font-size:12px;font-weight:bold">' . $this->escape((string) $item['item_status_label']) . '</span><table role="presentation" width="100%" style="background:#FFFFFF;border:1px solid #CBD7E6">' . $details . '</table>' . $extra . '</td></tr></table>';
+            $title = $reference === null ? '' : '<h3 style="margin:0 0 5px;font-size:17px;line-height:1.25;overflow-wrap:anywhere">' . $this->escape($reference) . '</h3>';
+            $html .= '<table class="partida-card" role="presentation" width="100%" style="margin:0 0 12px;border:1px solid #CBD7E6;border-left:5px solid ' . $tone['accent'] . ';border-radius:9px;border-collapse:separate;border-spacing:0;background:#F4F7FB"><tr><td style="padding:14px 14px"><table role="presentation" width="100%" style="border-collapse:collapse;border-spacing:0"><tr><td style="vertical-align:top"><span style="display:block;margin-bottom:3px;color:#64748B;font-size:10px;font-weight:bold;letter-spacing:.8px;text-transform:uppercase">Partida ' . (int) $item['partida_numero'] . '</span>' . $title . '</td><td style="text-align:right;vertical-align:top;padding-left:8px"><span style="display:inline-block;padding:4px 8px;border:1px solid ' . $tone['accent'] . ';border-radius:14px;background:' . $tone['bg'] . ';color:' . $tone['accent'] . ';font-size:10px;font-weight:bold;white-space:nowrap">' . $this->escape((string) $item['item_status_label']) . '</span></td></tr></table><p style="margin:0 0 10px;color:#465B74;line-height:1.4;overflow-wrap:anywhere">' . $this->escape((string) $item['description']) . '</p><table role="presentation" width="100%" style="background:#FFFFFF;border-collapse:collapse;border-spacing:0;table-layout:fixed">' . $details . '</table>' . $extra . '</td></tr></table>';
         }
 
         return $html;
@@ -439,9 +546,10 @@ final class ProductTicketEmailTemplateRenderer
                 . $this->sanitizePlainTextValue((string) $entry['value']);
         }
 
+        $lines[] = '';
+        $lines[] = (string) $model['section'];
         if ($model['items'] !== []) {
-            $lines[] = '';
-            $lines[] = (string) $model['section'];
+            $lines[] = 'PARTIDAS DEL TICKET';
             foreach ($model['items'] as $item) {
                 $lines[] = '';
                 $lines[] = 'Partida '
@@ -474,7 +582,7 @@ final class ProductTicketEmailTemplateRenderer
         }
         if ($model['truncated']) {
             $lines[] = '';
-            $lines[] = 'Este ticket contiene más partidas. Consulta el ticket completo en R-ERP.';
+            $lines[] = 'Mostrando ' . count($model['items']) . ' de ' . (int) $model['total_items'] . ' partidas. Consulta el ticket completo en R-ERP.';
         }
 
         $lines[] = '';
@@ -484,6 +592,9 @@ final class ProductTicketEmailTemplateRenderer
         $lines[] = $this->sanitizePlainTextValue((string) $model['system_name'])
             . ' · Correo automático';
         $lines[] = $this->sanitizePlainTextValue((string) $model['footer']);
+        if (is_string($model['footer_note']) && $model['footer_note'] !== '') {
+            $lines[] = $this->sanitizePlainTextValue($model['footer_note']);
+        }
 
         return implode("\r\n", $lines);
     }
@@ -566,6 +677,14 @@ final class ProductTicketEmailTemplateRenderer
             throw new ProductTicketEmailTemplateValidationException('date value is required.');
         }
         return $value->setTimezone(new DateTimeZone($timezone))->format('d/m/Y H:i');
+    }
+
+    private function formatDateOnly(mixed $value, string $timezone): string
+    {
+        if (!$value instanceof DateTimeImmutable) {
+            throw new ProductTicketEmailTemplateValidationException('date value is required.');
+        }
+        return $value->setTimezone(new DateTimeZone($timezone))->format('d/m/Y');
     }
 
     private function escape(string $value): string

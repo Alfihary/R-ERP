@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Infrastructure\Repositories;
 
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Domain\Tickets\ProductTicketEmailOutboxRepositoryContract;
 use PDO;
 
-final class ProductTicketEmailOutboxRepository
+final class ProductTicketEmailOutboxRepository implements ProductTicketEmailOutboxRepositoryContract
 {
     public function __construct(private readonly ConnectionProvider|PDO $connection)
     {

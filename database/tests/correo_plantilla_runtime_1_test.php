@@ -52,8 +52,10 @@ return static function (): array {
         'clave_sat_descripcion' => 'Unidades de condensación',
     ], $overrides);
 
+    $createdLines = [$line(1, 'EN_REVISION'), $line(2, 'EN_REVISION')];
+
     $inputs = [
-        'TICKET_CREADO' => [$ticket(['total_partidas' => 2]), []],
+        'TICKET_CREADO' => [$ticket(['total_partidas' => 2]), $createdLines],
         'PARTIDA_APROBADA' => [$ticket(), [$line(1, 'APROBADA')]],
         'PARTIDA_RECHAZADA' => [$ticket(), [$line(2, 'RECHAZADA')]],
         'TICKET_RESUELTO_TOTAL' => [
@@ -126,7 +128,7 @@ return static function (): array {
     };
 
     $approvedPayload = $builder->build('PARTIDA_APROBADA', $ticket(), [$line(1, 'APROBADA')], 0);
-    $createdPayload = $builder->build('TICKET_CREADO', $ticket(), [], 0);
+    $createdPayload = $builder->build('TICKET_CREADO', $ticket(), $createdLines, 0);
 
     $xssItem = $approvedPayload->items[0];
     $xssItem['description'] = 'A&B <script>alert("x")</script> " \' >';
@@ -178,6 +180,33 @@ return static function (): array {
             0
         )
     );
+    $createdOneRender = $renderer->render(
+        'TICKET_CREADO',
+        $builder->build('TICKET_CREADO', $ticket(['total_partidas' => 1]), [$line(1, 'EN_REVISION')], 0)
+    );
+    $createdTenRender = $renderer->render(
+        'TICKET_CREADO',
+        $builder->build('TICKET_CREADO', $ticket(['total_partidas' => 10]), $tenLines, 0)
+    );
+    $createdElevenRender = $renderer->render(
+        'TICKET_CREADO',
+        $builder->build('TICKET_CREADO', $ticket(['total_partidas' => 11]), $elevenLines, 0)
+    );
+    $createdEdgeRender = $renderer->render(
+        'TICKET_CREADO',
+        $builder->build(
+            'TICKET_CREADO',
+            $ticket(['total_partidas' => 1]),
+            [$line(1, 'EN_REVISION', [
+                'descripcion' => str_repeat('Descripción extensa de partida ', 12),
+                'unidad_sat_codigo' => null,
+                'unidad_sat_nombre' => null,
+                'clave_sat_codigo' => null,
+                'clave_sat_descripcion' => null,
+            ])],
+            0
+        )
+    );
 
     $domValid = true;
     if (class_exists(DOMDocument::class)) {
@@ -203,6 +232,14 @@ return static function (): array {
         'html_non_empty' => array_reduce($renders, static fn (bool $ok, RenderedEmail $mail): bool => $ok && trim($mail->htmlBody) !== '', true),
         'text_non_empty' => array_reduce($renders, static fn (bool $ok, RenderedEmail $mail): bool => $ok && trim($mail->textBody) !== '', true),
         'html_text_folio_parity' => array_reduce($renders, static fn (bool $ok, RenderedEmail $mail): bool => $ok && str_contains($mail->htmlBody, 'QA-900001') && str_contains($mail->textBody, 'QA-900001'), true),
+        'event_sections_match_html_and_text' => str_contains($renders['PARTIDA_APROBADA']->htmlBody, 'DATOS DE APROBACIÓN')
+            && str_contains($renders['PARTIDA_APROBADA']->textBody, 'DATOS DE APROBACIÓN')
+            && str_contains($renders['TICKET_CANCELADO']->htmlBody, 'ESTADO DEL TICKET')
+            && str_contains($renders['TICKET_CANCELADO']->textBody, 'ESTADO DEL TICKET'),
+        'company_context_in_html' => array_reduce($renders, static fn (bool $ok, RenderedEmail $mail): bool => $ok && str_contains($mail->htmlBody, 'Empresa QA &amp; Refrigeración'), true),
+        'approved_metadata_not_overwritten' => str_contains($renders['PARTIDA_APROBADA']->htmlBody, '>Partida<')
+            && str_contains($renders['PARTIDA_APROBADA']->htmlBody, '>Resultado<')
+            && str_contains($renders['PARTIDA_APROBADA']->htmlBody, 'Partida 1'),
         'utf8_output' => preg_match('//u', $allHtml . $allText) === 1,
         'description_xss_escaped_once' => str_contains($xssRender->htmlBody, 'A&amp;B &lt;script&gt;') && !str_contains($xssRender->htmlBody, '<script>alert'),
         'reason_xss_escaped' => str_contains($reasonRender->htmlBody, '&lt;script&gt;motivo&lt;/script&gt;'),
@@ -268,11 +305,29 @@ return static function (): array {
         'note_empty_hidden' => !str_contains($renders['PARTIDA_APROBADA']->htmlBody, '<strong>Nota</strong>'),
         'response_empty_hidden' => !str_contains($renders['PARTIDA_RECHAZADA']->htmlBody, '<strong>Respuesta:</strong>'),
         'cancel_without_items' => !str_contains($renders['TICKET_CANCELADO']->htmlBody, 'Partida 1'),
+        'created_one_item_card' => substr_count($createdOneRender->textBody, 'Resultado:') === 1,
+        'created_two_item_cards_keep_order' => substr_count($renders['TICKET_CREADO']->textBody, 'Resultado:') === 2
+            && strpos($renders['TICKET_CREADO']->textBody, 'Partida 1:') < strpos($renders['TICKET_CREADO']->textBody, 'Partida 2:'),
+        'created_ten_items_all_rendered' => substr_count($createdTenRender->textBody, 'Resultado:') === 10
+            && !str_contains($createdTenRender->textBody, 'más partidas'),
+        'created_eleven_items_truncated' => substr_count($createdElevenRender->textBody, 'Resultado:') === 10
+            && str_contains($createdElevenRender->textBody, 'Mostrando 10 de 11 partidas'),
+        'created_sat_fallback_and_no_invented_response' => str_contains($renders['TICKET_CREADO']->textBody, 'Unidad SAT: H87 · Pieza')
+            && str_contains($renders['TICKET_CREADO']->textBody, 'Clave SAT: 40101704 · Unidades de condensación')
+            && !str_contains($renders['TICKET_CREADO']->textBody, 'Respuesta:')
+            && !str_contains($renders['TICKET_CREADO']->textBody, 'Motivo:'),
+        'created_long_description_and_empty_optional_fields' => str_contains($createdEdgeRender->textBody, 'Descripción extensa de partida')
+            && !str_contains($createdEdgeRender->textBody, 'Unidad SAT:')
+            && !str_contains($createdEdgeRender->textBody, 'Clave SAT:'),
         'multiple_items_keep_order' => strpos($renders['TICKET_RESUELTO_TOTAL']->textBody, 'Partida 1:') < strpos($renders['TICKET_RESUELTO_TOTAL']->textBody, 'Partida 2:'),
         'ten_items_all_rendered' => substr_count($tenRender->textBody, 'Resultado:') === 10 && !str_contains($tenRender->textBody, 'más partidas'),
-        'eleven_items_truncated' => substr_count($elevenRender->textBody, 'Resultado:') === 10 && str_contains($elevenRender->textBody, 'más partidas'),
+        'eleven_items_truncated' => substr_count($elevenRender->textBody, 'Resultado:') === 10 && str_contains($elevenRender->textBody, 'Mostrando 10 de 11 partidas'),
+        'created_eleven_html_truncated' => str_contains($createdElevenRender->htmlBody, 'Mostrando 10 de 11 partidas')
+            && substr_count($createdElevenRender->htmlBody, 'class="partida-card"') === 10,
         'total_items_validation' => $fails(fn () => $renderer->render('PARTIDA_APROBADA', $manual($approvedPayload, totalItems: 0))),
         'cta_safe_url' => str_contains($renders['TICKET_CREADO']->htmlBody, 'href="http://localhost:8000/tickets/productos/901"'),
+        'preheader_contains_event_context' => str_contains($renders['TICKET_CREADO']->htmlBody, 'Ticket creado · QA-900001 · EN REVISIÓN'),
+        'cta_plain_fallback_present' => substr_count($renders['TICKET_CREADO']->htmlBody, 'http://localhost:8000/tickets/productos/901') >= 2,
         'unsafe_url_rejected' => $fails(fn () => $renderer->render('TICKET_CREADO', $manual($createdPayload, ctaUrl: 'javascript:alert(1)'))),
         'raw_html_field_rejected' => $fails(function () use ($renderer, $manual, $approvedPayload): void {
             $items = $approvedPayload->items;
@@ -284,7 +339,7 @@ return static function (): array {
         'no_unexpected_external_refs' => preg_match('/<(?:img|link|script)[^>]+(?:src|href)=["\']https?:/i', $allHtml) === 0,
         'deterministic_output' => $renderer->render('TICKET_CREADO', $createdPayload) == $renderer->render('TICKET_CREADO', $createdPayload),
         'text_uses_crlf' => str_contains($renders['TICKET_CREADO']->textBody, "\r\n") && !preg_match('/(?<!\r)\n/', $renders['TICKET_CREADO']->textBody),
-        'tones_controlled' => str_contains($renders['TICKET_RESUELTO_PARCIAL']->htmlBody, '#9A5B00') && str_contains($renders['PARTIDA_RECHAZADA']->htmlBody, '#B42318'),
+        'tones_controlled' => str_contains($renders['TICKET_RESUELTO_PARCIAL']->htmlBody, '#E5A52B') && str_contains($renders['PARTIDA_RECHAZADA']->htmlBody, '#D53D3D'),
         'branding_present' => str_contains($allHtml, 'ERP REFRIGERACIÓN') && str_contains($allText, 'R-ERP'),
         'no_recipient_logic' => !preg_match('/destinatario_email|resolveRecipients|FILTER_VALIDATE_EMAIL|\$payload->(?:to|cc|bcc)\b/i', $rendererSource),
         'renderer_has_no_db_dependency' => !preg_match('/PDO|ConnectionProvider|Repository/i', $rendererSource),

@@ -8,13 +8,12 @@ use App\Domain\Mail\ProductTicketEmailTemplatePayloadBuilder;
 use App\Domain\Mail\ProductTicketEmailTemplateRenderer;
 use App\Domain\Mail\QaMailContext;
 use App\Domain\Mail\QaMailValidationException;
-use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
 use RuntimeException;
 
 final class ProductTicketEmailOutboxService
 {
     public function __construct(
-        private readonly ProductTicketEmailOutboxRepository $outbox,
+        private readonly ProductTicketEmailOutboxRepositoryContract $outbox,
         private readonly ProductTicketEmailTemplateRenderer $renderer,
         private readonly ProductTicketEmailTemplatePayloadBuilder $payloadBuilder
     ) {
@@ -211,7 +210,7 @@ final class ProductTicketEmailOutboxService
 
         $lines = match ($event) {
             'PARTIDA_APROBADA', 'PARTIDA_RECHAZADA' => [$line],
-            'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => $this->outbox->findLinesContext($ticketId),
+            'TICKET_CREADO', 'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => $this->outbox->findLinesContext($ticketId),
             default => [],
         };
         $attachmentsCount = $this->outbox->countAttachments($ticketId);

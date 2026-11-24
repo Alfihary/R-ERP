@@ -54,9 +54,11 @@ final readonly class ProductTicketEmailTemplatePayloadBuilder
         }
 
         $items = match ($event) {
-            'TICKET_CREADO', 'TICKET_CANCELADO' => [],
+            'TICKET_CANCELADO' => [],
+            'TICKET_CREADO',
+            'TICKET_RESUELTO_TOTAL',
+            'TICKET_RESUELTO_PARCIAL' => $this->items($lines),
             'PARTIDA_APROBADA', 'PARTIDA_RECHAZADA' => $this->oneItem($lines),
-            'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => $this->items($lines),
         };
 
         $totalItems = $this->nonNegativeInt($ticket['total_partidas'] ?? null, 'ticket.total_items');
