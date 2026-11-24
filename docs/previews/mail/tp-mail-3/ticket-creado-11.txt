@@ -1,0 +1,75 @@
+R-ERP
+Ticket creado
+Folio: GU-004301
+Estado: EN REVISIÓN
+
+Hola qa.preview,
+
+El ticket GU-004301 fue recibido y se encuentra en revisión.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+Creado: 23/11/2026 10:00
+Total de partidas: 11
+
+DATOS DEL TICKET
+PARTIDAS DEL TICKET
+
+Partida 1: Solicitud de producto 1
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 2: Solicitud de producto 2
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 3: Solicitud de producto 3
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 4: Solicitud de producto 4
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 5: Solicitud de producto 5
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 6: Solicitud de producto 6
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 7: Solicitud de producto 7
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 8: Solicitud de producto 8
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 9: Solicitud de producto 9
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 10: Solicitud de producto 10
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Mostrando 10 de 11 partidas. Consulta el ticket completo en R-ERP.
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.
+La aprobación documental no crea automáticamente productos, precios ni inventario.

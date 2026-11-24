@@ -1,0 +1,36 @@
+R-ERP
+Ticket resuelto parcialmente
+Folio: GU-004301
+Estado: RESUELTO PARCIALMENTE
+
+Hola qa.preview,
+
+El ticket concluyó con resultados mixtos: algunas partidas fueron aprobadas y otras requieren corrección.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+Aprobadas: 1
+Rechazadas: 1
+Total: 2
+
+RESULTADOS DEL TICKET
+PARTIDAS DEL TICKET
+
+Partida 1: Solicitud de producto 1
+Resultado: Partida aprobada
+Referencia: QA-PROD-1
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+Respuesta: Datos autorizados.
+
+Partida 2: Solicitud de producto 2
+Resultado: Partida rechazada
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+Motivo: La clave SAT requiere correccion.
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.

@@ -1,0 +1,28 @@
+R-ERP
+Partida rechazada
+Folio: GU-004301
+Estado: RECHAZADA
+
+Hola qa.preview,
+
+La partida fue rechazada durante la revisión. Consulta el motivo antes de continuar.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+
+PARTIDA RECHAZADA
+PARTIDAS DEL TICKET
+
+Partida 2: Solicitud de producto 2
+Resultado: Partida rechazada
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+Motivo: La clave SAT requiere correccion.
+
+Adjuntos: este ticket tiene 1 archivo(s) de soporte.
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.

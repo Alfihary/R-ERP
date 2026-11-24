@@ -1,0 +1,22 @@
+R-ERP
+Ticket cancelado
+Folio: GU-004301
+Estado: CANCELADO
+
+Hola qa.preview,
+
+El ticket fue cancelado y ya no continuará su flujo de revisión.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+Cancelado: 23/11/2026 12:00
+
+ESTADO DEL TICKET
+
+Nota: Solicitud sustituida.
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.

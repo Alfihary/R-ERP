@@ -1,0 +1,33 @@
+R-ERP
+Ticket creado
+Folio: GU-004301
+Estado: EN REVISIÓN
+
+Hola qa.preview,
+
+El ticket GU-004301 fue recibido y se encuentra en revisión.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+Creado: 23/11/2026 10:00
+Total de partidas: 2
+
+DATOS DEL TICKET
+PARTIDAS DEL TICKET
+
+Partida 1: Solicitud de producto 1
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Partida 2: Solicitud de producto 2
+Resultado: En revisión
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.
+La aprobación documental no crea automáticamente productos, precios ni inventario.

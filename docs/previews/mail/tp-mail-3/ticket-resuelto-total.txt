@@ -1,0 +1,37 @@
+R-ERP
+Ticket resuelto
+Folio: GU-004301
+Estado: RESUELTO
+
+Hola qa.preview,
+
+El ticket fue revisado completamente y concluyó su proceso de revisión.
+
+Empresa: Empresa QA TP
+Almacén: Almacen GU
+Aprobadas: 2
+Rechazadas: 0
+Total: 2
+
+RESULTADO DEL TICKET
+PARTIDAS DEL TICKET
+
+Partida 1: Solicitud de producto 1
+Resultado: Partida aprobada
+Referencia: QA-PROD-1
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+Respuesta: Datos autorizados.
+
+Partida 2: Solicitud de producto 2
+Resultado: Partida aprobada
+Referencia: QA-PROD-1
+Unidad SAT: H87 · Pieza
+Clave SAT: 40101704 · Equipo de refrigeracion
+Respuesta: Datos autorizados.
+
+Ver ticket:
+https://preview.example.test/tickets/productos/4301
+
+R-ERP · Correo automático
+Este mensaje informa sobre una operación registrada en el sistema.
