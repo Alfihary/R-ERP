@@ -440,7 +440,7 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     <span aria-hidden="true">☰</span>
                     <span>Abrir navegación</span>
                 </button>
-                <div class="app-topbar__context">
+                <div class="app-topbar__context app-topbar__lead">
                     <span>Área privada</span>
                     <strong><?= e($pageTitle ?? 'Inicio') ?></strong>
                     <?php if ($activeCompany !== null && $activeWarehouse !== null): ?>
@@ -452,7 +452,7 @@ $activeWarehouse = is_array($context['active_warehouse'] ?? null)
                     <?php endif; ?>
                 </div>
 
-                <div class="app-account">
+                <div class="app-account app-topbar__account">
                     <div class="app-account__identity">
                         <strong><?= e($user['username'] ?? '') ?></strong>
                         <span><?= e($user['email'] ?? '') ?></span>

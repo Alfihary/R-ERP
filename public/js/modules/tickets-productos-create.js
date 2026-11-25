@@ -66,10 +66,15 @@
 
         cards.forEach((card, index) => {
             const title = card.querySelector('[data-partida-title]');
+            const number = card.querySelector('[data-partida-number]');
             const remove = card.querySelector('[data-remove-partida]');
 
             if (title instanceof HTMLElement) {
                 title.textContent = `Partida ${index + 1}`;
+            }
+
+            if (number instanceof HTMLElement) {
+                number.textContent = String(index + 1);
             }
 
             if (remove instanceof HTMLButtonElement) {
@@ -107,6 +112,20 @@
                     label.htmlFor = field.id;
                 }
             });
+        });
+
+        const count = cards.length;
+        const countLabel = count === 1 ? '1 partida' : `${count} partidas`;
+        const summaryLabel = count === 1
+            ? '1 partida lista para capturar'
+            : `${count} partidas listas para capturar`;
+
+        document.querySelectorAll('[data-partidas-count]').forEach((element) => {
+            element.textContent = countLabel;
+        });
+
+        document.querySelectorAll('[data-partidas-summary]').forEach((element) => {
+            element.textContent = summaryLabel;
         });
     };
 

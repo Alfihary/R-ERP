@@ -3,11 +3,11 @@
 :root {
     color-scheme: light;
     --color-bg: oklch(1 0 0);
-    --color-surface: oklch(0.97 0.006 160);
-    --color-surface-strong: oklch(0.925 0.012 160);
+    --color-surface: oklch(0.955 0.008 160);
+    --color-surface-strong: oklch(0.915 0.014 160);
     --color-ink: oklch(0.22 0.018 160);
     --color-muted: oklch(0.46 0.022 160);
-    --color-line: oklch(0.86 0.012 160);
+    --color-line: oklch(0.84 0.014 160);
     --color-primary: oklch(0.46 0.11 160);
     --color-primary-strong: oklch(0.37 0.095 160);
     --color-danger: oklch(0.42 0.14 28);
@@ -32,7 +32,13 @@
 
 html {
     min-width: 20rem;
+    scrollbar-width: none;
     background: var(--color-bg);
+}
+
+html::-webkit-scrollbar {
+    width: 0;
+    height: 0;
 }
 
 body {
@@ -241,18 +247,41 @@ a {
 
 .app-workspace {
     min-width: 0;
+    --topbar-offset: calc(var(--topbar-height) + 0.5rem);
+    padding-top: var(--topbar-offset);
     background: var(--color-surface);
 }
 
 .app-topbar {
-    display: flex;
+    display: grid;
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: var(--sidebar-width);
+    z-index: 20;
+    width: auto;
+    min-width: 0;
     min-height: var(--topbar-height);
     align-items: center;
-    justify-content: space-between;
     gap: 1.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
     padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--color-line);
     background: var(--color-bg);
+}
+
+.app-topbar__lead,
+.app-topbar__context,
+.app-topbar__account {
+    min-width: 0;
+}
+
+.app-topbar__lead {
+    grid-column: 1;
+}
+
+.app-topbar__account {
+    grid-column: 2;
 }
 
 .app-topbar__context span,
@@ -267,6 +296,7 @@ a {
 
 .app-topbar__context strong {
     font-size: 1rem;
+    overflow-wrap: anywhere;
 }
 
 .app-topbar__context small {
@@ -279,11 +309,13 @@ a {
 .app-account {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 1rem;
 }
 
 .app-account__identity {
     max-width: 20rem;
+    min-width: 0;
     text-align: right;
 }
 
@@ -556,6 +588,18 @@ a {
 .app-main {
     width: min(100%, 72rem);
     padding: 2rem;
+}
+
+.app-main:has(> .ticket-products__create) {
+    width: min(100%, 96rem);
+}
+
+.app-main:has(> .ticket-products__detail) {
+    width: min(100%, 96rem);
+}
+
+.app-main:has(> .ticket-products__index) {
+    width: min(100%, 96rem);
 }
 
 .page-heading {
@@ -950,18 +994,29 @@ a {
     }
 
     .app-topbar {
-        align-items: flex-start;
+        right: 0;
+        left: 0;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.75rem;
         padding: 0.875rem 1rem;
     }
 
     .app-account {
-        align-items: flex-end;
-        flex-direction: column;
-        gap: 0.5rem;
+        align-items: center;
+        gap: 0.625rem;
+    }
+
+    .app-topbar__lead {
+        grid-column: 2;
+    }
+
+    .app-topbar__account {
+        grid-column: 3;
     }
 
     .app-account__identity {
-        max-width: 13rem;
+        max-width: 10rem;
     }
 
     .app-main {
@@ -995,16 +1050,20 @@ a {
 }
 
 @media (max-width: 34rem) {
+    .app-workspace {
+        --topbar-offset: calc(8rem + 0.5rem);
+    }
+
     .app-topbar {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 0.75rem;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 0.625rem;
     }
 
     .app-account {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 0.5rem;
+        grid-column: 1 / -1;
+        justify-content: space-between;
+        gap: 0.625rem;
     }
 
     .app-account__identity {
@@ -1012,9 +1071,8 @@ a {
         text-align: left;
     }
 
-    .app-account form,
-    .app-account .button {
-        width: 100%;
+    .app-account form {
+        flex: 0 0 auto;
     }
 
     .page-heading__eyebrow,

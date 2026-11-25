@@ -40,6 +40,33 @@ $states = [
     'RECHAZADO' => 'Rechazado',
     'CANCELADO' => 'Cancelado',
 ];
+$statusSummaryCounts = [
+    'EN_REVISION' => 0,
+    'APROBADO' => 0,
+];
+
+foreach ($tickets as $ticket) {
+    if (!is_array($ticket)) {
+        continue;
+    }
+
+    $status = (string) ($ticket['estado'] ?? '');
+
+    if (array_key_exists($status, $statusSummaryCounts)) {
+        $statusSummaryCounts[$status]++;
+    }
+}
+$entityMark = static function (mixed $value): string {
+    $label = trim((string) $value);
+
+    if ($label === '') {
+        return '—';
+    }
+
+    preg_match('/^(.{1})/u', $label, $matches);
+
+    return strtoupper($matches[1] ?? substr($label, 0, 1));
+};
 $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
     $query = [];
 
@@ -57,31 +84,42 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
     return '/tickets/productos?' . http_build_query($query);
 };
 ?>
-<div class="ticket-products ticket-products__page">
-        <header class="page-heading ticket-products__hero">
-            <div class="page-heading__eyebrow">
-                <p class="page-heading__path">Solicitudes de alta de productos</p>
+<div class="ticket-products ticket-products__page ticket-products__index">
+        <header class="page-heading ticket-products__hero ticket-products__index-hero">
+            <div class="ticket-products__index-header-content">
+                <div class="ticket-products__index-eyebrow">
+                    <p class="page-heading__path">Solicitudes de alta de productos</p>
+                    <span class="ticket-products__header-chip">Flujo documental</span>
+                </div>
+                <h1>Tickets de productos</h1>
+                <p>
+                    Flujo documental para revisar partidas solicitadas sin crear productos,
+                    precios, inventario, compras ni proveedores reales.
+                </p>
+            </div>
+            <div class="ticket-products__index-header-action">
                 <?php if ($canCreate): ?>
                     <a class="button" href="/tickets/productos/crear">Nuevo ticket</a>
                 <?php else: ?>
                     <span class="ticket-products__permission-note">No tienes permiso para crear tickets.</span>
                 <?php endif; ?>
             </div>
-            <h1>Tickets de productos</h1>
-            <p>
-                Flujo documental para revisar partidas solicitadas sin crear productos,
-                precios, inventario, compras ni proveedores reales.
-            </p>
-            <p class="alert alert--warning ticket-products__note">
-                Este módulo es documental y no crea productos reales.
-            </p>
         </header>
 
-        <section class="home-section ticket-products__section" aria-labelledby="tickets-productos-filtros">
-            <div class="home-section__heading">
+        <section class="home-section ticket-products__section ticket-products__index-panel" aria-labelledby="tickets-productos-filtros">
+            <div class="home-section__heading ticket-products__filter-card-header">
                 <div>
                     <p class="section-kicker">Consulta</p>
-                    <h2 id="tickets-productos-filtros">Filtros</h2>
+                    <h2 id="tickets-productos-filtros">Filtros de búsqueda</h2>
+                </div>
+                <div class="ticket-products__filter-summary" aria-label="Resumen de estados visibles">
+                    <span class="ticket-products__summary-chip">Todos (<?= e((string) $total) ?>)</span>
+                    <span class="ticket-products__summary-chip ticket-products__summary-chip--warning">
+                        En revisión (<?= e((string) $statusSummaryCounts['EN_REVISION']) ?>)
+                    </span>
+                    <span class="ticket-products__summary-chip ticket-products__summary-chip--success">
+                        Aprobados (<?= e((string) $statusSummaryCounts['APROBADO']) ?>)
+                    </span>
                 </div>
             </div>
 
@@ -104,11 +142,13 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
 
                 <label class="field" for="ticket-producto-empresa">
                     <span>Empresa ID</span>
+                    <small class="ticket-products__help">Identificador de empresa asignada.</small>
                     <input id="ticket-producto-empresa" name="empresa_id" inputmode="numeric" value="<?= e($filters['empresa_id'] ?? '') ?>">
                 </label>
 
                 <label class="field" for="ticket-producto-almacen">
                     <span>Almacén ID</span>
+                    <small class="ticket-products__help">Identificador de almacén asignado.</small>
                     <input id="ticket-producto-almacen" name="almacen_id" inputmode="numeric" value="<?= e($filters['almacen_id'] ?? '') ?>">
                 </label>
 
@@ -140,17 +180,17 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
             </form>
         </section>
 
-        <section class="home-section ticket-products__section" aria-labelledby="tickets-productos-listado">
-            <div class="home-section__heading">
+        <section class="home-section ticket-products__section ticket-products__index-panel" aria-labelledby="tickets-productos-listado">
+            <div class="home-section__heading ticket-products__index-result-header">
                 <div>
                     <p class="section-kicker">Bandeja documental</p>
                     <h2 id="tickets-productos-listado">Listado</h2>
                 </div>
+                <p class="ticket-products__result-summary">
+                    <?= e((string) $total) ?> resultado<?= $total === 1 ? '' : 's' ?> ·
+                    página <?= e((string) $page) ?> de <?= e((string) $totalPages) ?>
+                </p>
             </div>
-            <p class="ticket-products__result-summary">
-                <?= e((string) $total) ?> resultado<?= $total === 1 ? '' : 's' ?> ·
-                página <?= e((string) $page) ?> de <?= e((string) $totalPages) ?>
-            </p>
 
             <?php if ($tickets === []): ?>
                 <div class="empty-state ticket-products__empty">
@@ -159,14 +199,16 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
                 </div>
             <?php else: ?>
                 <div class="table-scroll ticket-products__table-wrap">
-                    <table class="data-table ticket-products__table">
+                    <p class="ticket-products__table-hint" id="tickets-productos-table-hint" role="note">
+                        Desliza horizontalmente para consultar todas las columnas.
+                    </p>
+                    <table class="data-table ticket-products__table" aria-describedby="tickets-productos-table-hint">
                         <caption>Tickets documentales de solicitud de alta de productos</caption>
                         <thead>
                             <tr>
                                 <th scope="col">Folio</th>
                                 <th scope="col">Estado</th>
                                 <th scope="col">Empresa</th>
-                                <th scope="col">Almacén</th>
                                 <th scope="col">Solicitante</th>
                                 <th scope="col">Fecha</th>
                                 <th scope="col">Total</th>
@@ -182,29 +224,47 @@ $pageUrl = static function (int $targetPage) use ($filters, $perPage): string {
                                     continue;
                                 } ?>
                                 <?php $estado = (string) ($ticket['estado'] ?? ''); ?>
+                                <?php
+                                $createdAt = trim((string) ($ticket['created_at'] ?? ''));
+                                $createdDate = '—';
+                                $createdDatePart = substr($createdAt, 0, 10);
+
+                                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $createdDatePart) === 1) {
+                                    [$year, $month, $day] = array_map('intval', explode('-', $createdDatePart));
+
+                                    if (checkdate($month, $day, $year)) {
+                                        $createdDate = sprintf('%02d/%02d/%04d', $day, $month, $year);
+                                    }
+                                }
+                                ?>
                                 <tr>
-                                    <td><strong><?= e($ticket['folio'] ?? '') ?></strong></td>
-                                    <td><span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estado)) ?>"><?= e($estado) ?></span></td>
-                                    <td>
-                                        <strong><?= e($ticket['empresa_nombre'] ?? '—') ?></strong>
-                                        <span class="ticket-products__muted">#<?= e($ticket['empresa_id'] ?? '') ?></span>
+                                    <td data-label="Folio"><strong><?= e($ticket['folio'] ?? '') ?></strong></td>
+                                    <td data-label="Estado"><span class="badge ticket-products__badge ticket-products__badge--<?= e(strtolower($estado)) ?>"><?= e($estado) ?></span></td>
+                                    <td data-label="Empresa">
+                                        <div class="ticket-products__entity">
+                                            <span class="ticket-products__entity-mark" aria-hidden="true"><?= e($entityMark($ticket['empresa_nombre'] ?? '')) ?></span>
+                                            <span>
+                                                <strong><?= e($ticket['empresa_nombre'] ?? '—') ?></strong>
+                                                <span class="ticket-products__muted">#<?= e($ticket['empresa_id'] ?? '') ?></span>
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td>
-                                        <strong><?= e($ticket['almacen_codigo'] ?? '—') ?></strong>
-                                        <span class="ticket-products__muted"><?= e($ticket['almacen_nombre'] ?? '') ?></span>
+                                    <td data-label="Solicitante">
+                                        <div class="ticket-products__entity">
+                                            <span>
+                                                <strong><?= e($ticket['solicitante_nombre'] ?? '—') ?></strong>
+                                                <span class="ticket-products__muted">#<?= e($ticket['solicitante_id'] ?? '') ?></span>
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td>
-                                        <strong><?= e($ticket['solicitante_nombre'] ?? '—') ?></strong>
-                                        <span class="ticket-products__muted">#<?= e($ticket['solicitante_id'] ?? '') ?></span>
-                                    </td>
-                                    <td><?= e($ticket['created_at'] ?? '') ?></td>
-                                    <td><?= e($ticket['total_partidas'] ?? '0') ?></td>
-                                    <td><?= e($ticket['partidas_en_revision'] ?? '0') ?></td>
-                                    <td><?= e($ticket['partidas_aprobadas'] ?? '0') ?></td>
-                                    <td><?= e($ticket['partidas_rechazadas'] ?? '0') ?></td>
-                                    <td>
+                                    <td data-label="Fecha"><?= e($createdDate) ?></td>
+                                    <td data-label="Total"><?= e($ticket['total_partidas'] ?? '0') ?></td>
+                                    <td data-label="En revisión"><?= e($ticket['partidas_en_revision'] ?? '0') ?></td>
+                                    <td data-label="Aprobadas"><?= e($ticket['partidas_aprobadas'] ?? '0') ?></td>
+                                    <td data-label="Rechazadas"><?= e($ticket['partidas_rechazadas'] ?? '0') ?></td>
+                                    <td data-label="Detalle">
                                         <?php if ($canView): ?>
-                                            <a class="button button--sm button--secondary" href="/tickets/productos/<?= e((string) ($ticket['id'] ?? '')) ?>">
+                                            <a class="button button--sm button--secondary ticket-products__detail-link" href="/tickets/productos/<?= e((string) ($ticket['id'] ?? '')) ?>">
                                                 Ver detalle
                                             </a>
                                         <?php else: ?>
