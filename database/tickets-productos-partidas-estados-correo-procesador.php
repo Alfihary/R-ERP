@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Core\Env;
 use App\Domain\Mail\MailOutboxProcessor;
-use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use App\Infrastructure\Database\DatabaseTest;
 use App\Infrastructure\Mail\FakeMailTransport;
 use App\Infrastructure\Mail\PHPMailerMailTransport;
@@ -17,8 +17,18 @@ if (PHP_SAPI !== 'cli') {
 }
 
 define('BASE_PATH', dirname(__DIR__));
+require_once BASE_PATH . '/database/qa_test_harness.php';
 
 try {
+    qaHarnessGuardCliBeforeDatabase(
+        $argv,
+        [
+            'dry-run' => 'SELECT_ONLY',
+            'functional:test' => 'WRITE_QA',
+            'process' => 'WRITE_QA',
+        ],
+        ['r_erp_tickets_qa_2f']
+    );
     $command = $argv[1] ?? '';
     $options = [];
     foreach (array_slice($argv, 2) as $argument) {
@@ -54,15 +64,15 @@ try {
         throw new RuntimeException('The mail processor limit must be between 1 and 10.');
     }
 
-    $connection = new ConnectionProvider($databaseConfig);
+    $writeConnectionProvider = new WriteConnectionProvider($databaseConfig);
 
     if ($command === 'functional:test') {
-        $GLOBALS['tp_mail_processor_connection'] = $connection;
+        $GLOBALS['tp_mail_processor_connection'] = $writeConnectionProvider;
         $test = require BASE_PATH . '/database/tests/tickets_productos_partidas_estados_correo_procesador_1_test.php';
         if (!$test instanceof DatabaseTest) {
             throw new RuntimeException('Mail processor functional test has an invalid contract.');
         }
-        $result = $test->run($connection->pdo(), $expectedDatabase);
+        $result = $test->run($writeConnectionProvider->pdo(), $expectedDatabase);
     } else {
         $transport = $command === 'process'
             ? new PHPMailerMailTransport()
@@ -73,8 +83,8 @@ try {
                 throw new RuntimeException('Dry-run must not resolve SMTP secrets.');
             };
         $processor = new MailOutboxProcessor(
-            new ProductTicketEmailOutboxRepository($connection),
-            new MailConfigurationRepository($connection),
+            new ProductTicketEmailOutboxRepository($writeConnectionProvider),
+            new MailConfigurationRepository($writeConnectionProvider),
             $transport,
             $secretResolver
         );

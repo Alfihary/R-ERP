@@ -571,6 +571,8 @@ $mailConfigurationController = new MailConfigurationController(
     $csrf,
     $mailConfiguration
 );
+$outboxAuditRepository = new AuditRepository($writeConnectionProvider);
+$outboxAuditService = new AuditService($outboxAuditRepository);
 $mailOutboxController = new MailOutboxController(
     $config,
     $auth,
@@ -579,10 +581,10 @@ $mailOutboxController = new MailOutboxController(
     $csrf,
     new MailOutboxQueryRepository($connection),
     new MailOutboxActionService(
-        $connection,
-        new MailOutboxActionRepository($connection),
-        $audit,
-        $auditRepository
+        $writeConnectionProvider,
+        new MailOutboxActionRepository($writeConnectionProvider),
+        $outboxAuditService,
+        $outboxAuditRepository
     )
 );
 $auditController = new AuditController(

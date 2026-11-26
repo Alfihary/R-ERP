@@ -6,6 +6,7 @@ namespace App\Domain\Mail;
 
 use App\Domain\Audit\AuditService;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\MailOutboxActionRepository;
 use Throwable;
@@ -15,7 +16,7 @@ final class MailOutboxActionService
     private const SAVEPOINT = 'mail_outbox_action';
 
     public function __construct(
-        private readonly ConnectionProvider $connection,
+        private readonly ConnectionProvider|WriteConnectionProvider $connection,
         private readonly MailOutboxActionRepository $outbox,
         private readonly AuditService $audit,
         private readonly AuditRepository $auditRepository

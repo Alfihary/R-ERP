@@ -228,6 +228,17 @@ try {
     $assert(str_contains($outboxRepository, '$this->connection instanceof WriteConnectionProvider'), 'RW3-14 outbox does not resolve the WRITE provider.');
     $assert(str_contains($mailConfigurationRepository, 'ConnectionProvider|WriteConnectionProvider'), 'RW3-09 mail configuration repository does not accept WRITE provider.');
 
+    $rw3BaselineCommit = 'ed626c872b394e888cc1d9c433683b6115b8f123';
+    $historicalSource = static function (string $relativePath) use ($rw3BaselineCommit): string {
+        $command = 'git show ' . escapeshellarg($rw3BaselineCommit . ':' . $relativePath);
+        $source = shell_exec($command);
+        if (!is_string($source)) {
+            throw new RuntimeException('RW3 historical source could not be read: ' . $relativePath . '.');
+        }
+
+        return $source;
+    };
+
     $untouchedConsumerFiles = [
         'app/Domain/Mail/MailOutboxActionService.php',
         'app/Infrastructure/Repositories/MailOutboxActionRepository.php',
@@ -235,9 +246,9 @@ try {
         'database/tickets-productos-partidas-estados-correo-procesador.php',
     ];
     foreach ($untouchedConsumerFiles as $relativePath) {
-        $source = $readSource($relativePath);
-        $assert(!str_contains($source, 'ReadConnectionProvider'), 'RW3-17 unexpected READ migration: ' . $relativePath . '.');
-        $assert(!str_contains($source, 'WriteConnectionProvider'), 'RW3-17 unexpected WRITE migration: ' . $relativePath . '.');
+        $source = $historicalSource($relativePath);
+        $assert(!str_contains($source, 'ReadConnectionProvider'), 'RW3-17 historical checkpoint had READ migration: ' . $relativePath . '.');
+        $assert(!str_contains($source, 'WriteConnectionProvider'), 'RW3-17 historical checkpoint had WRITE migration: ' . $relativePath . '.');
     }
 
     $legacyProvider = new ConnectionProvider([

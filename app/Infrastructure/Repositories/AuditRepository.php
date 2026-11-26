@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Infrastructure\Repositories;
 
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 
 final class AuditRepository
 {
     private ?bool $tableExists = null;
 
-    public function __construct(private readonly ConnectionProvider $connection)
+    public function __construct(
+        private readonly ConnectionProvider|WriteConnectionProvider $connection
+    )
     {
     }
 
