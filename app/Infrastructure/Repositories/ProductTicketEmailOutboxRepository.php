@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Infrastructure\Repositories;
 
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use App\Domain\Tickets\ProductTicketEmailOutboxRepositoryContract;
 use PDO;
 
 final class ProductTicketEmailOutboxRepository implements ProductTicketEmailOutboxRepositoryContract
 {
-    public function __construct(private readonly ConnectionProvider|PDO $connection)
+    public function __construct(
+        private readonly ConnectionProvider|WriteConnectionProvider|PDO $connection
+    )
     {
     }
 
@@ -629,8 +632,11 @@ final class ProductTicketEmailOutboxRepository implements ProductTicketEmailOutb
 
     private function pdo(): PDO
     {
-        return $this->connection instanceof ConnectionProvider
-            ? $this->connection->pdo()
-            : $this->connection;
+        if ($this->connection instanceof ConnectionProvider
+            || $this->connection instanceof WriteConnectionProvider) {
+            return $this->connection->pdo();
+        }
+
+        return $this->connection;
     }
 }

@@ -343,9 +343,32 @@ $productTicketEmailNotifications = new ProductTicketEmailNotificationService(
         )
     )
 );
+$mailConfigurationWrite = new MailConfigurationService(
+    new MailConfigurationRepository($writeConnectionProvider)
+);
+$productTicketEmailNotificationsWrite = new ProductTicketEmailNotificationService(
+    $mailConfigurationWrite,
+    new ProductTicketEmailOutboxService(
+        new ProductTicketEmailOutboxRepository($writeConnectionProvider),
+        new ProductTicketEmailTemplateRenderer(),
+        new ProductTicketEmailTemplatePayloadBuilder(
+            (string) $config->get('app.url', 'http://localhost:8000'),
+            (string) $config->get('app.timezone', 'America/Mexico_City'),
+            in_array(
+                strtolower((string) $config->get('app.env', 'production')),
+                ['local', 'development', 'test'],
+                true
+            )
+        )
+    )
+);
 $productRequestTickets = new ProductRequestTicketService(
     new ProductRequestTicketRepository($connection),
     $productTicketEmailNotifications
+);
+$productRequestTicketsWrite = new ProductRequestTicketService(
+    new ProductRequestTicketRepository($writeConnectionProvider),
+    $productTicketEmailNotificationsWrite
 );
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
@@ -577,7 +600,8 @@ $productRequestTicketController = new ProductRequestTicketController(
     null,
     $config,
     $scopeContext,
-    $csrf
+    $csrf,
+    $productRequestTicketsWrite
 );
 $adminUserRepository = new UserRepository($connection);
 $adminRoleRepository = new \App\Infrastructure\Repositories\RoleRepository($connection);

@@ -116,6 +116,18 @@ $assert = static function (bool $condition, string $message): void {
     }
 };
 
+$rw2Commit = 'f2417d11bfff785ac1cf8a9425d71317c0950055';
+$gitShow = static function (string $commit, string $relativePath) use ($root): string {
+    $command = 'git -C ' . escapeshellarg($root)
+        . ' show ' . escapeshellarg($commit . ':' . $relativePath);
+    $source = shell_exec($command);
+    if (!is_string($source) || $source === '') {
+        throw new RuntimeException('Unable to load RW-2 historical snapshot: ' . $relativePath . '.');
+    }
+
+    return $source;
+};
+
 $snapshot = $snapshotEnv($keys);
 
 foreach ($keys as $key) {
@@ -123,8 +135,8 @@ foreach ($keys as $key) {
 }
 
 try {
-    $bootstrapSource = (string) file_get_contents($root . '/bootstrap/app.php');
-    $databaseBootstrapSource = (string) file_get_contents($root . '/bootstrap/database.php');
+    $bootstrapSource = $gitShow($rw2Commit, 'bootstrap/app.php');
+    $databaseBootstrapSource = $gitShow($rw2Commit, 'bootstrap/database.php');
 
     $assert(str_contains($bootstrapSource, 'use App\\Infrastructure\\Database\\ConnectionProvider;'), 'RW2-BOOT-03 legacy provider import missing.');
     $assert(str_contains($bootstrapSource, 'use App\\Infrastructure\\Database\\ReadConnectionProvider;'), 'RW2-BOOT-01 read provider import missing.');
@@ -188,9 +200,7 @@ try {
     ];
 
     foreach ($consumerFiles as $relativePath) {
-        $absolutePath = $root . '/' . $relativePath;
-        $assert(is_file($absolutePath), 'RW2 consumer file is missing: ' . $relativePath . '.');
-        $source = (string) file_get_contents($absolutePath);
+        $source = $gitShow($rw2Commit, $relativePath);
         $assert(!str_contains($source, 'ReadConnectionProvider'), 'RW2-BOOT-08/09 consumer migration detected in ' . $relativePath . '.');
         $assert(!str_contains($source, 'WriteConnectionProvider'), 'RW2-BOOT-08/09 consumer migration detected in ' . $relativePath . '.');
     }

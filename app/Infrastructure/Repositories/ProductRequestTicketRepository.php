@@ -9,6 +9,7 @@ use App\Domain\Folios\FolioValidationException;
 use App\Domain\Scope\EffectiveScope;
 use App\Domain\Tickets\ProductRequestTicketScopePolicy;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use PDO;
 
 final class ProductRequestTicketRepository
@@ -17,7 +18,9 @@ final class ProductRequestTicketRepository
     private const FOLIO_SERIES = 'TP';
     private const FOLIO_FORMAT = '{ALMACEN}-{NUMERO}';
 
-    public function __construct(private readonly ConnectionProvider $connection)
+    public function __construct(
+        private readonly ConnectionProvider|WriteConnectionProvider $connection
+    )
     {
     }
 

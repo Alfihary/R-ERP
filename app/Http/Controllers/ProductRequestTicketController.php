@@ -42,7 +42,8 @@ final class ProductRequestTicketController
         private readonly ?ProductRequestTicketRepository $ticketRepository = null,
         private readonly ?Config $config = null,
         private readonly ?ScopeContextService $scopeContext = null,
-        private readonly ?CsrfTokenService $csrf = null
+        private readonly ?CsrfTokenService $csrf = null,
+        private readonly ?ProductRequestTicketService $writeTickets = null
     ) {
     }
 
@@ -70,7 +71,7 @@ final class ProductRequestTicketController
     public function store(Request $request): Response
     {
         try {
-            $ticket = $this->tickets->crearTicket(
+            $ticket = $this->writeTickets()->crearTicket(
                 $this->ticketInput($request),
                 $this->userId(),
                 $this->user()['email'],
@@ -110,7 +111,7 @@ final class ProductRequestTicketController
     public function approveLine(Request $request, array $params): Response
     {
         try {
-            $this->tickets->resolverPartida(
+            $this->writeTickets()->resolverPartida(
                 $this->id($params['id'] ?? null),
                 $this->id($params['partidaId'] ?? null),
                 'APROBAR',
@@ -138,7 +139,7 @@ final class ProductRequestTicketController
     public function rejectLine(Request $request, array $params): Response
     {
         try {
-            $this->tickets->resolverPartida(
+            $this->writeTickets()->resolverPartida(
                 $this->id($params['id'] ?? null),
                 $this->id($params['partidaId'] ?? null),
                 'RECHAZAR',
@@ -164,7 +165,7 @@ final class ProductRequestTicketController
     {
         try {
             $ticketId = $this->id($params['id'] ?? null);
-            $this->tickets->agregarComentario(
+            $this->writeTickets()->agregarComentario(
                 $ticketId,
                 $this->optionalId($request->input('partida_id')),
                 (string) $request->input('comentario', ''),
@@ -185,7 +186,7 @@ final class ProductRequestTicketController
     {
         try {
             $ticketId = $this->id($params['id'] ?? null);
-            $this->tickets->agregarAdjunto(
+            $this->writeTickets()->agregarAdjunto(
                 $ticketId,
                 $this->optionalId($request->input('partida_id')),
                 $this->uploadedFile($request, 'adjunto'),
@@ -260,7 +261,7 @@ final class ProductRequestTicketController
     public function cancel(Request $request, array $params): Response
     {
         try {
-            $this->tickets->cancelarTicket(
+            $this->writeTickets()->cancelarTicket(
                 $this->id($params['id'] ?? null),
                 (string) $request->input('motivo', ''),
                 $this->userId(),
@@ -920,6 +921,17 @@ final class ProductRequestTicketController
         return $this->scopeContext()
             ->resolveForUser($this->userId())
             ->effectiveScope();
+    }
+
+    private function writeTickets(): ProductRequestTicketService
+    {
+        if ($this->writeTickets instanceof ProductRequestTicketService) {
+            return $this->writeTickets;
+        }
+
+        throw new ProductRequestTicketValidationException([
+            'database' => 'La escritura de tickets no está disponible.',
+        ]);
     }
 
     private function repository(): ?ProductRequestTicketRepository

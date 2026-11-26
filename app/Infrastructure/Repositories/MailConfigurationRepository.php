@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Infrastructure\Repositories;
 
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use PDO;
 
 final class MailConfigurationRepository
 {
-    public function __construct(private readonly ConnectionProvider $connection)
+    public function __construct(
+        private readonly ConnectionProvider|WriteConnectionProvider $connection
+    )
     {
     }
 
