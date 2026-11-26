@@ -87,6 +87,8 @@ use App\Http\Controllers\SatCatalogController;
 use App\Http\Controllers\WarehouseController;
 use App\Support\Security\CsrfTokenService;
 use App\Infrastructure\Database\ConnectionProvider;
+use App\Infrastructure\Database\ReadConnectionProvider;
+use App\Infrastructure\Database\WriteConnectionProvider;
 use App\Infrastructure\Repositories\AuditRepository;
 use App\Infrastructure\Repositories\AuditQueryRepository;
 use App\Infrastructure\Repositories\PermissionRepository;
@@ -184,6 +186,8 @@ if (!is_array($databaseConfig)) {
 }
 
 $connection = new ConnectionProvider($databaseConfig);
+$readConnectionProvider = new ReadConnectionProvider($databaseConfig);
+$writeConnectionProvider = new WriteConnectionProvider($databaseConfig);
 $auditRepository = new AuditRepository($connection);
 $audit = new AuditService($auditRepository);
 $auth = new AuthService(new UserRepository($connection), $session);
