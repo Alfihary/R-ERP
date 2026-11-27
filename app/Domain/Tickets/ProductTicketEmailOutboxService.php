@@ -344,7 +344,7 @@ final class ProductTicketEmailOutboxService
         if ($recipientMode !== 'RESPONSIBLES' && (int) ($rule['enviar_solicitante'] ?? 0) === 1) {
             $this->appendEmail($to, $ticket['solicitante_email'] ?? null);
         }
-        if ($recipientMode !== 'RESPONSIBLES' && (int) ($rule['enviar_responsables'] ?? 0) === 1) {
+        if ((int) ($rule['enviar_responsables'] ?? 0) === 1) {
             $this->appendEmail($cc, $responsibleEmail);
         }
 
