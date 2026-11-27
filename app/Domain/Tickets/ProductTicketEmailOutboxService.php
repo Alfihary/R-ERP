@@ -141,6 +141,7 @@ final class ProductTicketEmailOutboxService
         $partidaId = $this->nullablePositiveId($input['partida_id'] ?? null, 'partida_id');
         $event = strtoupper(trim((string) ($input['evento'] ?? '')));
         $createdBy = $this->nullablePositiveId($input['creado_por_usuario_id'] ?? null, 'creado_por_usuario_id');
+        $activityId = $this->nullablePositiveId($input['activity_id'] ?? null, 'activity_id');
 
         if ($qaContext !== null) {
             $qaContext->assertEvent($event);
@@ -185,7 +186,9 @@ final class ProductTicketEmailOutboxService
             ? $this->resolveRecipients(
                 $ticket,
                 $rule,
-                $input['responsable_email'] ?? null
+                $input['responsable_email'] ?? null,
+                (string) ($input['recipient_mode'] ?? 'REQUESTER'),
+                $input['actor_email'] ?? null
             )
             : ['to' => [$qaContext->recipient()], 'cc' => [], 'bcc' => []];
 
@@ -197,7 +200,7 @@ final class ProductTicketEmailOutboxService
             ];
         }
 
-        $dedupeKey = $this->dedupeKey($ticketId, $partidaId, $event);
+        $dedupeKey = $this->dedupeKey($ticketId, $partidaId, $event, $activityId);
         $existing = $this->outbox->findByDedupeKey($dedupeKey);
 
         if ($existing !== null) {
@@ -218,7 +221,12 @@ final class ProductTicketEmailOutboxService
             $event,
             $ticket,
             $lines,
-            $attachmentsCount
+            $attachmentsCount,
+            [
+                'actor_name' => $input['actor_name'] ?? $input['actor_email'] ?? null,
+                'text' => $input['activity_text'] ?? null,
+                'filename' => $input['activity_filename'] ?? null,
+            ]
         );
         $rendered = $this->renderer->render($event, $payload);
 
@@ -304,10 +312,12 @@ final class ProductTicketEmailOutboxService
         return $this->outbox->markError($this->positiveId($outboxId, 'outbox_id'), $message);
     }
 
-    private function dedupeKey(int $ticketId, ?int $partidaId, string $event): string
+    private function dedupeKey(int $ticketId, ?int $partidaId, string $event, ?int $activityId = null): string
     {
-        return 'ticket:' . $ticketId . ':partida:' . ($partidaId === null ? 'null' : (string) $partidaId)
+        $key = 'ticket:' . $ticketId . ':partida:' . ($partidaId === null ? 'null' : (string) $partidaId)
             . ':evento:' . $event;
+
+        return $activityId === null ? $key : $key . ':ocurrencia:' . $activityId;
     }
 
     /**
@@ -319,17 +329,33 @@ final class ProductTicketEmailOutboxService
      * @param array<string, mixed> $rule
      * @return array{to:list<string>,cc:list<string>,bcc:list<string>}
      */
-    private function resolveRecipients(array $ticket, array $rule, mixed $responsibleEmail): array
+    private function resolveRecipients(
+        array $ticket,
+        array $rule,
+        mixed $responsibleEmail,
+        string $recipientMode = 'REQUESTER',
+        mixed $actorEmail = null
+    ): array
     {
         $to = $this->jsonEmails($rule['to_json'] ?? null);
         $cc = $this->jsonEmails($rule['cc_json'] ?? null);
         $bcc = $this->jsonEmails($rule['bcc_json'] ?? null);
 
-        if ((int) ($rule['enviar_solicitante'] ?? 0) === 1) {
+        if ($recipientMode !== 'RESPONSIBLES' && (int) ($rule['enviar_solicitante'] ?? 0) === 1) {
             $this->appendEmail($to, $ticket['solicitante_email'] ?? null);
         }
-        if ((int) ($rule['enviar_responsables'] ?? 0) === 1) {
+        if ($recipientMode !== 'RESPONSIBLES' && (int) ($rule['enviar_responsables'] ?? 0) === 1) {
             $this->appendEmail($cc, $responsibleEmail);
+        }
+
+        $excluded = strtolower(trim((string) $actorEmail));
+        if ($excluded !== '') {
+            foreach (['to', 'cc', 'bcc'] as $scope) {
+                ${$scope} = array_values(array_filter(
+                    ${$scope},
+                    static fn(string $email): bool => $email !== $excluded
+                ));
+            }
         }
 
         $seen = [];

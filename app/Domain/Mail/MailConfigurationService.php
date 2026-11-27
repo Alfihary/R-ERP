@@ -18,6 +18,8 @@ final class MailConfigurationService
         'TICKET_RESUELTO_TOTAL',
         'TICKET_RESUELTO_PARCIAL',
         'TICKET_CANCELADO',
+        'COMENTARIO_AGREGADO',
+        'ADJUNTO_CARGADO',
     ];
 
     private const ENCRYPTIONS = ['none', 'tls', 'ssl'];

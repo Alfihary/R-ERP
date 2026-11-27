@@ -170,7 +170,8 @@ final class ProductRequestTicketController
                 $this->optionalId($request->input('partida_id')),
                 (string) $request->input('comentario', ''),
                 $this->userId(),
-                $this->effectiveScope()
+                $this->effectiveScope(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);
@@ -191,7 +192,8 @@ final class ProductRequestTicketController
                 $this->optionalId($request->input('partida_id')),
                 $this->uploadedFile($request, 'adjunto'),
                 $this->userId(),
-                $this->effectiveScope()
+                $this->effectiveScope(),
+                $this->user()['email']
             );
         } catch (ProductRequestTicketValidationException $exception) {
             return $this->actionValidationResponse($exception, $params);

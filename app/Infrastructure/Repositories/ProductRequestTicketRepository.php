@@ -37,6 +37,22 @@ final class ProductRequestTicketRepository
         return true;
     }
 
+    public function findActiveUserEmail(int $userId): ?string
+    {
+        $statement = $this->connection->pdo()->prepare(
+            'SELECT email
+             FROM usuarios
+             WHERE id = :id
+               AND activo = 1
+               AND eliminado_en IS NULL
+             LIMIT 1'
+        );
+        $statement->execute(['id' => $userId]);
+        $email = $statement->fetchColumn();
+
+        return is_string($email) && trim($email) !== '' ? trim($email) : null;
+    }
+
     public function commit(bool $ownsTransaction = true): void
     {
         if ($ownsTransaction) {

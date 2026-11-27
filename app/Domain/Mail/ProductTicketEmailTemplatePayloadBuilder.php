@@ -17,6 +17,8 @@ final readonly class ProductTicketEmailTemplatePayloadBuilder
         'TICKET_RESUELTO_TOTAL',
         'TICKET_RESUELTO_PARCIAL',
         'TICKET_CANCELADO',
+        'COMENTARIO_AGREGADO',
+        'ADJUNTO_CARGADO',
     ];
 
     private string $baseUrl;
@@ -41,7 +43,8 @@ final readonly class ProductTicketEmailTemplatePayloadBuilder
         string $event,
         array $ticket,
         array $lines,
-        int $attachmentsCount
+        int $attachmentsCount,
+        array $activity = []
     ): ProductTicketEmailTemplatePayload {
         $event = strtoupper(trim($event));
         if (!in_array($event, self::EVENTS, true)) {
@@ -59,11 +62,24 @@ final readonly class ProductTicketEmailTemplatePayloadBuilder
             'TICKET_RESUELTO_TOTAL',
             'TICKET_RESUELTO_PARCIAL' => $this->items($lines),
             'PARTIDA_APROBADA', 'PARTIDA_RECHAZADA' => $this->oneItem($lines),
+            'COMENTARIO_AGREGADO', 'ADJUNTO_CARGADO' => [],
         };
 
         $totalItems = $this->nonNegativeInt($ticket['total_partidas'] ?? null, 'ticket.total_items');
         $createdAt = $this->date($ticket['created_at'] ?? null, 'ticket.created_at');
         $cancelledAt = $this->date($ticket['cancelado_at'] ?? null, 'ticket.cancelled_at');
+
+        $note = match ($event) {
+            'COMENTARIO_AGREGADO' => $this->activityNote(
+                'Comentario de ' . $this->text($activity['actor_name'] ?? 'usuario'),
+                $activity['text'] ?? null
+            ),
+            'ADJUNTO_CARGADO' => $this->activityNote(
+                'Adjunto cargado por ' . $this->text($activity['actor_name'] ?? 'usuario'),
+                $activity['filename'] ?? null
+            ),
+            default => null,
+        };
 
         return new ProductTicketEmailTemplatePayload(
             $event,
@@ -99,10 +115,17 @@ final readonly class ProductTicketEmailTemplatePayloadBuilder
             $items,
             $attachmentsCount,
             $totalItems,
-            null,
+            $note,
             $this->baseUrl . '/tickets/productos/' . $ticketId,
             $this->dateTimeZone->getName()
         );
+    }
+
+    private function activityNote(string $label, mixed $value): ?string
+    {
+        $value = $this->nullableText($value);
+
+        return $value === null ? null : $label . ': ' . $value;
     }
 
     /** @param list<array<string, mixed>> $lines @return list<array<string, mixed>> */

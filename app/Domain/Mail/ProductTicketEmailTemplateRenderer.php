@@ -19,6 +19,8 @@ final class ProductTicketEmailTemplateRenderer
         'TICKET_RESUELTO_TOTAL',
         'TICKET_RESUELTO_PARCIAL',
         'TICKET_CANCELADO',
+        'COMENTARIO_AGREGADO',
+        'ADJUNTO_CARGADO',
     ];
 
     private const TICKET_STATUS_LABELS = [
@@ -56,6 +58,7 @@ final class ProductTicketEmailTemplateRenderer
             'PARTIDA_RECHAZADA' => 'line_rejected',
             'TICKET_RESUELTO_TOTAL', 'TICKET_RESUELTO_PARCIAL' => 'ticket_resolved',
             'TICKET_CANCELADO' => 'ticket_cancelled',
+            'COMENTARIO_AGREGADO', 'ADJUNTO_CARGADO' => 'ticket_activity',
             default => throw new ProductTicketEmailTemplateValidationException('event is unsupported.'),
         };
     }
@@ -247,6 +250,20 @@ final class ProductTicketEmailTemplateRenderer
                 'summary' => 'El ticket fue cancelado y ya no continuará su flujo de revisión.',
                 'section' => 'ESTADO DEL TICKET',
             ],
+            'COMENTARIO_AGREGADO' => [
+                'title' => 'Nuevo comentario',
+                'status_label' => 'ACTIVIDAD',
+                'status_tone' => 'review',
+                'summary' => 'Se agregó un comentario al ticket.',
+                'section' => 'NUEVO COMENTARIO',
+            ],
+            'ADJUNTO_CARGADO' => [
+                'title' => 'Nuevo adjunto',
+                'status_label' => 'ACTIVIDAD',
+                'status_tone' => 'review',
+                'summary' => 'Se agregó un documento al ticket.',
+                'section' => 'NUEVO ADJUNTO',
+            ],
         };
 
         $metadata = [
@@ -366,6 +383,8 @@ final class ProductTicketEmailTemplateRenderer
             'TICKET_RESUELTO_TOTAL' => '[R-ERP] Ticket ' . $folio . ' resuelto',
             'TICKET_RESUELTO_PARCIAL' => '[R-ERP] Ticket ' . $folio . ' resuelto parcialmente',
             'TICKET_CANCELADO' => '[R-ERP] Ticket ' . $folio . ' cancelado',
+            'COMENTARIO_AGREGADO' => '[R-ERP] Ticket ' . $folio . ': comentario nuevo',
+            'ADJUNTO_CARGADO' => '[R-ERP] Ticket ' . $folio . ': adjunto nuevo',
         };
     }
 
@@ -379,6 +398,7 @@ final class ProductTicketEmailTemplateRenderer
             'PARTIDA_RECHAZADA' => ['end' => '#E64B50', 'badge_bg' => '#762C3D', 'badge_border' => '#F27A80', 'badge_text' => '#FFFFFF'],
             'TICKET_RESUELTO_PARCIAL' => ['end' => '#E5A52B', 'badge_bg' => '#5C4A1B', 'badge_border' => '#E6C46B', 'badge_text' => '#FFF3C4'],
             'TICKET_CANCELADO' => ['end' => '#D53D3D', 'badge_bg' => '#5A2028', 'badge_border' => '#E28A8A', 'badge_text' => '#FFD9D9'],
+            'COMENTARIO_AGREGADO', 'ADJUNTO_CARGADO' => ['end' => '#1686D7', 'badge_bg' => '#164F80', 'badge_border' => '#6EB6E8', 'badge_text' => '#D9F0FF'],
             default => throw new ProductTicketEmailTemplateValidationException('Unsupported header event.'),
         };
         $brandMarkup = '<span aria-hidden="true" style="display:inline-block;margin-right:6px;color:#25C3CF;font-size:14px;line-height:1">&#8226;</span><span style="color:#9ED8FF">' . $this->escape($model['brand_label']) . '</span>';
