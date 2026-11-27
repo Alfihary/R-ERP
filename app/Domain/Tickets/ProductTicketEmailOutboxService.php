@@ -186,7 +186,9 @@ final class ProductTicketEmailOutboxService
             ? $this->resolveRecipients(
                 $ticket,
                 $rule,
-                $input['responsable_email'] ?? null,
+                is_array($input['responsible_emails'] ?? null)
+                    ? $input['responsible_emails']
+                    : [],
                 (string) ($input['recipient_mode'] ?? 'REQUESTER'),
                 $input['actor_email'] ?? null
             )
@@ -332,7 +334,7 @@ final class ProductTicketEmailOutboxService
     private function resolveRecipients(
         array $ticket,
         array $rule,
-        mixed $responsibleEmail,
+        array $responsibleEmails,
         string $recipientMode = 'REQUESTER',
         mixed $actorEmail = null
     ): array
@@ -345,7 +347,9 @@ final class ProductTicketEmailOutboxService
             $this->appendEmail($to, $ticket['solicitante_email'] ?? null);
         }
         if ((int) ($rule['enviar_responsables'] ?? 0) === 1) {
-            $this->appendEmail($cc, $responsibleEmail);
+            foreach ($responsibleEmails as $responsibleEmail) {
+                $this->appendEmail($cc, $responsibleEmail);
+            }
         }
 
         $excluded = strtolower(trim((string) $actorEmail));

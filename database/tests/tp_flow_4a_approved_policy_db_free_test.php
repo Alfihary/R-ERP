@@ -111,7 +111,7 @@ $rule = [
     'cc_json' => null,
     'bcc_json' => null,
 ];
-$resolved = $recipients->invoke($outbox, $ticketRecipients, $rule, null, 'REQUESTER', 'actor@example.invalid');
+$resolved = $recipients->invoke($outbox, $ticketRecipients, $rule, [], 'REQUESTER', 'actor@example.invalid');
 $assert(!in_array('actor@example.invalid', $resolved['to'], true), 'Actor must be excluded from recipients.');
 $assert(in_array('solicitante@example.invalid', $resolved['to'], true), 'Requester must remain the primary recipient.');
 

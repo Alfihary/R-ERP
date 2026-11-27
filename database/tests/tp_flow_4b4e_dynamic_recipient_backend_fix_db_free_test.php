@@ -56,18 +56,18 @@ $rule = [
 ];
 $ticket = ['solicitante_email' => 'requester@example.invalid'];
 
-$responsibles = $method->invoke($service, $ticket, $rule, 'responsible@example.invalid', 'RESPONSIBLES', 'requester@example.invalid');
+$responsibles = $method->invoke($service, $ticket, $rule, ['responsible@example.invalid'], 'RESPONSIBLES', 'requester@example.invalid');
 $assert($responsibles['to'] === ['responsible@example.invalid'], 'RESPONSIBLES_MUST_SELECT_RESPONSIBLE');
 $assert(!in_array('requester@example.invalid', array_merge($responsibles['to'], $responsibles['cc'], $responsibles['bcc']), true), 'REQUESTER_ACTOR_MUST_BE_EXCLUDED');
 
-$requester = $method->invoke($service, $ticket, $rule, 'responsible@example.invalid', 'REQUESTER', 'responsible@example.invalid');
+$requester = $method->invoke($service, $ticket, $rule, ['responsible@example.invalid'], 'REQUESTER', 'responsible@example.invalid');
 $assert($requester['to'] === ['requester@example.invalid'], 'REQUESTER_MODE_MUST_SELECT_REQUESTER');
 $assert(!in_array('responsible@example.invalid', array_merge($requester['to'], $requester['cc'], $requester['bcc']), true), 'RESPONSIBLE_ACTOR_MUST_BE_EXCLUDED');
 
 $deduped = $method->invoke($service, $ticket, [
     ...$rule,
     'cc_json' => json_encode(['requester@example.invalid', 'responsible@example.invalid'], JSON_THROW_ON_ERROR),
-], 'responsible@example.invalid', 'REQUESTER', 'nobody@example.invalid');
+], ['responsible@example.invalid'], 'REQUESTER', 'nobody@example.invalid');
 $all = array_merge($deduped['to'], $deduped['cc'], $deduped['bcc']);
 $assert(count($all) === count(array_unique($all)), 'RECIPIENT_DEDUPE_MUST_BE_PRESERVED');
 
@@ -79,7 +79,7 @@ $zero = $method->invoke($service, [
     'to_json' => null,
     'cc_json' => null,
     'bcc_json' => null,
-], null, 'REQUESTER', 'same@example.invalid');
+], [], 'REQUESTER', 'same@example.invalid');
 $assert($zero === ['to' => [], 'cc' => [], 'bcc' => []], 'ZERO_RECIPIENT_MUST_REMAIN_EMPTY');
 
 echo "TP_FLOW_4B4E_DYNAMIC_RECIPIENT_BACKEND_FIX_DB_FREE=PASS\n";

@@ -25,7 +25,8 @@ final class ProductRequestTicketService
 
     public function __construct(
         private readonly ProductRequestTicketRepository $tickets,
-        private readonly ?ProductTicketEmailNotificationService $notifications = null
+        private readonly ?ProductTicketEmailNotificationService $notifications = null,
+        private readonly ?ResponsibleRecipientResolverInterface $responsibleRecipients = null
     )
     {
     }
@@ -135,7 +136,9 @@ final class ProductRequestTicketService
                     $ticketId,
                     null,
                     $usuarioId,
-                    $actorEmail
+                    $actorEmail,
+                    [],
+                    $ticket
                 );
 
                 return $ticket;
@@ -272,7 +275,9 @@ final class ProductRequestTicketService
                     $ticketId,
                     null,
                     $usuarioId,
-                    $actorEmail
+                    $actorEmail,
+                    [],
+                    $ticket
                 );
             } elseif (in_array($ticketState, [self::TICKET_APROBADO, self::TICKET_RECHAZADO], true)) {
                 $eventNotifications[] = $this->notify(
@@ -280,7 +285,9 @@ final class ProductRequestTicketService
                     $ticketId,
                     null,
                     $usuarioId,
-                    $actorEmail
+                    $actorEmail,
+                    [],
+                    $ticket
                 );
             } elseif ($event === 'PARTIDA_RECHAZADA') {
                 $eventNotifications[] = $this->notify(
@@ -288,7 +295,9 @@ final class ProductRequestTicketService
                     $ticketId,
                     $partidaId,
                     $usuarioId,
-                    $actorEmail
+                    $actorEmail,
+                    [],
+                    $ticket
                 );
             }
             $ticket['notifications'] = $eventNotifications;
@@ -367,7 +376,9 @@ final class ProductRequestTicketService
                 $ticketId,
                 null,
                 $usuarioId,
-                $actorEmail
+                $actorEmail,
+                [],
+                $ticket
             );
 
             return $ticket;
@@ -459,7 +470,8 @@ final class ProductRequestTicketService
                     'recipient_mode' => (int) ($ticket['solicitante_usuario_id'] ?? 0) === $usuarioId
                         ? 'RESPONSIBLES'
                         : 'REQUESTER',
-                ]
+                ],
+                $ticket
             );
 
             return $this->obtenerTicketOrFail($ticketId, $scope);
@@ -545,7 +557,8 @@ final class ProductRequestTicketService
                         'recipient_mode' => (int) ($ticket['solicitante_usuario_id'] ?? 0) === $usuarioId
                             ? 'RESPONSIBLES'
                             : 'REQUESTER',
-                    ]
+                    ],
+                    $ticket
                 );
 
                 return $this->obtenerTicketOrFail($ticketId, $scope);
@@ -725,7 +738,8 @@ final class ProductRequestTicketService
         ?int $partidaId,
         int $actorUserId,
         ?string $actorEmail,
-        array $activity = []
+        array $activity = [],
+        ?array $ticketContext = null
     ): array {
         if ($this->notifications === null) {
             return [
@@ -735,13 +749,25 @@ final class ProductRequestTicketService
             ];
         }
 
+        $responsibleEmails = [];
+        if ($this->responsibleRecipients instanceof ResponsibleRecipientResolverInterface) {
+            if (is_array($ticketContext)) {
+                $responsibleEmails = $this->responsibleRecipients->emailsForTicketContext(
+                    (int) ($ticketContext['empresa_id'] ?? 0),
+                    (int) ($ticketContext['almacen_id'] ?? 0),
+                    $actorUserId
+                );
+            }
+        }
+
         return $this->notifications->handle(
             $event,
             $ticketId,
             $partidaId,
             $actorUserId,
             $actorEmail,
-            array_merge($activity, ['actor_email' => $actorEmail])
+            array_merge($activity, ['actor_email' => $actorEmail]),
+            $responsibleEmails
         );
     }
 

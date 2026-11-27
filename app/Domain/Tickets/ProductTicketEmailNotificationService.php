@@ -29,7 +29,8 @@ final class ProductTicketEmailNotificationService
         ?int $partidaId,
         int $actorUserId,
         ?string $actorEmail = null,
-        array $activity = []
+        array $activity = [],
+        array $responsibleEmails = []
     ): array {
         $configuration = $this->activeRule($event);
         if ($configuration['reason'] !== null) {
@@ -41,7 +42,7 @@ final class ProductTicketEmailNotificationService
             'partida_id' => $partidaId,
             'evento' => $event,
             'creado_por_usuario_id' => $actorUserId,
-            'responsable_email' => $actorEmail,
+            'responsible_emails' => $responsibleEmails,
             ...$activity,
         ], $configuration['rule']);
     }

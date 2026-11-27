@@ -47,6 +47,7 @@ use App\Domain\Security\PermissionService;
 use App\Domain\Scope\ScopeContextService;
 use App\Domain\Scope\UserScopeService;
 use App\Domain\Tickets\ProductRequestTicketService;
+use App\Domain\Tickets\ResponsibleRecipientResolver;
 use App\Domain\Tickets\ProductTicketEmailNotificationService;
 use App\Domain\Tickets\ProductTicketEmailOutboxService;
 use App\Domain\Vcards\VcardPrivacyService;
@@ -116,6 +117,7 @@ use App\Infrastructure\Repositories\ProductDocumentRepository;
 use App\Infrastructure\Repositories\ProductPriceHistoryRepository;
 use App\Infrastructure\Repositories\ProductPriceRepository;
 use App\Infrastructure\Repositories\ProductRequestTicketRepository;
+use App\Infrastructure\Repositories\ResponsibleRecipientRepository;
 use App\Infrastructure\Repositories\ProductTicketEmailOutboxRepository;
 use App\Infrastructure\Repositories\ProfileRepository;
 use App\Infrastructure\Repositories\SatCatalogRepository;
@@ -368,7 +370,10 @@ $productRequestTickets = new ProductRequestTicketService(
 );
 $productRequestTicketsWrite = new ProductRequestTicketService(
     new ProductRequestTicketRepository($writeConnectionProvider),
-    $productTicketEmailNotificationsWrite
+    $productTicketEmailNotificationsWrite,
+    new ResponsibleRecipientResolver(
+        new ResponsibleRecipientRepository($readConnectionProvider)
+    )
 );
 $userScope = new UserScopeService(new ScopeRepository($connection));
 $scopeContext = new ScopeContextService($userScope, $session);
