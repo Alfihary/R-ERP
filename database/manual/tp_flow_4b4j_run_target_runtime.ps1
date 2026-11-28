@@ -7,7 +7,9 @@ param(
     [switch]$Preflight,
     [string]$ConfirmTargetDatabase = '',
     [string]$Php = 'php',
-    [string]$RuntimeScript = ''
+    [string]$RuntimeScript = '',
+    [ValidateSet('preflight', 'smoke', 'full', '')]
+    [string]$RuntimeMode = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +19,9 @@ $targetDatabase = 'r_erp_db_core_0_test'
 
 if (-not $Preflight -and [string]::IsNullOrWhiteSpace($RuntimeScript)) {
     throw 'TARGET_RUNTIME_LAUNCHER_REQUIRES_PREFLIGHT_OR_RUNTIME_SCRIPT'
+}
+if (-not $Preflight -and [string]::IsNullOrWhiteSpace($RuntimeMode)) {
+    throw 'TARGET_RUNTIME_LAUNCHER_REQUIRES_RUNTIME_MODE'
 }
 if ([string]::IsNullOrWhiteSpace($ConfirmTargetDatabase) -or $ConfirmTargetDatabase -ne $targetDatabase) {
     throw 'TARGET_DATABASE_CONFIRMATION_REQUIRED'
@@ -77,5 +82,5 @@ if ($Preflight) {
 }
 
 $runtimePath = (Resolve-Path (Join-Path $repo $RuntimeScript)).Path
-& $Php $runtimePath
+& $Php $runtimePath ('--' + $RuntimeMode)
 exit $LASTEXITCODE
