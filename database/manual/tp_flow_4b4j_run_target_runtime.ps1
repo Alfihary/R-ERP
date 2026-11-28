@@ -8,7 +8,7 @@ param(
     [string]$ConfirmTargetDatabase = '',
     [string]$Php = 'php',
     [string]$RuntimeScript = '',
-    [ValidateSet('preflight', 'smoke', 'full', '')]
+    [ValidateSet('preflight', 'grants', 'smoke', 'full', '')]
     [string]$RuntimeMode = ''
 )
 

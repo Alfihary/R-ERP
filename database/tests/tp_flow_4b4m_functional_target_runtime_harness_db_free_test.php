@@ -12,11 +12,11 @@ foreach ([$harness, $launcher] as $file) {
 $source = file_get_contents($harness);
 $launcherSource = file_get_contents($launcher);
 foreach ([
-    "'--preflight'", "'--smoke'", "'--full'", 'ReadConnectionProvider',
+    "'--preflight'", "'--grants'", "'--smoke'", "'--full'", 'ReadConnectionProvider',
     'WriteConnectionProvider', 'ResponsibleRecipientResolver',
     'ProductRequestTicketService', 'ProductTicketEmailNotificationService',
     'ProductTicketEmailOutboxService', 'try {', 'finally {',
-    'tickets_productos_correo_outbox', 'DELETE FROM', 'r_erp_db_core_0_test',
+    'tickets_productos_correos', 'series_documentales', 'DELETE FROM', 'r_erp_db_core_0_test',
     'consulta@localhost', 'r_erp_tickets_write@localhost',
     'smtp_connections', 'worker_runtime_executed',
 ] as $needle) {

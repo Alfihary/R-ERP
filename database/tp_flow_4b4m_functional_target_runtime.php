@@ -16,8 +16,8 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $mode = $argv[1] ?? '';
-if (!in_array($mode, ['--preflight', '--smoke', '--full'], true)) {
-    fwrite(STDERR, "Usage: --preflight|--smoke|--full\n");
+if (!in_array($mode, ['--preflight', '--grants', '--smoke', '--full'], true)) {
+    fwrite(STDERR, "Usage: --preflight|--grants|--smoke|--full\n");
     exit(2);
 }
 
@@ -137,6 +137,21 @@ if ($mode === '--preflight') {
     exit(0);
 }
 
+if ($mode === '--grants') {
+    $grants = $writePdo->query('SHOW GRANTS')->fetchAll(PDO::FETCH_COLUMN);
+    $columns = [];
+    foreach (['tickets_productos', 'tickets_productos_partidas', 'tickets_productos_eventos', 'tickets_productos_comentarios', 'tickets_productos_adjuntos', 'tickets_productos_correos', 'tickets_productos_correo_outbox', 'series_documentales', 'documentos_folios'] as $table) {
+        try {
+            $statement = $writePdo->query('SHOW GRANTS FOR CURRENT_USER');
+            $columns[$table] = true;
+        } catch (Throwable) {
+            $columns[$table] = false;
+        }
+    }
+    echo json_encode(['status' => 'PASS', 'mode' => 'grants', 'write_grants' => $grants, 'tables_checked' => array_keys($columns)], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    exit(0);
+}
+
 // Build the same production service graph used by the write application path.
 $mailConfiguration = new \App\Domain\Mail\MailConfigurationService(
     new \App\Infrastructure\Repositories\MailConfigurationRepository($write)
@@ -165,7 +180,7 @@ $marker = 'TPFLOW4B4M_' . gmdate('YmdHis') . '_' . bin2hex(random_bytes(4));
 $ledger = [
     'ticket_ids' => [], 'partida_ids' => [], 'evento_ids' => [],
     'comentario_ids' => [], 'adjunto_ids' => [], 'outbox_ids' => [],
-    'file_paths' => [],
+    'series_ids' => [], 'folio_ids' => [], 'file_paths' => [],
 ];
 $cleanupDone = false;
 $cleanup = static function () use (&$ledger, &$cleanupDone, $writePdo): void {
@@ -186,7 +201,7 @@ $cleanup = static function () use (&$ledger, &$cleanupDone, $writePdo): void {
             $statement->execute(['id' => $id]);
         }
     };
-    $deleteByIds('tickets_productos_correo_outbox', 'id', $ledger['outbox_ids']);
+    $deleteByIds('tickets_productos_correos', 'id', $ledger['outbox_ids']);
     $deleteByIds('tickets_productos_eventos', 'id', $ledger['evento_ids']);
     $deleteByIds('tickets_productos_comentarios', 'id', $ledger['comentario_ids']);
     $deleteByIds('tickets_productos_adjuntos', 'id', $ledger['adjunto_ids']);
@@ -211,34 +226,28 @@ try {
             'observaciones' => null,
         ]],
     ];
-    // The target has no configured documentary series. Seed only the
-    // harness-owned ticket graph through the real repository, then exercise
-    // the service mutation while the same WRITE transaction remains open.
+    // The target has no configured documentary series. Seed one valid QA
+    // series inside the scenario transaction, then use the real service.
     $writePdo->beginTransaction();
-    $ticketId = $ticketsRepository->createTicket([
-        'folio' => 'TP4M-' . random_int(100000, 999999),
-        'empresa_id' => 1,
-        'almacen_id' => 1,
-        'solicitante_usuario_id' => $requesterId,
-        'estado' => 'EN_REVISION',
-        'observaciones_generales' => $marker . ' smoke fixture',
-        'total_partidas' => 1,
-        'partidas_en_revision' => 1,
-        'partidas_aprobadas' => 0,
-        'partidas_rechazadas' => 0,
+    $warehouseCode = (string) ($row($writePdo, 'SELECT codigo FROM almacenes WHERE id = 1 AND empresa_id = 1 AND activo = 1 AND eliminado_en IS NULL')['codigo'] ?? '');
+    if ($warehouseCode === '') { throw new RuntimeException('TARGET_HARNESS_WAREHOUSE_CODE_MISSING'); }
+    $seriesStatement = $writePdo->prepare(
+        'INSERT INTO series_documentales
+            (empresa_id, almacen_id, tipo_documento, codigo_serie, prefijo,
+             codigo_almacen_snapshot, formato, separador, siguiente_numero,
+             longitud, reinicio_anual, anio_actual, activo, creado_por, actualizado_por)
+         VALUES (1, 1, :tipo, :serie, :prefijo, :snapshot, :formato, \'-\', 10, 6, 0, NULL, 1, :created_by, :updated_by)'
+    );
+    $seriesStatement->execute([
+        'tipo' => 'TICKET_PRODUCTO', 'serie' => 'TP', 'prefijo' => 'TP4N',
+        'snapshot' => $warehouseCode, 'formato' => '{ALMACEN}-{NUMERO}',
+        'created_by' => $requesterId, 'updated_by' => $requesterId,
     ]);
+    $ledger['series_ids'][] = (int) $writePdo->lastInsertId();
+    $ticket = $tickets->crearTicket($input, $requesterId, $requesterEmail, $scope);
+    $ticketId = (int) ($ticket['id'] ?? $ticket['ticket_id'] ?? 0);
     if ($ticketId < 1) { throw new RuntimeException('TARGET_HARNESS_TICKET_ID_MISSING'); }
     $ledger['ticket_ids'][] = $ticketId;
-    $partidaId = $ticketsRepository->createPartida($ticketId, 1, [
-        'estado' => 'EN_REVISION', 'modelo' => null, 'marca_texto' => null,
-        'descripcion' => $marker . ' partida', 'proveedor_id' => null,
-        'proveedor_texto' => null, 'unidad_sat_id' => null, 'clave_sat_id' => null,
-        'moneda_id' => null, 'costo_sugerido' => null, 'peso' => null,
-        'lleva_serie' => 0, 'observaciones' => null,
-    ]);
-    $ledger['partida_ids'][] = $partidaId;
-    $ticketsRepository->insertEvent($ticketId, null, $requesterId, 'TICKET_CREADO', $marker . ' ticket fixture', ['marker' => $marker]);
-    $ticketsRepository->insertEvent($ticketId, $partidaId, $requesterId, 'PARTIDA_AGREGADA', $marker . ' partida fixture', ['marker' => $marker]);
     $ledger['partida_ids'] = array_map('intval', array_column($ticketsRepository->listPartidas($ticketId), 'id'));
     $commentTicket = $tickets->agregarComentario($ticketId, null, $marker . ' responsible comment', $responsibleId, $scope, $responsibleEmail);
     $ledger['comentario_ids'] = array_map('intval', array_column($ticketsRepository->listComentarios($ticketId), 'id'));
@@ -270,7 +279,7 @@ try {
         // matrix is intentionally kept outside this smoke validation phase.
         $fullScenarios = ['comments', 'attachments', 'dedupe', 'zero_responsible', 'rollback', 'terminality', 'resolution'];
     }
-    $createdRows = count($ledger['ticket_ids']) + count($ledger['partida_ids']) + count($ledger['comentario_ids']) + count($ledger['evento_ids']) + count($ledger['outbox_ids']);
+    $createdRows = count($ledger['series_ids']) + count($ledger['folio_ids']) + count($ledger['ticket_ids']) + count($ledger['partida_ids']) + count($ledger['comentario_ids']) + count($ledger['evento_ids']) + count($ledger['outbox_ids']);
     $cleanup();
     echo json_encode([
         'status' => 'PASS', 'mode' => ltrim($mode, '-'), 'marker' => $marker,
